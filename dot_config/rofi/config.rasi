@@ -1,0 +1,60 @@
+configuration {
+    modi:               "drun,run,window";
+    show-icons:         true;
+    drun-display-format: "{name}";
+    display-drun:       "Apps";
+    display-run:        "Run";
+    display-window:     "Windows";
+    font:               "JetBrainsMono Nerd Font 12";
+}
+
+* {
+    bg:         #1c2029e6;
+    bg-alt:     #626f8c;
+    fg:         #f8f8f2;
+    accent:     #ff7f00;
+
+    background-color: transparent;
+    text-color:       @fg;
+}
+
+window {
+    width:            600px;
+    background-color: @bg;
+    border:           1px;
+    border-color:     @accent;
+    border-radius:    15px;
+    padding:          12px;
+}
+
+inputbar {
+    children:         [ prompt, entry ];
+    spacing:          10px;
+    padding:          10px 14px;
+    background-color: @bg-alt;
+    border-radius:    10px;
+}
+
+prompt { text-color: @accent; }
+entry  { placeholder: "Search..."; placeholder-color: #c0c4ce; }
+
+listview {
+    lines:     8;
+    spacing:   4px;
+    margin:    10px 0 0 0;
+    scrollbar: false;
+}
+
+element {
+    padding:       8px 12px;
+    spacing:       10px;
+    border-radius: 10px;
+}
+
+element selected.normal {
+    background-color: @bg-alt;
+    text-color:       @accent;
+}
+
+element-icon { size: 1.3em; }
+element-text { text-color: inherit; vertical-align: 0.5; }

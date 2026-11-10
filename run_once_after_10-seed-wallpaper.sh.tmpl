@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+# Create the wallpaper folder and put a default image in it if it is empty.
+set -euo pipefail
+dir="{{ .chezmoi.homeDir }}/Pictures/Wallpapers"
+mkdir -p "$dir"
+if [[ -z $(ls -A "$dir") ]]; then
+    cp /usr/share/hypr/wall2.png "$dir/default.png"
+fi

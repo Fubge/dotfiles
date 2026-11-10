@@ -19,13 +19,32 @@ libpulse
 # Power
 power-profiles-daemon
 
-# Desktop tools (reworked in phase 4)
-wl-clipboard
-brightnessctl
-playerctl
-network-manager-applet
+# Desktop components
+waybar
+rofi
 dunst
-kitty
+hyprpaper
+hypridle
+hyprlock
+hyprpolkitagent
+xdg-desktop-portal-gtk   # file chooser for GTK apps
+network-manager-applet
+pavucontrol
+
+# Clipboard, screenshots, media keys
+wl-clipboard
+cliphist
 grim
 slurp
+brightnessctl
+playerctl
+
+# Fonts
+ttf-jetbrains-mono-nerd
+ttf-nerd-fonts-symbols
+noto-fonts
+noto-fonts-emoji
+
+# Apps
+kitty
 dolphin

@@ -37,3 +37,4 @@ vim
 nano
 htop
 wget
+jq

@@ -7,7 +7,11 @@ hl.bind(mod .. " + Q",     run(v.terminal))
 hl.bind(mod .. " + B",     run(v.browser))
 hl.bind(mod .. " + E",     run(v.fileManager))
 hl.bind(mod .. " + D",     run("discord"))
-hl.bind(mod .. " + space", run(v.menu))
+hl.bind(mod .. " + space",  run(v.menu))
+hl.bind(mod .. " + V",      run(v.bin .. "rofi-clipboard"))
+hl.bind(mod .. " + Return", run(v.bin .. "rofi-websearch"))
+hl.bind(mod .. " + Escape", run(v.bin .. "rofi-power"))
+hl.bind(mod .. " + L",      hl.dsp.exec_cmd("loginctl lock-session"))
 
 -- Windows
 hl.bind(mod .. " + X",   hl.dsp.window.close())

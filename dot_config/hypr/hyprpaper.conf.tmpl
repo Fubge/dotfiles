@@ -1,0 +1,10 @@
+# Wallpaper: every image in ~/Pictures/Wallpapers, rotated every 30 minutes.
+# Drop your own images into that folder.
+splash = false
+
+wallpaper {
+    monitor =
+    path = {{ .chezmoi.homeDir }}/Pictures/Wallpapers
+    fit_mode = cover
+    timeout = 1800
+}

@@ -7,14 +7,18 @@ M.launch      = "uwsm app -- "
 M.terminal    = "kitty"
 M.browser     = "vivaldi"
 M.fileManager = "dolphin"
-M.menu        = "wofi --show drun"   -- replaced by rofi in phase 4
+M.menu        = "rofi -show drun"
+M.bin         = os.getenv("HOME") .. "/.local/bin/"
 
 -- Startup layout: workspace 1 stays empty --------------------------------------
 M.startup = {
     { workspace = 2, cmd = M.browser,  class = "vivaldi" },
     { workspace = 3, cmd = M.terminal, class = "kitty" },
 }
-M.background = { "discord --start-minimized" }
+M.background = {
+    "discord --start-minimized",
+    "wl-paste --watch cliphist store",   -- clipboard history
+}
 
 -- Look -----------------------------------------------------------------------
 M.colors = {
