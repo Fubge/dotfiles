@@ -7,7 +7,8 @@ M.launch      = "uwsm app -- "
 M.terminal    = "kitty"
 M.browser     = "vivaldi"
 M.fileManager = "dolphin"
-M.menu        = "rofi -show drun"
+-- App launcher; text without a matching app is searched on the web
+M.menu        = "rofi -show combi -modes combi,web:" .. os.getenv("HOME") .. "/.local/bin/rofi-web-mode -combi-modes web,drun -display-combi Apps"
 M.bin         = os.getenv("HOME") .. "/.local/bin/"
 
 -- Startup layout: workspace 1 stays empty --------------------------------------

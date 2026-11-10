@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+# websearch <query>: open a web search in the browser and jump to its window.
+engine="${WEBSEARCH_URL:-https://duckduckgo.com/?q=}"
+browser_class="${BROWSER_CLASS:-vivaldi-stable}"
+
+query="$*"
+[[ -n $query ]] || exit 0
+xdg-open "${engine}$(printf '%s' "$query" | jq -sRr @uri)" >/dev/null 2>&1
+hyprctl dispatch "hl.dsp.focus({window=\"class:${browser_class}\"})" >/dev/null

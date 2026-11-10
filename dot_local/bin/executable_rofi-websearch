@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# Type a query, open the search in the default browser
-engine="${WEBSEARCH_URL:-https://duckduckgo.com/?q=}"
+# SUPER+Return: type a query, search the web
 query=$(rofi -dmenu -p "Web" -theme-str 'listview { lines: 0; }') || exit 0
-[[ -n $query ]] || exit 0
-xdg-open "${engine}$(printf '%s' "$query" | jq -sRr @uri)"
+exec "$HOME/.local/bin/websearch" "$query"

@@ -36,7 +36,7 @@ inputbar {
 }
 
 prompt { text-color: @accent; }
-entry  { placeholder: "Search..."; placeholder-color: #c0c4ce; }
+entry  { placeholder: "App or web search..."; placeholder-color: #c0c4ce; }
 
 listview {
     lines:     8;

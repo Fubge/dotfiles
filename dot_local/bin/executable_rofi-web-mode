@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# rofi script mode used by the app launcher (SUPER+Space):
+# lists nothing itself; text that matches no app is sent here and searched on the web.
+# ROFI_RETV=2 means "custom input" (Enter on text without a matching entry).
+if [[ ${ROFI_RETV:-0} == 2 && -n $1 ]]; then
+    setsid -f "$HOME/.local/bin/websearch" "$1" >/dev/null 2>&1
+fi
