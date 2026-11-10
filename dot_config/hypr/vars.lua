@@ -39,6 +39,13 @@ M.dropdown = {
     move  = { "monitor_w*0.2", "monitor_h*0.05" },
 }
 
+-- Popups opened from the bar: float under the mouse, close when focus leaves
+M.popup = {
+    classes = { "org.pulseaudio.pavucontrol", "popup-term" },
+    size    = { 460, 520 },
+    move    = { "cursor_x-230", "48" },   -- centered under the click, below the bar
+}
+
 -- Input ----------------------------------------------------------------------
 M.keyboard = { layout = "de", options = "caps:swapescape" }
 M.touchpad = "gxtp5400:00-27c6:0f96-touchpad"

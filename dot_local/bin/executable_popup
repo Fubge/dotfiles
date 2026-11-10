@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# popup CLASS CMD...: open CMD as a floating popup under the mouse,
+# or close it if it is already open (click the bar icon again to dismiss).
+class=$1; shift
+addr=$(hyprctl clients -j | jq -r --arg c "$class" '.[] | select(.class == $c) | .address' | head -1)
+if [[ -n $addr ]]; then
+    hyprctl dispatch "hl.dsp.window.close({window = \"address:$addr\"})" >/dev/null
+else
+    exec uwsm app -- "$@"
+fi

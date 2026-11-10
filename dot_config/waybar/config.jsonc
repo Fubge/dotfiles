@@ -135,7 +135,7 @@
         "format-muted": "\udb81\udf5f",
         "format-icons": ["\udb81\udd7f", "\udb81\udd80", "\udb81\udd7e"],
         "scroll-step": 2,
-        "on-click": "uwsm app -- pavucontrol",
+        "on-click": "~/.local/bin/popup org.pulseaudio.pavucontrol pavucontrol",
         "on-click-right": "wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle"
     },
     // Icon only (signal strength); name and speed in the tooltip
@@ -147,7 +147,7 @@
         "tooltip-format-wifi": "{essid} ({signalStrength}%)\n{ipaddr}\n\udb80\udc45 {bandwidthDownBytes}   \udb80\udc5d {bandwidthUpBytes}",
         "tooltip-format-ethernet": "{ifname}\n{ipaddr}",
         "on-click": "~/.local/bin/rofi-wifi",
-        "on-click-right": "uwsm app -- kitty nmtui",
+        "on-click-right": "~/.local/bin/popup popup-term kitty --class popup-term nmtui",
         "interval": 5
     },
     "bluetooth": {
@@ -157,7 +157,7 @@
         "format-connected": "\udb80\udcb1 {num_connections}",
         "tooltip-format-connected": "{device_enumerate}",
         "tooltip-format-enumerate-connected": "{device_alias} {device_battery_percentage}%",
-        "on-click": "uwsm app -- kitty bluetoothctl"
+        "on-click": "~/.local/bin/popup popup-term kitty --class popup-term bluetoothctl"
     },
     "tray": {
         "icon-size": 16,

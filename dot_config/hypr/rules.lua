@@ -11,6 +11,34 @@ hl.window_rule({
     stay_focused = true,
 })
 
+-- Bar popups (volume mixer, Wi-Fi/Bluetooth terminals)
+for _, class in ipairs(v.popup.classes) do
+    hl.window_rule({
+        name  = "popup-" .. class,
+        match = { class = "^" .. (class:gsub("%.", "\\.")) .. "$" },
+        float = true,
+        pin   = true,
+        size  = v.popup.size,
+        move  = v.popup.move,
+    })
+end
+
+local function is_popup(win)
+    for _, class in ipairs(v.popup.classes) do
+        if win.class == class then return true end
+    end
+    return false
+end
+
+-- Close popups as soon as another window gets focus
+hl.on("window.active", function(active)
+    for _, win in ipairs(hl.get_windows()) do
+        if is_popup(win) and (not active or win.address ~= active.address) then
+            hl.dispatch(hl.dsp.window.close({ window = win }))
+        end
+    end
+end)
+
 hl.window_rule({
     name    = "terminal-opacity",
     match   = { class = "^kitty$" },
