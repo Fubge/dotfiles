@@ -115,9 +115,10 @@
     "backlight": {
         "device": "intel_backlight",
         "format": "{icon}  {percent}%",
-        "format-icons": ["\udb80\udcde", "\udb80\udcdf", "\udb80\udce0"],
+        "format-icons": ["\udb81\udd94", "\udb81\udd99", "\udb81\udda8"],
         "on-scroll-up": "brightnessctl -e4 -n2 set 2%+",
-        "on-scroll-down": "brightnessctl -e4 -n2 set 2%-"
+        "on-scroll-down": "brightnessctl -e4 -n2 set 2%-",
+        "tooltip-format": "Brightness {percent}% (scroll to change)"
     },
     "battery": {
         "states": { "warning": 25, "critical": 10 },
