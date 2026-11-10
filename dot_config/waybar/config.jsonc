@@ -46,7 +46,15 @@
     "hyprland/window": {
         "format": "{class}",
         "separate-outputs": true,
-        "max-length": 24
+        "max-length": 24,
+        // Friendly names instead of raw window classes
+        "rewrite": {
+            "org\\.pulseaudio\\.pavucontrol": "Volume",
+            "vivaldi-stable": "Vivaldi",
+            "org\\.kde\\.dolphin": "Files",
+            "kitty|popup-term|dropdown_terminal": "Terminal",
+            "discord": "Discord"
+        }
     },
 
     // ---------------------------------------------------------------- center

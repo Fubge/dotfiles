@@ -48,3 +48,10 @@ noto-fonts-emoji
 # Apps
 kitty
 dolphin
+
+# Theming (dark GTK + Qt, icons, cursor)
+adw-gtk-theme
+papirus-icon-theme
+breeze               # Qt style + breeze_cursors
+qt6ct
+archlinux-xdg-menu   # "Open with" menus in Dolphin
