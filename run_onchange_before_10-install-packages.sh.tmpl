@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Installs all packages listed in packages/*.txt (official repos only).
 # chezmoi re-runs this script whenever one of the lists changes:
-{{ range (list "base" "hardware" "desktop" "apps" "dev") -}}
+{{ range (list "base" "hardware" "desktop" "shell" "apps" "dev") -}}
 # {{ . }}: {{ include (printf "packages/%s.txt" .) | sha256sum }}
 {{ end -}}
 set -euo pipefail

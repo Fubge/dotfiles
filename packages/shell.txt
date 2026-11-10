@@ -1,0 +1,15 @@
+# Shell: zsh + plugins from the official repos (no plugin manager needed)
+zsh
+zsh-completions
+zsh-autosuggestions
+zsh-syntax-highlighting
+starship
+fzf
+zoxide
+
+# Modern CLI tools
+eza        # ls
+bat        # cat with syntax highlighting
+ripgrep    # grep (also used by Neovim)
+fd         # find (also used by Neovim)
+fastfetch

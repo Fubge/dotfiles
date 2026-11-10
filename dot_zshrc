@@ -1,0 +1,50 @@
+# ~/.zshrc - interactive zsh configuration
+
+# --- History --------------------------------------------------------------
+HISTFILE=~/.local/state/zsh/history
+HISTSIZE=50000
+SAVEHIST=50000
+mkdir -p "${HISTFILE:h}"
+setopt SHARE_HISTORY          # share history between all open terminals
+setopt HIST_IGNORE_ALL_DUPS   # no duplicates
+setopt HIST_IGNORE_SPACE      # commands starting with a space are not saved
+setopt HIST_REDUCE_BLANKS
+
+# --- General options ------------------------------------------------------
+setopt AUTO_CD                # type a directory name to cd into it
+setopt INTERACTIVE_COMMENTS   # allow # comments on the command line
+setopt NO_BEEP
+bindkey -e                    # emacs-style keys (Ctrl+A, Ctrl+E, ...)
+bindkey '^[[1;5C' forward-word    # Ctrl+Right
+bindkey '^[[1;5D' backward-word   # Ctrl+Left
+bindkey '^[[3~'   delete-char     # Delete
+
+# --- Completion -----------------------------------------------------------
+autoload -Uz compinit
+compinit -d ~/.cache/zcompdump
+zstyle ':completion:*' menu select                          # arrow-key menu
+zstyle ':completion:*' matcher-list 'm:{a-zA-Z}={A-Za-z}'   # case-insensitive
+zstyle ':completion:*' list-colors "${(s.:.)LS_COLORS}"
+zstyle ':completion:*:descriptions' format '%F{208}-- %d --%f'
+zstyle ':completion:*' group-name ''
+
+# --- Tools ----------------------------------------------------------------
+source <(fzf --zsh)               # Ctrl+R history search, Ctrl+T files, Alt+C dirs
+eval "$(zoxide init zsh)"         # z <part of a path> jumps to frecent dirs
+eval "$(starship init zsh)"
+
+# --- Aliases --------------------------------------------------------------
+alias ls='eza --icons --group-directories-first'
+alias ll='eza -l --icons --group-directories-first --git'
+alias la='eza -la --icons --group-directories-first --git'
+alias tree='eza --tree --icons'
+alias cat='bat --style=plain --paging=never'
+alias grep='grep --color=auto'
+alias ff='fastfetch'
+alias dots='chezmoi cd'               # jump into the dotfiles repo
+alias update='sudo pacman -Syu'
+
+# --- Plugins (must be sourced last) ---------------------------------------
+ZSH_AUTOSUGGEST_HIGHLIGHT_STYLE='fg=#626f8c'
+source /usr/share/zsh/plugins/zsh-autosuggestions/zsh-autosuggestions.zsh
+source /usr/share/zsh/plugins/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh

@@ -40,12 +40,6 @@ hl.on("window.active", function(active)
 end)
 
 hl.window_rule({
-    name    = "terminal-opacity",
-    match   = { class = "^kitty$" },
-    opacity = v.terminalOpacity,
-})
-
-hl.window_rule({
     name   = "discord-float",
     match  = { class = "^discord$" },
     float  = true,

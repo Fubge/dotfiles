@@ -30,7 +30,6 @@ M.colors = {
 M.gaps     = { inner = 6, outer = 6 }
 M.border   = 1
 M.rounding = 10
-M.terminalOpacity = "0.9"
 
 -- Dropdown terminal (Alt+Tab), sizes relative to the monitor -------------------
 M.dropdown = {
