@@ -10,6 +10,8 @@ Changes made by hand (not managed by chezmoi yet). `bootstrap.sh` will automate 
 | `/etc/fstab` | `@snapshots` subvolume mounted at `/.snapshots` | Snapshots survive a rollback of `@` |
 | `/etc/kernel/cmdline` | `cryptdevice=…:root:allow-discards` | Let TRIM pass through LUKS to the SSD |
 | `fstrim.timer` | enabled | Weekly TRIM |
+| user `raphael` | login shell `/usr/bin/zsh` (`chsh`) | zsh as interactive shell |
+| user `raphael` | added to group `gamemode` | GameMode daemon permissions |
 
 ## Rollback (root snapshot)
 

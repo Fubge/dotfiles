@@ -60,3 +60,20 @@ hl.window_rule({
     match = { class = "^$", title = "^$", xwayland = true, float = true, fullscreen = false, pin = false },
     no_focus = true,
 })
+
+-- Games: Steam games (steam_app_*) and gamescope open on workspace 5,
+-- may tear (lower latency) and skip animations.
+hl.window_rule({
+    name      = "games",
+    match     = { class = "^(steam_app_.*|gamescope)$" },
+    workspace = "5",
+    immediate = true,
+    no_anim   = true,
+})
+
+-- Steam client: small dialogs float
+hl.window_rule({
+    name  = "steam-dialogs",
+    match = { class = "^steam$", title = "^(Friends List|Steam Settings|Steam - News.*)$" },
+    float = true,
+})

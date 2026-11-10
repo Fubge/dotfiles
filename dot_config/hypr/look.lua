@@ -10,7 +10,7 @@ hl.config({
             inactive_border = v.colors.inactive,
         },
         resize_on_border = false,
-        allow_tearing    = false,
+        allow_tearing    = true,     -- only used by windows with the "immediate" rule (games)
         layout           = "master",
     },
 
@@ -38,6 +38,10 @@ hl.config({
     },
 
     animations = { enabled = true },
+
+    render = {
+        direct_scanout = 2,          -- skip compositing for fullscreen games
+    },
 
     misc = {
         force_default_wallpaper = -1,   -- until hyprpaper arrives in phase 4

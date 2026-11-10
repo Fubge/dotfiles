@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+# Install the latest GE-Proton release into Steam's compatibility tools folder.
+# Afterwards restart Steam and pick it under Properties > Compatibility.
+set -euo pipefail
+
+dest="$HOME/.steam/root/compatibilitytools.d"
+api="https://api.github.com/repos/GloriousEggroll/proton-ge-custom/releases/latest"
+mkdir -p "$dest"
+
+release=$(curl -fsSL "$api")
+tag=$(jq -r .tag_name <<<"$release")
+if [[ -d $dest/$tag ]]; then
+    echo "$tag is already installed."
+    exit 0
+fi
+
+tar_url=$(jq -r '.assets[] | select(.name | endswith(".tar.gz")) | .browser_download_url' <<<"$release")
+sum_url=$(jq -r '.assets[] | select(.name | endswith(".sha512sum")) | .browser_download_url' <<<"$release")
+
+tmp=$(mktemp -d)
+trap 'rm -rf "$tmp"' EXIT
+echo "Downloading $tag ..."
+curl -fL --progress-bar -o "$tmp/$tag.tar.gz" "$tar_url"
+curl -fsSL -o "$tmp/$tag.sha512sum" "$sum_url"
+(cd "$tmp" && sha512sum -c "$tag.sha512sum")
+
+tar -xzf "$tmp/$tag.tar.gz" -C "$dest"
+echo "Installed $tag to $dest. Restart Steam to use it."

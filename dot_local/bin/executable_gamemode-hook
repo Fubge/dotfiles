@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+# Called by GameMode: switch to the performance power profile while gaming
+# and restore the previous profile afterwards.
+state="${XDG_RUNTIME_DIR:-/tmp}/gamemode-previous-profile"
+case "$1" in
+    start)
+        powerprofilesctl get > "$state"
+        powerprofilesctl set performance
+        notify-send -a GameMode -i applications-games "GameMode on" "Power profile: performance"
+        ;;
+    end)
+        powerprofilesctl set "$(cat "$state" 2>/dev/null || echo balanced)"
+        rm -f "$state"
+        notify-send -a GameMode -i applications-games "GameMode off" "Power profile restored"
+        ;;
+esac
