@@ -20,4 +20,6 @@ if ((${#missing[@]} == 0)); then
 fi
 
 echo "packages: installing ${#missing[@]} missing package(s): ${missing[*]}"
-sudo pacman -S --needed "${missing[@]}"
+flags=(--needed)
+[[ -t 0 ]] || flags+=(--noconfirm)   # non-interactive run (no terminal)
+sudo pacman -S "${flags[@]}" "${missing[@]}"

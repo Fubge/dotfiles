@@ -1,0 +1,44 @@
+-- Central place for all values that would otherwise be hardcoded.
+local M = {}
+
+-- Applications ---------------------------------------------------------------
+-- Every app is launched through uwsm so it runs in its own systemd scope.
+M.launch      = "uwsm app -- "
+M.terminal    = "kitty"
+M.browser     = "vivaldi"
+M.fileManager = "dolphin"
+M.menu        = "wofi --show drun"   -- replaced by rofi in phase 4
+
+-- Startup layout: workspace 1 stays empty --------------------------------------
+M.startup = {
+    { workspace = 2, cmd = M.browser,  class = "vivaldi" },
+    { workspace = 3, cmd = M.terminal, class = "kitty" },
+}
+M.background = { "discord --start-minimized" }
+
+-- Look -----------------------------------------------------------------------
+M.colors = {
+    accent   = "rgba(ff7f00ff)",
+    inactive = "rgba(646464ff)",
+    shadow   = 0xee1a1a1a,
+}
+M.gaps     = { inner = 6, outer = 6 }
+M.border   = 1
+M.rounding = 10
+M.terminalOpacity = "0.9"
+
+-- Dropdown terminal (Alt+Tab), sizes relative to the monitor -------------------
+M.dropdown = {
+    class = "dropdown_terminal",
+    size  = { "monitor_w*0.6", "monitor_h*0.4" },
+    move  = { "monitor_w*0.2", "monitor_h*0.05" },
+}
+
+-- Input ----------------------------------------------------------------------
+M.keyboard = { layout = "de", options = "caps:swapescape" }
+M.touchpad = "gxtp5400:00-27c6:0f96-touchpad"
+
+-- Screenshots ----------------------------------------------------------------
+M.screenshotDir = os.getenv("HOME") .. "/Pictures/Screenshots"
+
+return M

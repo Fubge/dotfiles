@@ -20,6 +20,9 @@ libpulse
 power-profiles-daemon
 
 # Desktop tools (reworked in phase 4)
+wl-clipboard
+brightnessctl
+playerctl
 network-manager-applet
 dunst
 kitty

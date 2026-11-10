@@ -2,3 +2,4 @@
 vivaldi
 vivaldi-ffmpeg-codecs
 bitwarden
+discord
