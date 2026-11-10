@@ -1,0 +1,4 @@
+# User applications
+vivaldi
+vivaldi-ffmpeg-codecs
+bitwarden

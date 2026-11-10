@@ -1,0 +1,39 @@
+# Core system: boot, filesystem, networking, maintenance
+base
+base-devel
+linux
+linux-firmware
+intel-ucode
+sof-firmware
+mkinitcpio
+grub
+efibootmgr
+btrfs-progs
+zram-generator
+sudo
+
+# Snapshots (root only, pre/post pacman)
+snapper
+snap-pac
+
+# Networking & bluetooth
+networkmanager
+wpa_supplicant
+bluez
+bluez-utils
+ufw
+
+# Maintenance
+fwupd
+smartmontools
+reflector
+pacman-contrib
+
+# CLI basics
+git
+github-cli
+chezmoi
+vim
+nano
+htop
+wget

@@ -1,0 +1,28 @@
+# Hyprland session
+hyprland
+uwsm
+sddm
+xdg-desktop-portal-hyprland
+xdg-utils
+qt5-wayland
+qt6-wayland
+
+# Audio (PipeWire)
+pipewire
+pipewire-alsa
+pipewire-jack
+pipewire-pulse
+wireplumber
+gst-plugin-pipewire
+libpulse
+
+# Power
+power-profiles-daemon
+
+# Desktop tools (reworked in phase 4)
+network-manager-applet
+dunst
+kitty
+grim
+slurp
+dolphin

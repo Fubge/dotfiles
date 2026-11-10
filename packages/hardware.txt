@@ -1,0 +1,6 @@
+# Intel Arc (Xe3) graphics & video acceleration
+# Refined in phase 2 (hardware & power)
+vulkan-intel
+intel-media-driver
+vpl-gpu-rt
+libvpl
