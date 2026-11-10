@@ -4,3 +4,12 @@ vulkan-intel
 intel-media-driver
 vpl-gpu-rt
 libvpl
+
+# Fingerprint reader (Synaptics 06cb:019d)
+fprintd
+
+# Diagnostics
+libva-utils
+vulkan-tools
+usbutils
+python-gobject   # required by powerprofilesctl
