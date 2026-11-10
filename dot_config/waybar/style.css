@@ -1,0 +1,89 @@
+/* Palette (same as hypr/vars.lua, rofi, dunst, hyprlock) */
+@define-color dark    #1c2029;
+@define-color slate   #808aa2;
+@define-color steel   #626f8c;
+@define-color fg      #f8f8f2;
+@define-color accent  #ff7f00;
+@define-color warn    #ffcc66;
+@define-color crit    #ff5555;
+
+* {
+    font-family: "JetBrainsMono Nerd Font", "Symbols Nerd Font";
+    font-size: 13px;
+    min-height: 0;
+    border: none;
+}
+
+window#waybar {
+    background: transparent;
+    color: @fg;
+}
+
+tooltip {
+    background: alpha(@dark, 0.95);
+    border: 1px solid @accent;
+    border-radius: 10px;
+}
+
+/* Every section is its own pill */
+.modules-left,
+.modules-right {
+    background: @slate;
+    border-radius: 15px;
+}
+.modules-center {
+    background: @dark;
+    border-radius: 15px;
+}
+
+/* ---------------------------------------------------------------- left */
+#workspaces {
+    background: @steel;
+    border-radius: 15px;
+    padding: 0 10px;
+}
+#workspaces button {
+    color: @fg;
+    padding: 0 6px;
+    background: none;
+    box-shadow: none;
+}
+#workspaces button.empty { color: alpha(@fg, 0.4); }
+#workspaces button.active,
+#workspaces button:hover { color: @accent; }
+#workspaces button.urgent { color: @crit; }
+
+#window { padding: 0 16px; }
+window#waybar.empty #window { padding: 0; }
+
+/* ---------------------------------------------------------------- center */
+#clock {
+    padding: 0 20px;
+    font-weight: bold;
+}
+
+/* ---------------------------------------------------------------- right */
+#hardware { padding: 0 6px; }
+#system   { background: @steel; border-radius: 15px; padding: 0 6px; }
+#audio    { padding: 0 6px; }
+
+#network, #temperature, #cpu, #memory,
+#power-profiles-daemon, #backlight, #battery,
+#wireplumber, #bluetooth, #tray {
+    padding: 0 9px;
+}
+
+#custom-power {
+    background: @dark;
+    color: @accent;
+    border-radius: 15px;
+    padding: 0 14px 0 12px;
+}
+
+/* ---------------------------------------------------------------- states */
+#temperature.critical,
+#battery.critical:not(.charging) { color: @crit; }
+#battery.warning:not(.charging)  { color: @warn; }
+#battery.charging                { color: #a6e3a1; }
+#power-profiles-daemon.performance { color: @accent; }
+#wireplumber.muted, #bluetooth.disabled, #bluetooth.off { color: alpha(@fg, 0.5); }

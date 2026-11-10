@@ -1,0 +1,146 @@
+// Waybar: floating pill-shaped bar, layout inspired by the old dotfiles.
+// Colors live in style.css.
+{
+    "layer": "top",
+    "position": "top",
+    "margin-top": 8,
+    "margin-left": 12,
+    "margin-right": 12,
+    "spacing": 0,
+
+    "modules-left":   ["hyprland/workspaces", "hyprland/window"],
+    "modules-center": ["clock"],
+    "modules-right":  ["group/hardware", "group/system", "group/audio", "custom/power"],
+
+    // ---------------------------------------------------------------- groups
+    "group/hardware": {
+        "orientation": "horizontal",
+        "modules": ["network", "temperature", "cpu", "memory"]
+    },
+    "group/system": {
+        "orientation": "horizontal",
+        "modules": ["power-profiles-daemon", "backlight", "battery"]
+    },
+    "group/audio": {
+        "orientation": "horizontal",
+        "modules": ["wireplumber", "bluetooth", "tray"]
+    },
+
+    // ---------------------------------------------------------------- left
+    "hyprland/workspaces": {
+        "format": "{icon}",
+        "persistent-workspaces": { "*": 5 },
+        "format-icons": {
+            "1": "\udb80\udedc",
+            "2": "\udb81\udd9f",
+            "3": "\udb80\udd8d",
+            "4": "\udb80\udd69",
+            "5": "\udb80\ude97",
+            "default": "\udb81\udf66"
+        },
+        "on-scroll-up": "hyprctl dispatch 'hl.dsp.focus({workspace = \"e-1\"})'",
+        "on-scroll-down": "hyprctl dispatch 'hl.dsp.focus({workspace = \"e+1\"})'"
+    },
+    "hyprland/window": {
+        "format": "{class}",
+        "separate-outputs": true,
+        "max-length": 24
+    },
+
+    // ---------------------------------------------------------------- center
+    "clock": {
+        "format": "{:%H:%M}",
+        "format-alt": "{:%a, %d. %b  %H:%M}",
+        "tooltip-format": "<tt><small>{calendar}</small></tt>",
+        "calendar": {
+            "mode": "month",
+            "weeks-pos": "left",
+            "format": {
+                "months":   "<span color='#ffead3'><b>{}</b></span>",
+                "weeks":    "<span color='#808aa2'>W{}</span>",
+                "weekdays": "<span color='#ffcc66'><b>{}</b></span>",
+                "today":    "<span color='#ff7f00'><b><u>{}</u></b></span>"
+            }
+        }
+    },
+
+    // ---------------------------------------------------------------- hardware
+    "network": {
+        "format-wifi": "󰖩  {essid}",
+        "format-ethernet": "󰈀  {ipaddr}",
+        "format-disconnected": "󰖪  offline",
+        "tooltip-format-wifi": "{essid} ({signalStrength}%)\n{ipaddr}\n {bandwidthDownBytes}   {bandwidthUpBytes}",
+        "on-click": "uwsm app -- kitty nmtui",
+        "interval": 5
+    },
+    "temperature": {
+        "hwmon-path-abs": "/sys/devices/platform/coretemp.0/hwmon",
+        "input-filename": "temp1_input",
+        "critical-threshold": 90,
+        "format": "\udb81\udd0f  {temperatureC}°"
+    },
+    "cpu": {
+        "format": "\udb83\udee0  {usage}%",
+        "interval": 2
+    },
+    "memory": {
+        "format": "\udb80\udf5b  {used:0.1f}/{total:0.0f} GB",
+        "tooltip-format": "Swap: {swapUsed:0.1f}/{swapTotal:0.0f} GB",
+        "interval": 5
+    },
+
+    // ---------------------------------------------------------------- system
+    "power-profiles-daemon": {
+        "format": "{icon}",
+        "tooltip-format": "Power profile: {profile}\nClick to switch",
+        "format-icons": {
+            "performance": "󰓅",
+            "balanced": "󰾅",
+            "power-saver": "󰾆"
+        }
+    },
+    "backlight": {
+        "device": "intel_backlight",
+        "format": "{icon}  {percent}%",
+        "format-icons": ["󰃞", "󰃟", "󰃠"],
+        "on-scroll-up": "brightnessctl -e4 -n2 set 2%+",
+        "on-scroll-down": "brightnessctl -e4 -n2 set 2%-"
+    },
+    "battery": {
+        "states": { "warning": 25, "critical": 10 },
+        "format": "{icon}  {capacity}%",
+        "format-charging": "󰂄  {capacity}%",
+        "format-plugged": "󰚥  {capacity}%",
+        "format-icons": ["󰁺", "󰁼", "󰁾", "󰂀", "󰁹"],
+        "tooltip-format": "{timeTo}\n{power:.1f} W"
+    },
+
+    // ---------------------------------------------------------------- audio
+    "wireplumber": {
+        "format": "{icon}  {volume}%",
+        "format-muted": "󰝟",
+        "format-icons": ["󰕿", "󰖀", "󰕾"],
+        "scroll-step": 2,
+        "on-click": "uwsm app -- pavucontrol",
+        "on-click-right": "wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle"
+    },
+    "bluetooth": {
+        "format": "󰂯",
+        "format-disabled": "󰂲",
+        "format-off": "󰂲",
+        "format-connected": "󰂱 {num_connections}",
+        "tooltip-format-connected": "{device_enumerate}",
+        "tooltip-format-enumerate-connected": "{device_alias} {device_battery_percentage}%",
+        "on-click": "uwsm app -- kitty bluetoothctl"
+    },
+    "tray": {
+        "icon-size": 16,
+        "spacing": 12
+    },
+
+    "custom/power": {
+        "format": "⏻",
+        "tooltip": false,
+        "on-click": "~/.local/bin/rofi-power"
+    }
+}
