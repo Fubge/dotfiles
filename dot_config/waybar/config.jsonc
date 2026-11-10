@@ -145,7 +145,8 @@
         "format-disconnected": "\udb82\udd2e",
         "tooltip-format-wifi": "{essid} ({signalStrength}%)\n{ipaddr}\n\udb80\udc45 {bandwidthDownBytes}   \udb80\udc5d {bandwidthUpBytes}",
         "tooltip-format-ethernet": "{ifname}\n{ipaddr}",
-        "on-click": "uwsm app -- kitty nmtui",
+        "on-click": "~/.local/bin/rofi-wifi",
+        "on-click-right": "uwsm app -- kitty nmtui",
         "interval": 5
     },
     "bluetooth": {

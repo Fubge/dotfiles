@@ -1,0 +1,5 @@
+# Disable the system-wide nm-applet autostart; waybar + rofi-wifi replace it.
+[Desktop Entry]
+Type=Application
+Name=nm-applet
+Hidden=true
