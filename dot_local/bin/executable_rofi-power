@@ -1,7 +1,12 @@
 #!/usr/bin/env bash
 # Power menu: lock, logout, suspend, reboot, shutdown
 choice=$(printf '%s\n' "󰌾  Lock" "󰍃  Logout" "󰤄  Suspend" "󰜉  Reboot" "󰐥  Shutdown" \
-    | rofi -dmenu -i -p "Power" -theme-str 'window { width: 280px; } listview { lines: 5; }')
+    | rofi -dmenu -i -no-custom -p "Power" -theme-str '
+        window   { width: 220px; padding: 8px; }
+        mainbox  { children: [ listview ]; }
+        listview { lines: 5; margin: 0; }
+        element  { padding: 10px 14px; }
+    ')
 case "$choice" in
     *Lock)     loginctl lock-session ;;
     *Logout)   uwsm stop ;;
