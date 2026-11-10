@@ -1,3 +1,5 @@
 # Development (languages are set up later)
+neovim
+tree-sitter-cli   # builds Treesitter parsers for Neovim
 nodejs
 npm
