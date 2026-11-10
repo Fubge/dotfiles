@@ -14,15 +14,21 @@ if [[ -d $dest/$tag ]]; then
     exit 0
 fi
 
-tar_url=$(jq -r '.assets[] | select(.name | endswith(".tar.gz")) | .browser_download_url' <<<"$release")
-sum_url=$(jq -r '.assets[] | select(.name | endswith(".sha512sum")) | .browser_download_url' <<<"$release")
+# Pick the x86_64 build (newer releases also ship aarch64)
+asset() {
+    jq -r --arg ext "$1" '[.assets[] | select(.name | endswith($ext)) | select(.name | contains("aarch64") | not)][0]' <<<"$release"
+}
+tar_name=$(asset .tar.gz | jq -r .name)
+tar_url=$(asset .tar.gz | jq -r .browser_download_url)
+sum_url=$(asset .sha512sum | jq -r .browser_download_url)
+[[ $tar_url == https://* && $sum_url == https://* ]] || { echo "No x86_64 asset found for $tag" >&2; exit 1; }
 
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
 echo "Downloading $tag ..."
-curl -fL --progress-bar -o "$tmp/$tag.tar.gz" "$tar_url"
-curl -fsSL -o "$tmp/$tag.sha512sum" "$sum_url"
-(cd "$tmp" && sha512sum -c "$tag.sha512sum")
+curl -fL --progress-bar -o "$tmp/$tar_name" "$tar_url"
+curl -fsSL -o "$tmp/checksum" "$sum_url"
+(cd "$tmp" && sha512sum -c checksum)
 
-tar -xzf "$tmp/$tag.tar.gz" -C "$dest"
+tar -xzf "$tmp/$tar_name" -C "$dest"
 echo "Installed $tag to $dest. Restart Steam to use it."
