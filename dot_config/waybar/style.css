@@ -6,6 +6,7 @@
 @define-color accent  #ff7f00;
 @define-color warn    #ffcc66;
 @define-color crit    #ff5555;
+@define-color good    #a6e3a1;
 
 * {
     font-family: "JetBrainsMono Nerd Font", "Symbols Nerd Font";
@@ -26,8 +27,7 @@ tooltip {
 }
 
 /* Every section is its own pill */
-.modules-left,
-.modules-right {
+.modules-left, .modules-right {
     background: @slate;
     border-radius: 15px;
 }
@@ -36,21 +36,38 @@ tooltip {
     border-radius: 15px;
 }
 
+/* Gentle hover feedback on everything clickable */
+#workspaces button, #clock, #mpris, #idle_inhibitor, #power-profiles-daemon,
+#backlight, #battery, #wireplumber, #network, #bluetooth, #custom-power, #cpu {
+    transition: all 250ms ease;
+    border-radius: 12px;
+}
+#clock:hover, #mpris:hover, #idle_inhibitor:hover, #power-profiles-daemon:hover,
+#wireplumber:hover, #network:hover, #bluetooth:hover, #cpu:hover {
+    background: alpha(@fg, 0.12);
+}
+
 /* ---------------------------------------------------------------- left */
 #workspaces {
     background: @steel;
     border-radius: 15px;
-    padding: 0 10px;
+    padding: 2px 4px;
 }
 #workspaces button {
     color: @fg;
-    padding: 0 6px;
+    padding: 0 8px;
+    margin: 0 1px;
     background: none;
     box-shadow: none;
 }
-#workspaces button.empty { color: alpha(@fg, 0.4); }
-#workspaces button.active,
-#workspaces button:hover { color: @accent; }
+#workspaces button.empty  { color: alpha(@fg, 0.4); }
+#workspaces button:hover  { color: @accent; background: alpha(@dark, 0.25); }
+/* Active workspace becomes a wider orange pill */
+#workspaces button.active {
+    color: @dark;
+    background: @accent;
+    padding: 0 16px;
+}
 #workspaces button.urgent { color: @crit; }
 
 #window { padding: 0 16px; }
@@ -58,18 +75,23 @@ window#waybar.empty #window { padding: 0; }
 
 /* ---------------------------------------------------------------- center */
 #clock {
-    padding: 0 20px;
+    padding: 0 18px;
     font-weight: bold;
 }
+#mpris {
+    padding: 0 16px 0 10px;
+    color: @slate;
+}
+#mpris.playing { color: @accent; }
 
 /* ---------------------------------------------------------------- right */
-#hardware { padding: 0 6px; }
-#system   { background: @steel; border-radius: 15px; padding: 0 6px; }
-#audio    { padding: 0 6px; }
+#hardware { padding: 0 4px; }
+#system   { background: @steel; border-radius: 15px; padding: 0 4px; }
+#connect  { padding: 0 4px; }
 
-#network, #temperature, #cpu, #memory,
-#power-profiles-daemon, #backlight, #battery,
-#wireplumber, #bluetooth, #tray {
+#cpu, #temperature, #memory,
+#idle_inhibitor, #power-profiles-daemon, #backlight, #battery,
+#wireplumber, #network, #bluetooth, #tray {
     padding: 0 9px;
 }
 
@@ -79,11 +101,25 @@ window#waybar.empty #window { padding: 0; }
     border-radius: 15px;
     padding: 0 14px 0 12px;
 }
+#custom-power:hover { background: @accent; color: @dark; }
 
 /* ---------------------------------------------------------------- states */
-#temperature.critical,
-#battery.critical:not(.charging) { color: @crit; }
-#battery.warning:not(.charging)  { color: @warn; }
-#battery.charging                { color: #a6e3a1; }
-#power-profiles-daemon.performance { color: @accent; }
-#wireplumber.muted, #bluetooth.disabled, #bluetooth.off { color: alpha(@fg, 0.5); }
+#idle_inhibitor.activated           { color: @accent; }
+#power-profiles-daemon.performance  { color: @accent; }
+#power-profiles-daemon.power-saver  { color: @good; }
+#cpu.high, #memory.high             { color: @warn; }
+#temperature.critical               { color: @crit; }
+#battery.charging, #battery.plugged { color: @good; }
+#battery.warning:not(.charging)     { color: @warn; }
+#wireplumber.muted, #bluetooth.disabled, #bluetooth.off,
+#network.disconnected               { color: alpha(@fg, 0.45); }
+#bluetooth.connected                { color: #89b4fa; }
+
+/* Critical battery pulses red */
+@keyframes pulse {
+    to { background: @crit; color: @dark; }
+}
+#battery.critical:not(.charging) {
+    color: @crit;
+    animation: pulse 1s ease-in-out infinite alternate;
+}
