@@ -10,6 +10,6 @@ login_wallpaper = "generated/horizon.jpg"   # relative to ~/Pictures/Wallpapers 
 
 # Big centered overlays (app launcher, wallpaper picker, shortcuts, clipboard,
 # web search) all share one frame: same size, same top edge, same search pill
-overlay_width  = 1120
-overlay_height = 700
-overlay_top    = 90                  # px from the top of the screen
+overlay_width  = 1300
+overlay_height = 760
+overlay_top    = 70                  # px from the top of the screen
