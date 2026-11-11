@@ -122,11 +122,11 @@ window#waybar.empty #window { padding: 0; }
 #cpu.high, #memory.high             { color: @warn; }
 #temperature.critical               { color: @crit; }
 /* Battery (~/.local/bin/battery): fills up green while charging,
-   calm blue when held by the charge limit, plug flashes yellow on plug-in */
+   calm blue when held by the charge limit, one yellow spark when the plug
+   clicks in */
 #custom-battery.charging, #custom-battery.full { color: @good; }
 #custom-battery.plugged             { color: {{ .palette.cyan_bright }}; }
 #custom-battery.plug                { color: @warn; }
-#custom-battery.unplug              { color: alpha(@fg, 0.45); }
 #custom-battery.warning             { color: @warn; }
 #wireplumber.muted, #bluetooth.disabled, #bluetooth.off,
 #network.disconnected               { color: alpha(@fg, 0.45); }

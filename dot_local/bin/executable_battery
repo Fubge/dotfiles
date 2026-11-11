@@ -8,8 +8,10 @@ Icon only, percent and times in the tooltip. Ten level steps everywhere:
   plugged   held by the charge limit: plain battery in blue, no animation
   full      battery with a heart
 While plugged in, a small plug sits next to the battery (charging, held, full),
-so one glance tells whether the laptop is on the cable. Plugging in or out
-shows a big plug for a moment (class plug / unplug).
+so one glance tells whether the laptop is on the cable. Plugging in, the plug
+slides in from the side and clicks into place (one short yellow spark, class
+plug); unplugging, it drifts away and fades out. No constant motion besides
+the charging fill.
 
 Waits for udev power_supply events, so it sleeps while nothing changes.
 """
@@ -29,7 +31,8 @@ BOLT = ["\U000F089C", "\U000F0086", "\U000F0087", "\U000F0088", "\U000F089D",
 HEART = "\U000F120F"
 PLUG, UNPLUG = "\U000F06A5", "\U000F06A6"
 
-PLUG_MOMENT = 1.5   # seconds the plug shows after plugging in or out
+ANIM_FRAME = 0.11   # seconds per frame of the plug in/out animation
+EM, EN = "\u2003", "\u2002"
 IDLE_POLL = 60      # fallback refresh without udev events (capacity drift)
 
 
@@ -94,9 +97,25 @@ def frame_time(watts):
     return 0.35 if watts >= 45 else 0.6 if watts >= 15 else 1.0
 
 
-def emit(text, cls, tip, ac=False):
-    if ac:
-        text += f" <span size='smaller'>{PLUG}</span>"
+def small(glyph, alpha=100):
+    return f"<span size='smaller' alpha='{alpha}%'>{glyph}</span>"
+
+
+# Plug sliding in: (gap, plug markup, class override); last frame = "click"
+PLUG_IN = [(EM + EM, small(PLUG, 30), None), (EM, small(PLUG, 60), None),
+           (EN, small(PLUG), None), (" ", PLUG, "plug"), (" ", PLUG, "plug")]
+# Unplugged: it drifts away and fades
+PLUG_OUT = [(" ", small(UNPLUG), None), (EN, small(UNPLUG, 70), None),
+            (EM, small(UNPLUG, 45), None), (EM + EM, small(UNPLUG, 20), None)]
+
+
+def emit(text, cls, tip, ac=False, extra=None):
+    if extra:
+        gap, plug, override = extra
+        text += gap + plug
+        cls = override or cls
+    elif ac:
+        text += " " + small(PLUG)
     print(json.dumps({"text": text, "class": cls, "tooltip": tip}), flush=True)
 
 
@@ -106,35 +125,36 @@ def main():
         stdout=subprocess.PIPE, text=True)
     last_ac = None
     frame = 0
-    plug_until = 0.0
+    anim = []
     while True:
         s = state()
         if last_ac is not None and s["ac"] != last_ac:
-            plug_until = time.monotonic() + PLUG_MOMENT
+            anim = list(PLUG_IN if s["ac"] else PLUG_OUT)
             frame = 0
         last_ac = s["ac"]
         tip = tooltip(s)
         wait = IDLE_POLL
 
-        if time.monotonic() < plug_until:
-            emit(PLUG if s["ac"] else UNPLUG, "plug" if s["ac"] else "unplug", tip)
-            wait = plug_until - time.monotonic()
-        elif s["kind"] == "charging":
+        extra = anim.pop(0) if anim else None
+        if extra:
+            wait = ANIM_FRAME
+        if s["kind"] == "charging":
             # Fill loop: current step .. full, at least three frames,
             # the full icon stays a beat longer before it starts over
             first = min(step(s["cap"]), 7)
             frames = list(range(first, 10)) + [9]
             frame %= len(frames)
-            emit(BOLT[frames[frame]], "charging", tip, ac=True)
-            frame += 1
-            wait = frame_time(s["watts"])
+            emit(BOLT[frames[frame]], "charging", tip, True, extra)
+            if not extra:
+                frame += 1
+                wait = frame_time(s["watts"])
         elif s["kind"] == "full":
-            emit(HEART, "full", tip, ac=True)
+            emit(HEART, "full", tip, True, extra)
         elif s["kind"] == "plugged":
-            emit(PLAIN[step(s["cap"])], "plugged", tip, ac=True)
+            emit(PLAIN[step(s["cap"])], "plugged", tip, True, extra)
         else:
             cls = "critical" if s["cap"] <= 10 else "warning" if s["cap"] <= 25 else "discharging"
-            emit(PLAIN[step(s["cap"])], cls, tip)
+            emit(PLAIN[step(s["cap"])], cls, tip, False, extra)
 
         ready, _, _ = select.select([udev.stdout], [], [], max(0.05, wait))
         if ready:
