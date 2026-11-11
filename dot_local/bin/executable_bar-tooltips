@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+# bar-tooltips off|on OWNER: hide waybar's tooltips while a menu or popup is open.
+# After a click the mouse still rests on the bar icon, and its tooltip would be
+# drawn on top of the menu. waybar reloads its CSS when the imported
+# ~/.config/waybar/menu-state.css changes (reload_style_on_change), so no restart.
+#
+# OWNER is the caller's PID: "on" only takes effect for the last caller of "off",
+# so a menu that was replaced by a newer one does not bring the tooltips back.
+#   rofi-menu, popup, rofi-wifi (password prompt) call this.
+css=$HOME/.config/waybar/menu-state.css
+owner_file=${XDG_RUNTIME_DIR:-/tmp}/bar-tooltips-owner
+
+case ${1-} in
+    off)
+        echo "${2-}" >"$owner_file"
+        echo 'tooltip.background, tooltip.background * { opacity: 0; background: transparent; border-color: transparent; color: transparent; box-shadow: none; }' >"$css"
+        ;;
+    on)
+        [[ $(cat "$owner_file" 2>/dev/null) == "${2-}" ]] || exit 0
+        rm -f "$owner_file"
+        : >"$css"
+        ;;
+    *) echo "usage: bar-tooltips off|on OWNER" >&2; exit 2 ;;
+esac

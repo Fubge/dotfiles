@@ -10,6 +10,10 @@ addr=$(hyprctl clients -j | jq -r --arg c "$class" '.[] | select(.class == $c) |
 if [[ -n $addr ]]; then
     hyprctl dispatch "hl.dsp.window.close({window = \"address:$addr\"})" >/dev/null
 elif ! $close_only; then
+    # No bar tooltips on top of the popup while it is open (~/.local/bin/bar-tooltips);
+    # uwsm app (scope) runs in the foreground, so the trap fires when the popup closes
+    "$HOME/.local/bin/bar-tooltips" off $$
+    trap '"$HOME/.local/bin/bar-tooltips" on $$' EXIT
     pkill -x rofi
-    exec uwsm app -- "$@"
+    uwsm app -- "$@"
 fi

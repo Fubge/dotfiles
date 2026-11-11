@@ -2,6 +2,9 @@
 // Colors live in style.css. Icons are Nerd Font glyphs written as JSON escapes.
 {
     "layer": "top",
+    // Reload only the CSS when style.css or an import changes (menu-state.css
+    // hides tooltips while a menu or popup is open, see ~/.local/bin/bar-tooltips)
+    "reload_style_on_change": true,
     "position": "top",
     "height": 30,
     "margin-top": {{ .design.gaps_in }},

@@ -66,6 +66,9 @@ if [[ $idx == "$active" ]]; then
 elif nmcli -t -f NAME connection show | grep -Fxq "$ssid"; then
     nmcli connection up id "$ssid" >/dev/null && notify-send -t 2000 "Wi-Fi" "Connected to $ssid"
 elif [[ -n ${secured[idx]} ]]; then
+    # Plain rofi, not rofi-menu: hide the bar tooltips here too (~/.local/bin/bar-tooltips)
+    "$HOME/.local/bin/bar-tooltips" off $$
+    trap '"$HOME/.local/bin/bar-tooltips" on $$' EXIT
     pass=$(rofi -dmenu -password -p "Password" -theme menu -theme-str "
         listview { lines: 0; } entry { placeholder: \"Password for $ssid\"; }") || exit 0
     nmcli device wifi connect "$ssid" password "$pass" >/dev/null \

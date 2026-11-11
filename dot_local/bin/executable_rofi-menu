@@ -34,6 +34,10 @@ lines=$(cat)
 # Only one menu at a time (rofi refuses to start a second one). A click on another
 # bar icon closes the open menu and opens this one; on the same icon it just closes.
 state=${XDG_RUNTIME_DIR:-/tmp}/rofi-menu-open
+# No bar tooltips on top of the menu. Taken before the old menu is closed, so
+# that one's exit does not show them again (~/.local/bin/bar-tooltips)
+"$HOME/.local/bin/bar-tooltips" off $$
+trap '"$HOME/.local/bin/bar-tooltips" on $$' EXIT
 if pgrep -x rofi >/dev/null; then
     prev=$(cat "$state" 2>/dev/null)
     pkill -x rofi
