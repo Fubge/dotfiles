@@ -93,6 +93,14 @@ hl.window_rule({
     workspace = "5 silent",
 })
 
+-- YouTube runs as a Vivaldi app window (own class) on workspace 4, whether
+-- youtube-autostart opens it or Vivaldi restores it with the last session
+hl.window_rule({
+    name = "youtube",
+    match = { class = "^vivaldi-www\\.youtube\\.com__.*$" },
+    workspace = "4 silent",
+})
+
 -- Ignore maximize requests from apps
 hl.window_rule({
     name = "suppress-maximize-events",
