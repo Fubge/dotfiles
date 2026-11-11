@@ -10,7 +10,7 @@
 
 * {
     font-family: "{{ .design.font }}", "Symbols Nerd Font";
-    font-size: 13px;
+    font-size: 14px;
     min-height: 0;
     border: none;
 }
@@ -62,9 +62,14 @@ tooltip {
 window#waybar.empty #window { padding: 0; }
 
 /* ---------------------------------------------------------------- center */
+/* Clock face + time share one pill; the face takes the time-of-day color */
+#custom-clockface { padding: 0 2px 0 16px; font-size: 16px; }
+#custom-clockface.morning { color: {{ .palette.yellow_bright }}; }
+#custom-clockface.day     { color: {{ .palette.yellow }}; }
+#custom-clockface.evening { color: @accent; }
+#custom-clockface.night   { color: {{ .palette.cyan_bright }}; }
 #clock {
-    padding: 0 18px;
-    font-weight: bold;
+    padding: 0 18px 0 8px;
 }
 #mpris {
     padding: 0 16px 0 10px;
@@ -80,7 +85,7 @@ window#waybar.empty #window { padding: 0; }
 #cpu, #temperature, #memory,
 #idle_inhibitor, #custom-power-profile, #custom-brightness, #battery,
 #wireplumber, #network, #bluetooth, #tray {
-    padding: 0 9px;
+    padding: 0 10px;
 }
 
 #custom-power {
@@ -96,7 +101,8 @@ window#waybar.empty #window { padding: 0; }
 #custom-power-profile.power-saver  { color: @good; }
 #cpu.high, #memory.high             { color: @warn; }
 #temperature.critical               { color: @crit; }
-#battery.charging, #battery.plugged { color: @good; }
+#battery.charging, #battery.full    { color: @good; }
+#battery.plugged                    { color: {{ .palette.cyan_bright }}; }
 #battery.warning:not(.charging)     { color: @warn; }
 #wireplumber.muted, #bluetooth.disabled, #bluetooth.off,
 #network.disconnected               { color: alpha(@fg, 0.45); }

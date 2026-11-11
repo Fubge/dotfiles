@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# Waybar custom/clockface: a clock-face icon that shows the current hour,
+# colored by the time of day (class morning / day / evening / night, see style.css)
+h=$(date +%-H)
+faces=($'\U000F144A' $'\U000F143F' $'\U000F1440' $'\U000F1441' $'\U000F1442' $'\U000F1443'
+       $'\U000F1444' $'\U000F1445' $'\U000F1446' $'\U000F1447' $'\U000F1448' $'\U000F1449')
+if   (( h >= 5  && h < 11 )); then class=morning
+elif (( h >= 11 && h < 17 )); then class=day
+elif (( h >= 17 && h < 22 )); then class=evening
+else class=night
+fi
+printf '{"text": "%s", "class": "%s", "tooltip": false}\n' "${faces[h % 12]}" "$class"

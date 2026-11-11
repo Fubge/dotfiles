@@ -3,13 +3,14 @@
 {
     "layer": "top",
     "position": "top",
+    "height": 30,
     "margin-top": {{ .design.gaps_in }},
     "margin-left": {{ .design.gaps_out }},
     "margin-right": {{ .design.gaps_out }},
     "spacing": 0,
 
     "modules-left":   ["hyprland/workspaces", "hyprland/window"],
-    "modules-center": ["clock", "mpris"],
+    "modules-center": ["custom/clockface", "clock", "mpris"],
     "modules-right":  ["group/hardware", "group/system", "group/connect", "custom/power"],
 
     // ---------------------------------------------------------------- groups
@@ -60,9 +61,16 @@
     },
 
     // ---------------------------------------------------------------- center
+    // Clock face of the current hour, colored by the time of day (script: ~/.local/bin/clockface)
+    "custom/clockface": {
+        "exec": "~/.local/bin/clockface",
+        "return-type": "json",
+        "interval": 30
+    },
     "clock": {
-        "format": "{:%H:%M}",
-        "format-alt": "\udb80\udced {:%a, %d. %b}",
+        // Bold time, quieter date next to it; click hides the date
+        "format": "<b>{0:%H:%M}</b>  <span alpha='60%'>{0:%a %d. %b}</span>",
+        "format-alt": "<b>{0:%H:%M}</b>",
         "tooltip-format": "<tt><small>{calendar}</small></tt>",
         "calendar": {
             "mode": "month",
@@ -87,8 +95,10 @@
     },
 
     // ---------------------------------------------------------------- hardware
+    // Snail, rabbit, rocket, fire: the busier the CPU, the faster the animal
     "cpu": {
-        "format": "\udb83\udee0 {usage}%",
+        "format": "{icon} {usage}%",
+        "format-icons": ["\udb85\ude77", "\udb82\udd07", "\udb81\udc63", "\udb80\ude38"],
         "interval": 2,
         "states": { "high": 80 }
     },
@@ -96,7 +106,8 @@
         "hwmon-path-abs": "/sys/devices/platform/coretemp.0/hwmon",
         "input-filename": "temp1_input",
         "critical-threshold": 90,
-        "format": "\udb81\udd0f {temperatureC}°"
+        "format": "{icon} {temperatureC}°",
+        "format-icons": ["\udb84\udcc3", "\udb81\udd0f", "\udb84\udcc2"]
     },
     "memory": {
         "format": "\udb80\udf5b {used:0.1f}/{total:0.0f} GB",
@@ -106,10 +117,10 @@
     },
 
     // ---------------------------------------------------------------- system
-    // Coffee cup: click to keep the screen awake (videos, downloads, ...)
+    // Coffee = stays awake, zZ = idles and locks as usual. Click toggles (videos, downloads, ...)
     "idle_inhibitor": {
         "format": "{icon}",
-        "format-icons": { "activated": "\udb80\udd76", "deactivated": "\udb81\udeca" },
+        "format-icons": { "activated": "\udb80\udd76", "deactivated": "\udb81\udcb2" },
         "tooltip-format-activated": "Staying awake",
         "tooltip-format-deactivated": "Idle as usual"
     },
@@ -132,16 +143,20 @@
         "on-click": "~/.local/bin/popup popup.brightness ~/.local/bin/brightness-popup"
     },
     "battery": {
-        // icon only like brightness and volume (percent in the tooltip);
-        // ten Material steps so the icon alone tells the level
+        // Icon only like brightness and volume (percent in the tooltip).
+        // Ten level steps everywhere: draining = plain, charging = bolt,
+        // plugged but held by the charge limit = plain in blue, full = heart
         "states": { "warning": 25, "critical": 10 },
         "format": "{icon}",
-        "format-plugged": "\udb81\udea5",
         "format-icons": {
             "default":  ["\udb80\udc7a", "\udb80\udc7b", "\udb80\udc7c", "\udb80\udc7d", "\udb80\udc7e", "\udb80\udc7f", "\udb80\udc80", "\udb80\udc81", "\udb80\udc82", "\udb80\udc79"],
-            "charging": ["\udb82\udc9c", "\udb80\udc86", "\udb80\udc87", "\udb80\udc88", "\udb82\udc9d", "\udb80\udc89", "\udb82\udc9e", "\udb80\udc8a", "\udb80\udc8b", "\udb80\udc85"]
+            "charging": ["\udb82\udc9c", "\udb80\udc86", "\udb80\udc87", "\udb80\udc88", "\udb82\udc9d", "\udb80\udc89", "\udb82\udc9e", "\udb80\udc8a", "\udb80\udc8b", "\udb80\udc85"],
+            "plugged":  ["\udb80\udc7a", "\udb80\udc7b", "\udb80\udc7c", "\udb80\udc7d", "\udb80\udc7e", "\udb80\udc7f", "\udb80\udc80", "\udb80\udc81", "\udb80\udc82", "\udb80\udc79"],
+            "full":     ["\udb84\ude0f"]
         },
-        "tooltip-format": "Battery {capacity}%\n{timeTo}\n{power:.1f} W"
+        "tooltip-format": "Battery {capacity}%\n{timeTo}\n{power:.1f} W",
+        "tooltip-format-plugged": "Battery {capacity}%\nPlugged in, held by the charge limit",
+        "tooltip-format-full": "Battery full\nPlugged in"
     },
 
     // ---------------------------------------------------------------- connect
@@ -179,7 +194,7 @@
         "on-click-right": "~/.local/bin/popup popup-term kitty --class popup-term bluetoothctl"
     },
     "tray": {
-        "icon-size": 16,
+        "icon-size": 17,
         "spacing": 12
     },
 
