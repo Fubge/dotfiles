@@ -39,6 +39,7 @@ slurp
 brightnessctl
 playerctl
 cava
+python-pillow   # renders the bar pet (~/.local/lib/pet)
 
 # Wallpapers: ImageMagick makes the menu thumbnails and login screen copies
 imagemagick

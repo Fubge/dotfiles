@@ -98,9 +98,14 @@ Files ending in `.tmpl` are generated from these values.
 - **`SUPER+C`** shows / hides one long-running Claude Code session (kitty on
   `special:claude`, started hidden at login). `SUPER+X` only hides it, `SUPER+SHIFT+X`
   ends it. **`SUPER+SHIFT+C`** = small prompt pill, the question goes into that session.
-- The sparkle left of the window title shows its state (ready, twinkling, orange =
-  needs you, green = finished while hidden, plus a notification). Right click = new
-  chat, resume, restart, quit. Script: `~/.local/bin/claude-pad`.
+- A little pixel pet left of the window title shows its state: sleeps while Claude
+  is off, potters about when ready (dozes at night), mines / types / thinks while
+  working, jumps with a "!" when it needs you, cheers and shows a gem when it finished
+  while hidden (plus a notification). Right click = new chat, resume, restart, quit,
+  switch pet (Mochi fluffball or Kitty, `claude-pad pet NAME`). Script:
+  `~/.local/bin/claude-pad`; the pets are drawn in `~/.local/lib/pet/pet.py`
+  (`pet.py sheet FILE` = contact sheet), frames are rendered into
+  `~/.config/waybar/pet` by a chezmoi run script.
 - It runs in this repo, not in `~`: Claude Code never remembers the trust prompt for
   the home folder. Its memory folder is a symlink so it shares the home one:
   `~/.claude/projects/-home-<user>--local-share-chezmoi/memory -> ../-home-<user>/memory`.

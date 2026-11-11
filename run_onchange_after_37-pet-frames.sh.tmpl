@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+# Bar pet frames (custom/claude): rendered from ~/.local/lib/pet/pet.py into
+# ~/.config/waybar/pet (PNGs + pet.css, imported by style.css).
+# pet.py: {{ include "dot_local/lib/pet/pet.py" | sha256sum }}
+set -euo pipefail
+python3 "$HOME/.local/lib/pet/pet.py" build "$HOME/.config/waybar/pet"

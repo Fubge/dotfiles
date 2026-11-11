@@ -8,30 +8,31 @@ its own special workspace (special:claude), like Spotify on special:music.
   claude-pad ask       SUPER+SHIFT+C: small prompt pill, the text goes into the
                        running session and the pad opens with the answer
   claude-pad menu      bar right click: new chat, resume, restart, quit
-  claude-pad watch     waybar module custom/claude (sparkle icon + typewriter)
+  claude-pad watch     waybar module custom/claude: the bar pet
+  claude-pad pet NAME  pick the pet (mochi, kitty)
   claude-pad hook EV   called by Claude Code hooks (~/.claude/settings.json),
                        only inside the pad (CLAUDE_PAD=1), event JSON on stdin
 
-States (file $XDG_RUNTIME_DIR/claude-pad/state, the bar follows via a FIFO):
-  off       no session          sparkle, dim
-  starting  window up, Claude not ready yet
-  idle      waiting for a prompt  sparkle outline
-  busy      working              sparkle twinkles (outline <-> filled)
-  waiting   needs you (permission, question)  orange, "needs you"
-  done      finished while the pad was hidden  green, "done"
+States (file $XDG_RUNTIME_DIR/claude-pad/state, the bar follows via a FIFO)
+and what the pet does (frames from ~/.local/lib/pet/pet.py):
+  off       no session          sleeps
+  starting  window up, Claude not ready yet   wakes up
+  idle      waiting for a prompt  potters about (blinks, looks, hops, waves...),
+                                  dozes at night
+  busy      working              mines, types on a laptop, thinks
+  waiting   needs you (permission, question)  jumps with a "!"
+  done      finished while the pad was hidden  cheers, then shows off a gem
 The last answer (first paragraph) is kept in $RUN/last: the notification and the
 quick prompt show it, so a reply can go straight back from the prompt pill.
 """
 import html
 import json
 import os
+import random
 import select
 import subprocess
 import sys
 import time
-
-sys.path.insert(0, os.path.expanduser("~/.local/lib/flair"))
-from typewriter import Typewriter  # noqa: E402
 
 CLASS = "claude_pad"
 WS = "claude"
@@ -47,17 +48,29 @@ BIN = os.path.join(HOME, ".local/bin")
 # a symlink to the home one (~/.claude/projects/-home-USER/memory), so both share it
 WORKDIR = os.path.join(HOME, ".local/share/chezmoi")
 
-COLORS = {
-    "dim": "{{ .palette.comment }}",
+PET_DIR = os.path.join(HOME, ".config/waybar/pet")      # built by pet.py
+PET_FILE = os.path.join(HOME, ".local/state/claude-pad/pet")
+PETS = {"mochi": "Mochi", "kitty": "Kitty"}
+NIGHT = (22, 6)      # idle turns into dozing between these hours
+
+# What the pet does per state: (animation, weight). Animations exist per pet in
+# anims.json; names a pet does not have are skipped.
+ACTIVITIES = {
+    "idle": [("rest", 5), ("breathe", 3), ("blink", 4), ("look", 2), ("wave", 1),
+             ("hop", 1), ("wiggle", 1), ("yawn", 0.5), ("happy", 1),
+             ("twinkle", 1.5), ("swish", 1.5)],
+    "night": [("doze", 3), ("sleep", 2), ("breathe", 2), ("rest", 2), ("yawn", 1)],
+    "off": [("sleep", 1)],
+    "busy": [("mine", 4), ("type", 3), ("think", 2)],
+    "waiting": [("alert", 3), ("rest", 1)],
+    "done": [("gem", 3), ("happy", 1)],
 }
-SPARKLE, SPARKLE_FILLED = "\uEC10", "\uEC21"   # nf-cod-sparkle(_filled)
-ICONS = {"off": SPARKLE, "starting": SPARKLE, "idle": SPARKLE,
-         "busy": SPARKLE, "waiting": SPARKLE_FILLED, "done": SPARKLE_FILLED}
-WORDS = {"waiting": "needs you", "done": "done"}
-WORD_HOLD = 4.0      # seconds a word stays before it is erased again
-TWINKLE_FPS = 2.5
-FPS = 60             # while the typewriter moves
-NBSP = " "
+# played once when a state begins
+INTROS = {"starting": "wake", "done": "cheer", "waiting": "alert"}
+TIPS = {"off": "Claude is not running", "starting": "Claude starts…",
+        "idle": "Claude is ready", "busy": "Claude is working…",
+        "waiting": "Claude needs you", "done": "Claude is done"}
+NBSP = "\u00a0"
 
 
 # --------------------------------------------------------------- helpers
@@ -254,6 +267,9 @@ def menu():
     if running:
         rows += [("\U000F0709  Restart Claude", restart),
                  ("\U000F0156  Quit Claude", quit_pad)]
+    current = read_pet()
+    rows += [("\U000F03E9  Pet: " + label, (lambda n=name: set_pet(n)))
+             for name, label in PETS.items() if name != current]
     pick = subprocess.run([os.path.join(BIN, "rofi-menu"), "--bar", "Claude", ""],
                           input="\n".join(r[0] for r in rows), capture_output=True, text=True)
     if pick.stdout.strip().isdigit():
@@ -335,9 +351,92 @@ def hook(name):
         set_state("off")
 
 
-# --------------------------------------------------------------- bar
-def span(color, text):
-    return f"<span color='{color}'>{text}</span>"
+# --------------------------------------------------------------- bar pet
+def read_pet():
+    try:
+        with open(PET_FILE) as f:
+            name = f.read().strip()
+    except OSError:
+        name = ""
+    return name if name in PETS else "mochi"
+
+
+def set_pet(name):
+    if name not in PETS:
+        sys.exit("pets: " + ", ".join(PETS))
+    os.makedirs(os.path.dirname(PET_FILE), exist_ok=True)
+    with open(PET_FILE, "w") as f:
+        f.write(name)
+    set_state(read_state())   # wakes the bar
+
+
+def load_anims():
+    try:
+        with open(os.path.join(PET_DIR, "anims.json")) as f:
+            return json.load(f)["anims"]
+    except (OSError, ValueError, KeyError):
+        return {}
+
+
+def night():
+    hour = time.localtime().tm_hour
+    return hour >= NIGHT[0] or hour < NIGHT[1]
+
+
+class Pet:
+    """Plays animations (lists of [frame class, ms]) one after another; picks
+    the next one by weight from the activities of the current state."""
+
+    def __init__(self):
+        self.anims = load_anims()
+        self.kind = read_pet()
+        self.state = None
+        self.queue = []          # [[frame, ms], ...] left of the current animation
+        self.frame = None
+        self.until = 0.0
+        self.last_pick = None
+
+    def mood(self):
+        if self.state == "idle" and night():
+            return "night"
+        return self.state if self.state in ACTIVITIES else "idle"
+
+    def pick(self):
+        have = self.anims.get(self.kind, {})
+        options = [(n, w) for n, w in ACTIVITIES[self.mood()] if n in have]
+        # avoid the same fidget twice in a row (looks mechanical)
+        if len(options) > 1:
+            options = [(n, w) for n, w in options if n != self.last_pick] or options
+        if not options:
+            return []
+        name = random.choices([n for n, _ in options], [w for _, w in options])[0]
+        self.last_pick = name
+        steps = [list(x) for x in have[name]]
+        if name == "rest":      # rest a random while, so the rhythm never repeats
+            steps[0][1] = random.randint(1200, 3500)
+        return steps
+
+    def update(self, state, kind):
+        """Switch state or pet; returns True if the shown frame changed."""
+        if kind != self.kind or state != self.state:
+            self.kind, self.state = kind, state
+            intro = INTROS.get(state)
+            have = self.anims.get(kind, {})
+            self.queue = [list(x) for x in have[intro]] if intro in have else []
+            self.until = 0
+        now = time.monotonic()
+        if now < self.until:
+            return False
+        if not self.queue:
+            self.queue = self.pick()
+        if not self.queue:
+            self.frame, self.until = None, now + 3600
+            return True
+        frame, ms = self.queue.pop(0)
+        self.until = now + ms / 1000
+        changed = frame != self.frame
+        self.frame = frame
+        return changed
 
 
 def watch():
@@ -345,40 +444,24 @@ def watch():
     if not os.path.exists(FIFO):
         os.mkfifo(FIFO)
     fd = os.open(FIFO, os.O_RDWR | os.O_NONBLOCK)   # RDWR: never sees EOF
-    tw = Typewriter(pad=True)
-    state, word_until, last, next_alive = None, 0.0, None, 0.0
+    pet = Pet()
+    last, next_alive = None, 0.0
     while True:
         now = time.monotonic()
         if now >= next_alive:   # session gone without a SessionEnd hook (killed)
             next_alive = now + 3
             if read_state() != "off" and not window():
                 set_state("off")
-        new = read_state()
-        if new != state:
-            state = new
-            word = WORDS.get(state, "")
-            tw.set(word)
-            word_until = now + len(word) / tw.type_speed + WORD_HOLD if word else 0
-        if word_until and now >= word_until:
-            word_until = 0
-            tw.set("")
-        typed, moving = tw.frame()
-        text = ICONS.get(state, ICONS["off"])
-        if state == "busy" and int(now * TWINKLE_FPS) % 2:
-            text = SPARKLE_FILLED
-        if typed:
-            text += " " + typed
-        tip = {"off": "Claude is not running", "starting": "Claude starts…",
-               "idle": "Claude is ready", "busy": "Claude is working…",
-               "waiting": "Claude needs you", "done": "Claude is done"}.get(state, "")
-        out = json.dumps({"text": text, "class": state,
-                          "tooltip": tip + "\n\n<small>Click show · Right click menu</small>"})
+        state = read_state()
+        pet.update(state, read_pet())
+        classes = ["pet", pet.kind, state] + ([pet.frame] if pet.frame else [])
+        tip = TIPS.get(state, "") + "\n\n<small>Click show · Right click menu</small>"
+        out = json.dumps({"text": NBSP, "class": classes, "tooltip": tip})
         if out != last:
             print(out, flush=True)
             last = out
-        timeout = (1 / FPS if moving else 1 / TWINKLE_FPS if state == "busy"
-                   else max(0.05, word_until - now) if word_until else 3)
-        if select.select([fd], [], [], timeout)[0]:
+        timeout = max(0.01, pet.until - time.monotonic())
+        if select.select([fd], [], [], min(timeout, 3))[0]:
             try:
                 os.read(fd, 4096)
             except OSError:
@@ -391,6 +474,8 @@ if __name__ == "__main__":
     args = sys.argv[1:]
     if len(args) == 2 and args[0] == "hook":
         hook(args[1])
+    elif len(args) == 2 and args[0] == "pet":
+        set_pet(args[1])
     elif len(args) == 1 and args[0] in cmds:
         cmds[args[0]]()
     else:
