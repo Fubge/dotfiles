@@ -26,10 +26,28 @@ require("mini.files").setup({ windows = { preview = true, width_preview = 50 } }
 local map = vim.keymap.set
 local builtin, extra = MiniPick.builtin, MiniExtra.pickers
 
-map("n", "<leader>sf", builtin.files,      { desc = "Search files" })
-map("n", "<leader>sg", builtin.grep_live,  { desc = "Search by grep (live)" })
-map("n", "<leader>sw", function() builtin.grep({ pattern = vim.fn.expand("<cword>") }) end,
-    { desc = "Search word under cursor" })
+-- Two scopes:
+--   project  = git root of the current file (fallback: current directory)
+--   home     = everything in ~ (heavy folders are skipped via ~/.config/ripgrep/ignore)
+local function project_root()
+    return vim.fs.root(0, ".git") or vim.uv.cwd()
+end
+local function in_dir(picker, dir, label, extra_opts)
+    return function()
+        local local_opts = vim.tbl_extend("force", { tool = "rg" }, extra_opts or {})
+        picker(local_opts, { source = { cwd = dir(), name = label } })
+    end
+end
+local home = function() return vim.env.HOME end
+
+map("n", "<leader>sf", in_dir(builtin.files, project_root, "Files (project)"),     { desc = "Files in project" })
+map("n", "<leader>sg", in_dir(builtin.grep_live, project_root, "Grep (project)"),  { desc = "Grep in project" })
+map("n", "<leader>sw", function()
+    builtin.grep({ tool = "rg", pattern = vim.fn.expand("<cword>") },
+        { source = { cwd = project_root(), name = "Word (project)" } })
+end, { desc = "Word under cursor in project" })
+map("n", "<leader>sF", in_dir(builtin.files, home, "Files (home)"),                { desc = "Files everywhere (~)" })
+map("n", "<leader>sG", in_dir(builtin.grep_live, home, "Grep (home)"),             { desc = "Grep everywhere (~)" })
 map("n", "<leader>sh", builtin.help,       { desc = "Search help" })
 map("n", "<leader>sk", extra.keymaps,      { desc = "Search keymaps" })
 map("n", "<leader>sd", extra.diagnostic,   { desc = "Search diagnostics" })

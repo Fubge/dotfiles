@@ -2,3 +2,4 @@
 typeset -U path                      # no duplicate entries
 path=("$HOME/.local/bin" $path)      # personal scripts (rofi menus, dots-check, ...)
 export PATH
+export RIPGREP_CONFIG_PATH="$HOME/.config/ripgrep/config"

@@ -1,0 +1,6 @@
+# ripgrep defaults (used by `rg` in the terminal and by Neovim's search).
+# Activated via RIPGREP_CONFIG_PATH (set in ~/.zshenv and ~/.config/uwsm/env).
+--hidden
+--glob=!.git/
+--smart-case
+--ignore-file={{ .chezmoi.homeDir }}/.config/ripgrep/ignore

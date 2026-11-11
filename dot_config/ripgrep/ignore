@@ -1,0 +1,19 @@
+# Never search these (gitignore syntax). Mostly matters for home-wide searches.
+.cache/
+.steam/
+.local/share/Steam/
+.local/share/Trash/
+.local/share/nvim/
+.local/state/
+.config/vivaldi/
+.config/discord/
+.config/Bitwarden/
+.mozilla/
+.var/
+.npm/
+.cargo/registry/
+.rustup/
+node_modules/
+__pycache__/
+.venv/
+*.pyc
