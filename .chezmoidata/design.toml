@@ -14,8 +14,8 @@ overlay_width  = 1300
 overlay_height = 760
 overlay_top    = 70                  # px from the top of the screen
 
-# Exceptions, both centered on the screen: the app launcher is a compact grid,
-# the web search a single search pill
-launcher_width  = 820
-launcher_height = 540
+# Exceptions: the app launcher is a compact grid in the upper part,
+# the web search a single search pill in the center
+launcher_width  = 640
+launcher_top    = 190                # px from the screen top (Spotlight-like)
 websearch_width = 560

@@ -1,36 +1,45 @@
-/* App launcher (SUPER+Space): icon grid inside the shared overlay frame
-   (overlay.rasi: size, position, search pill, footer). Only the grid lives here. */
+/* App launcher (SUPER+Space): compact icon grid. Shares the look of the
+   overlays (overlay.rasi: search pill, colors, footer) but is smaller and sits
+   in the upper part of the screen (like Spotlight / Raycast). */
 @import "overlay.rasi"
 
-/* compact and centered on the screen, unlike the other overlays */
 window {
-    location: center;
-    anchor:   center;
-    y-offset: 0;
+    /* top edge fixed, so the search pill always sits in the same spot */
+    location: north;
+    anchor:   north;
+    /* rofi counts y from below the bar (8 px margin + 22 px bar) */
+    y-offset: {{ sub .design.launcher_top 30 }}px;
     width:    {{ .design.launcher_width }}px;
-    height:   {{ .design.launcher_height }}px;
+    height:   0;   /* fit the content: search pill + grid + footer */
+    padding:  20px 18px 14px 18px;
 }
 
-entry { placeholder: "Search apps or the web"; }
+mainbox    { spacing: 16px; }
+box-search { width: 340px; padding: 9px 16px; }
+entry {
+    placeholder: "Search apps or the web";
+    font:        "{{ .design.font_ui }} 12";
+}
 
 listview {
     columns:       6;
-    lines:         3;
+    lines:         2;   /* 12 tiles, more scroll */
     flow:          horizontal;
     fixed-columns: true;   /* a single match keeps its tile size */
-    spacing:       6px;
+    fixed-height:  true;   /* grid keeps its height while filtering */
+    spacing:       4px;
 }
 
 element {
-    orientation:   vertical;
-    padding:       18px 8px 14px 8px;
-    spacing:       10px;
+    orientation: vertical;
+    padding:     12px 6px 10px 6px;
+    spacing:     8px;
 }
 
-element-icon { size: 64px; horizontal-align: 0.5; }
+element-icon { size: 48px; horizontal-align: 0.5; }
 
 element-text {
-    font:             @font-ui;
+    font:             "{{ .design.font_ui }} 10";
     highlight:        bold;
     horizontal-align: 0.5;
     vertical-align:   0;
