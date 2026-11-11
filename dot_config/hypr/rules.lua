@@ -27,7 +27,7 @@ for class, size in pairs(v.popup.classes) do
     })
 end
 
--- Overlays: same size and spot as the rofi overlays (horizontally centered)
+-- Overlays: same size and spot as the rofi overlays (centered on the screen)
 for _, class in ipairs(v.overlays) do
     hl.window_rule({
         name = "overlay-" .. class,
@@ -35,7 +35,7 @@ for _, class in ipairs(v.overlays) do
         float = true,
         pin = true,
         size = v.overlay.size,
-        move = { "monitor_w*0.5-" .. v.overlay.size[1] // 2, tostring(v.overlay.top) },
+        move = { "monitor_w*0.5-" .. v.overlay.size[1] // 2, "monitor_h*0.5-" .. v.overlay.size[2] // 2 },
         rounding = v.overlay.rounding,
     })
 end

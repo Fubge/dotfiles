@@ -11,10 +11,8 @@
 }
 
 window {
-    location:         north;
-    anchor:           north;
-    /* rofi counts y from below the bar (8 px margin + 22 px bar) */
-    y-offset:         {{ sub .design.overlay_top 30 }}px;
+    location:         center;
+    anchor:           center;
     width:            {{ .design.overlay_width }}px;
     height:           {{ .design.overlay_height }}px;
     padding:          28px 24px 18px 24px;
