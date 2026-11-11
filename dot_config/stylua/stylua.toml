@@ -1,0 +1,6 @@
+# Default Lua style for stylua (used when a project has no stylua.toml of its own)
+column_width = 120
+indent_type = "Spaces"
+indent_width = 4
+quote_style = "AutoPreferDouble"
+call_parentheses = "Always"

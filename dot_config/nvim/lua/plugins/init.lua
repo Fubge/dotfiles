@@ -6,3 +6,5 @@
 require("plugins.ui")
 require("plugins.search")
 require("plugins.treesitter")
+require("plugins.editing")
+require("plugins.git")

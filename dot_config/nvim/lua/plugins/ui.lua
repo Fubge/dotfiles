@@ -1,10 +1,12 @@
 -- Look & feel: colorscheme, statusline, icons, keymap hints.
-local gh = function(repo) return "https://github.com/" .. repo end
+local gh = function(repo)
+    return "https://github.com/" .. repo
+end
 
 vim.pack.add({
-    gh("folke/tokyonight.nvim"),     -- colorscheme
-    gh("echasnovski/mini.nvim"),     -- collection of small modules (statusline, icons, ...)
-    gh("folke/which-key.nvim"),      -- popup that shows available keys
+    gh("folke/tokyonight.nvim"), -- colorscheme
+    gh("echasnovski/mini.nvim"), -- collection of small modules (statusline, icons, ...)
+    gh("folke/which-key.nvim"), -- popup that shows available keys
 })
 
 -- Colorscheme ----------------------------------------------------------------
@@ -28,20 +30,28 @@ require("tokyonight").setup({
     end,
     on_highlights = function(hl, c)
         hl.CursorLineNr = { fg = p.accent, bold = true }
-        hl.FloatBorder  = { fg = p.accent, bg = p.bg_dark }
+        hl.FloatBorder = { fg = p.accent, bg = p.bg_dark }
         hl.WinSeparator = { fg = p.steel }
-        hl.Search       = { fg = p.bg, bg = p.yellow }
-        hl.IncSearch    = { fg = p.bg, bg = p.accent }
-        hl.Cursor       = { fg = p.bg, bg = p.accent }
+        hl.Search = { fg = p.bg, bg = p.yellow }
+        hl.IncSearch = { fg = p.bg, bg = p.accent }
+        hl.Cursor = { fg = p.bg, bg = p.accent }
         -- Statusline mode pill: same colors as the active workspace in waybar
-        hl.MiniStatuslineModeNormal  = { fg = p.bg, bg = p.accent, bold = true }
-        hl.MiniStatuslineModeInsert  = { fg = p.bg, bg = p.green, bold = true }
-        hl.MiniStatuslineModeVisual  = { fg = p.bg, bg = p.magenta, bold = true }
+        hl.MiniStatuslineModeNormal = { fg = p.bg, bg = p.accent, bold = true }
+        hl.MiniStatuslineModeInsert = { fg = p.bg, bg = p.green, bold = true }
+        hl.MiniStatuslineModeVisual = { fg = p.bg, bg = p.magenta, bold = true }
         hl.MiniStatuslineModeReplace = { fg = p.bg, bg = p.red, bold = true }
         hl.MiniStatuslineModeCommand = { fg = p.bg, bg = p.yellow, bold = true }
-        hl.MiniStatuslineDevinfo     = { fg = p.fg, bg = p.steel }
-        hl.MiniStatuslineFileinfo    = { fg = p.fg, bg = p.steel }
-        hl.MiniStatuslineFilename    = { fg = p.fg_muted, bg = p.bg_dark }
+        hl.MiniStatuslineDevinfo = { fg = p.fg, bg = p.steel }
+        hl.MiniStatuslineFileinfo = { fg = p.fg, bg = p.steel }
+        hl.MiniStatuslineFilename = { fg = p.fg_muted, bg = p.bg_dark }
+        -- Git change signs
+        hl.MiniDiffSignAdd = { fg = p.green }
+        hl.MiniDiffSignChange = { fg = p.yellow }
+        hl.MiniDiffSignDelete = { fg = p.red }
+        -- Completion popup
+        hl.Pmenu = { fg = p.fg, bg = p.bg_dark }
+        hl.PmenuSel = { fg = p.bg, bg = p.accent, bold = true }
+        hl.PmenuThumb = { bg = p.steel }
     end,
 })
 vim.cmd.colorscheme("tokyonight-night")

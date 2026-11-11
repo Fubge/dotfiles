@@ -16,9 +16,26 @@ vim.api.nvim_create_autocmd("PackChanged", {
 })
 
 require("nvim-treesitter").install({
-    "bash", "c", "css", "diff", "gitcommit", "git_config", "html", "javascript",
-    "json", "lua", "markdown", "markdown_inline", "python", "query", "regex",
-    "toml", "typescript", "vim", "vimdoc", "yaml",
+    "bash",
+    "c",
+    "css",
+    "diff",
+    "gitcommit",
+    "git_config",
+    "html",
+    "javascript",
+    "json",
+    "lua",
+    "markdown",
+    "markdown_inline",
+    "python",
+    "query",
+    "regex",
+    "toml",
+    "typescript",
+    "vim",
+    "vimdoc",
+    "yaml",
 })
 
 -- Turn Treesitter on for every buffer that has a parser

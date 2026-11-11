@@ -4,7 +4,9 @@ local group = vim.api.nvim_create_augroup("user", { clear = true })
 -- Briefly highlight what you just yanked (copied)
 vim.api.nvim_create_autocmd("TextYankPost", {
     group = group,
-    callback = function() vim.hl.on_yank() end,
+    callback = function()
+        vim.hl.on_yank()
+    end,
 })
 
 -- Reopen a file at the line where you left it

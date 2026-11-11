@@ -2,15 +2,15 @@ local v = require("vars")
 
 hl.config({
     input = {
-        kb_layout    = v.keyboard.layout,
-        kb_options   = v.keyboard.options,  -- Caps Lock <-> Escape (great for Neovim)
-        follow_mouse = 0,                   -- focus changes on click, not on hover
-        float_switch_override_focus = 0,    -- ...also between floating and tiled windows
-        sensitivity  = 0,
+        kb_layout = v.keyboard.layout,
+        kb_options = v.keyboard.options, -- Caps Lock <-> Escape (great for Neovim)
+        follow_mouse = 0, -- focus changes on click, not on hover
+        float_switch_override_focus = 0, -- ...also between floating and tiled windows
+        sensitivity = 0,
         touchpad = {
-            natural_scroll       = true,
+            natural_scroll = true,
             disable_while_typing = true,
-            clickfinger_behavior = true,    -- 2-finger click = right, 3-finger = middle
+            clickfinger_behavior = true, -- 2-finger click = right, 3-finger = middle
         },
     },
 })

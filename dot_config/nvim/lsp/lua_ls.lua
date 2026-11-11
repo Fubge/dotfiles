@@ -8,9 +8,9 @@ return {
             runtime = { version = "LuaJIT" },
             workspace = {
                 checkThirdParty = false,
-                library = { vim.env.VIMRUNTIME },   -- Neovim's runtime (vim.* API)
+                library = { vim.env.VIMRUNTIME }, -- Neovim's runtime (vim.* API)
             },
-            diagnostics = { globals = { "vim", "hl" } },  -- hl = Hyprland's Lua API
+            diagnostics = { globals = { "vim", "hl" } }, -- hl = Hyprland's Lua API
             telemetry = { enable = false },
         },
     },
