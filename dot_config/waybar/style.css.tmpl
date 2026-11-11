@@ -51,8 +51,14 @@ tooltip {
     margin: 0 1px;
     background: none;
     box-shadow: none;
+    transition: all 0.25s ease-out;
 }
 #workspaces button.empty  { color: alpha(@fg, 0.4); }
+/* Hover: the icon lights up orange and the button stretches a little */
+#workspaces button:hover {
+    color: @accent;
+    padding: 0 11px;
+}
 /* Active workspace becomes a wider orange pill */
 #workspaces button.active {
     color: @dark;
