@@ -2,14 +2,17 @@
 # wallpaper: choose and switch wallpapers (hyprpaper backend).
 #   wallpaper pick        grid menu with previews (SUPER+W)
 #   wallpaper set FILE    set a specific image (stays until changed)
+#   wallpaper login FILE  set the login screen (SDDM) background
 #   wallpaper shuffle     switch to shuffle mode: random image now and every 30 min
 #   wallpaper tick        called by the timer; changes image only in shuffle mode
+# In the menu: Enter = desktop, Shift+Enter = login screen, Ctrl+Enter = both.
 # Images come from ~/Pictures/Wallpapers (incl. subfolders) and the Arch wallpaper package.
 set -uo pipefail
 
 dirs=("$HOME/Pictures/Wallpapers" "/usr/share/backgrounds/archlinux")
 state="${XDG_STATE_HOME:-$HOME/.local/state}/wallpaper"
 thumbs="${XDG_CACHE_HOME:-$HOME/.cache}/wallpaper-thumbs"
+login_dir=/var/lib/login-wallpaper   # user-owned, read by the SDDM theme "slate"
 mkdir -p "$state" "$thumbs"
 
 list_images() {
@@ -25,6 +28,15 @@ apply() {
 set_fixed() {
     echo fixed > "$state/mode"
     apply "$1"
+}
+
+set_login() {   # cropped to the panel size as JPEG, so SDDM never chokes on webp etc.
+    [[ -w $login_dir ]] || { notify-send "Wallpapers" "$login_dir missing (chezmoi apply)"; return 1; }
+    local tmp="$login_dir/.new.jpg"
+    magick "$1[0]" -resize 2880x1800^ -gravity center -extent 2880x1800 -quality 92 "$tmp" &&
+        mv -f "$tmp" "$login_dir/background.jpg" &&
+        ln -sfn "$1" "$state/login" &&
+        notify-send -t 2000 "Wallpapers" "Login screen: $(basename "${1%.*}")"
 }
 
 random_image() {
@@ -46,28 +58,32 @@ pick() {
         notify-send -t 2000 "Wallpapers" "Creating previews..."
     fi
 
-    local mode; mode=$(cat "$state/mode" 2>/dev/null || echo fixed)
-    {
+    local mode idx rc; mode=$(cat "$state/mode" 2>/dev/null || echo fixed)
+    idx=$({
         printf '%s\0icon\x1f%s\n' "Shuffle$([[ $mode == shuffle ]] && echo ' (on)')" "media-playlist-shuffle"
         for img in "${images[@]}"; do
             name=$(basename "${img%.*}")
             printf '%s\0icon\x1f%s\n' "$name" "$(thumbnail "$img")"
         done
-    } | rofi -dmenu -i -show-icons -format i -p "Wallpaper" -theme overlay -theme-str '
+    } | rofi -dmenu -i -show-icons -format i -p "Wallpaper" -theme overlay \
+        -kb-accept-alt "" -kb-accept-custom "" \
+        -kb-custom-1 "Shift+Return" -kb-custom-2 "Control+Return" -theme-str '
         entry    { placeholder: "Filter wallpapers..."; }
         listview { columns: 4; lines: 3; flow: horizontal; fixed-columns: true; spacing: 6px; }
         element  { orientation: vertical; padding: 10px 8px 8px 8px; spacing: 6px; }
         element-icon { size: 140px; horizontal-align: 0.5; }
         element-text { font: @font-ui; horizontal-align: 0.5; }
-        textbox-hint { str: "Enter  set wallpaper      ·      Esc  close"; }
-    ' | {
-        read -r idx || exit 0
-        if [[ $idx == 0 ]]; then
-            shuffle
-        else
-            set_fixed "${images[idx - 1]}"
-        fi
-    }
+        textbox-hint { str: "Enter  desktop      ·      Shift+Enter  login screen      ·      Ctrl+Enter  both      ·      Esc  close"; }
+    ')
+    rc=$?   # rofi: 0 Enter, 10 Shift+Enter, 11 Ctrl+Enter, 1 Esc
+    [[ -n $idx ]] || return 0
+    if [[ $idx == 0 ]]; then
+        shuffle
+        return
+    fi
+    local img=${images[idx - 1]}
+    [[ $rc == 10 ]] || set_fixed "$img"
+    [[ $rc == 0 ]] || set_login "$img"
 }
 
 shuffle() {
@@ -78,7 +94,8 @@ shuffle() {
 case "${1:-pick}" in
     pick) pick ;;
     set) [[ -f ${2:-} ]] && set_fixed "$(realpath "$2")" || { echo "usage: wallpaper set FILE" >&2; exit 1; } ;;
+    login) [[ -f ${2:-} ]] && set_login "$(realpath "$2")" || { echo "usage: wallpaper login FILE" >&2; exit 1; } ;;
     shuffle) shuffle ;;
     tick) [[ $(cat "$state/mode" 2>/dev/null) == shuffle ]] && apply "$(random_image)" ;;
-    *) sed -n '2,7p' "$0"; exit 1 ;;
+    *) sed -n '2,9p' "$0"; exit 1 ;;
 esac

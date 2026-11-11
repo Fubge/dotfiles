@@ -6,7 +6,7 @@ gaps_in   = 8                        # between windows
 gaps_out  = 16                       # between windows and screen edge (also bar margins)
 font      = "JetBrainsMono Nerd Font"
 font_ui   = "Noto Sans"
-login_wallpaper = "generated/horizon.jpg"   # relative to ~/Pictures/Wallpapers (SDDM background)
+login_wallpaper = "generated/horizon.jpg"   # relative to ~/Pictures/Wallpapers; first SDDM background only, then SUPER+W Shift+Enter
 
 # Big centered overlays (app launcher, wallpaper picker, shortcuts, clipboard,
 # web search) all share one frame: same size, same top edge, same search pill

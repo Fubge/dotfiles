@@ -1,16 +1,20 @@
 #!/usr/bin/env bash
-# Generate the SDDM theme config from the palette and copy the login wallpaper.
+# Generate the SDDM theme config from the palette and prepare the login wallpaper.
+# The background lives in /var/lib/login-wallpaper, owned by the user, so the
+# wallpaper menu (Shift+Enter) can change it without sudo. login_wallpaper in
+# design.toml only seeds it the first time.
 # palette: {{ .palette | toJson | sha256sum }}
 # design: {{ .design | toJson | sha256sum }}
 set -euo pipefail
 theme=/usr/share/sddm/themes/slate
+bgdir=/var/lib/login-wallpaper
 wall="{{ .chezmoi.homeDir }}/Pictures/Wallpapers/{{ .design.login_wallpaper }}"
 [[ -d $theme ]] || { echo "sddm: theme not installed yet"; exit 0; }
 
 tmp=$(mktemp)
 cat > "$tmp" <<CONF
 [General]
-background=background.jpg
+background=$bgdir/background.jpg
 font={{ .design.font }}
 rounding={{ .design.rounding }}
 border={{ .design.border }}
@@ -27,5 +31,9 @@ red={{ .palette.red }}
 CONF
 sudo install -m 0644 "$tmp" "$theme/theme.conf"
 rm -f "$tmp"
-[[ -f $wall ]] && sudo install -m 0644 "$wall" "$theme/background.jpg"
-echo "sddm: theme.conf + background updated"
+sudo install -d -m 0755 -o "$(id -un)" -g "$(id -gn)" "$bgdir"
+sudo rm -f "$theme/background.jpg"   # old location
+if [[ ! -f $bgdir/background.jpg && -f $wall ]]; then
+    "{{ .chezmoi.homeDir }}/.local/bin/wallpaper" login "$wall"
+fi
+echo "sddm: theme.conf updated, background in $bgdir"
