@@ -88,7 +88,7 @@ def first_start():
 
 
 def window():
-    tw = Typewriter(type_speed=26, erase_speed=60)
+    tw = Typewriter()
     current = {"name": ""}
     out = subprocess.run(["hyprctl", "activewindow", "-j"], capture_output=True, text=True).stdout
     try:
@@ -143,7 +143,7 @@ def wifi_name():
 
 
 def wifi():
-    tw = Typewriter(type_speed=20, erase_speed=40)
+    tw = Typewriter()
     state = {"name": wifi_name(), "hide_at": None}
 
     def check():

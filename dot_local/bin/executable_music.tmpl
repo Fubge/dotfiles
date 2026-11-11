@@ -43,7 +43,9 @@ def refresh_rate():
 
 
 FPS = refresh_rate()          # visualizer frames per second = display refresh rate
-TYPE_SPEED = 22               # characters per second when a new song appears
+# typing speed shared with the other typewriter texts
+sys.path.insert(0, os.path.expanduser("~/.local/lib/flair"))
+from typewriter import TYPE_SPEED  # noqa: E402
 SCROLL_SPEED = 4              # marquee characters per second (moves pixel by pixel)
 CHAR_W = 14 * 0.6             # advance of one JetBrains Mono character at the bar's 14 px
 SCROLL_HOLD = 2.0             # seconds the start of a long title stays put

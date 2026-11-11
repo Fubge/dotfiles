@@ -11,13 +11,17 @@ one is typed in with an orange block caret that disappears when done.
 import html
 import time
 
+# One speed for the whole desktop (characters per second). Users of this lib
+# take the defaults; lock-greeting (bash) mirrors TYPE_SPEED as ms per char.
+TYPE_SPEED = 17
+ERASE_SPEED = 40
 CARET_COLOR = "{{ .palette.accent }}"
 CARET = "▍"
 NBSP = " "
 
 
 class Typewriter:
-    def __init__(self, type_speed=24, erase_speed=55, pad=False, caret_hold=0.5):
+    def __init__(self, type_speed=TYPE_SPEED, erase_speed=ERASE_SPEED, pad=False, caret_hold=0.5):
         """speeds in characters per second; pad=True fills up to the final width
         with no-break spaces so neighbours do not move while typing.
         caret_hold: seconds the caret stays after the last character."""

@@ -25,7 +25,7 @@ fi
 text="$hello, ${USER}"
 
 delay=500   # ms: let the screen fade in first
-speed=80    # ms per character
+speed=59    # ms per character (= TYPE_SPEED 17/s in ~/.local/lib/flair/typewriter.py)
 typed=$(((elapsed - delay) / speed))
 ((typed < 0)) && typed=0
 caret="<span foreground='{{ .palette.accent }}'>▍</span>"
