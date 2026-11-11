@@ -3,3 +3,6 @@ bootstrap.sh
 packages/
 docs/
 system/
+
+**/__pycache__
+.gitignore
