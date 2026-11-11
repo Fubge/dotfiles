@@ -58,8 +58,7 @@ tooltip {
 }
 #workspaces button.urgent { color: @crit; }
 
-#window { padding: 0 16px; }
-window#waybar.empty #window { padding: 0; }
+#custom-window { padding: 0 16px; }
 
 /* ---------------------------------------------------------------- center */
 /* Terminal clock:  ❯ 17:48  // Mi 11. Nov▍
@@ -91,11 +90,41 @@ window#waybar.empty #window { padding: 0; }
     from { opacity: 1; }
     to   { opacity: 0.15; }
 }
-/* now playing: colors come from the script (pango), only the frame here */
+/* now playing: icon + visualizer bars + title (~/.local/bin/music).
+   Each bar is its own module; the script only sets a height class l0..l16,
+   CSS draws a rounded pill growing from the middle and eases between heights. */
+#custom-music-icon { padding: 0 8px 0 8px; }
 #custom-music {
-    padding: 0 12px 0 8px;
+    padding: 0 12px 0 10px;
     color: {{ .palette.fg_muted }};
 }
+/* Each bar is a 9 px wide label: a crisp 3 px core (gradient) over a soft
+   radial glow. Two background layers instead of box-shadow: the blurred shadow
+   tripled waybar's CPU use, gradients are cheap. */
+#music label.bar {
+    font-size: 1px;
+    color: transparent;
+    padding: 0;
+    min-width: 11px;
+    margin: 13px 0;
+    border-radius: 2px;
+    background-image: linear-gradient(to top, @accent 35%, {{ .palette.yellow }}),
+                      radial-gradient(closest-side, alpha(@accent, 0.95), alpha(@accent, 0.45) 55%, alpha(@accent, 0));
+    background-size: 3px 100%, 100% 100%;
+    background-position: center, center;
+    background-repeat: no-repeat;
+    transition: margin 45ms linear;
+}
+#music label.bar.paused {
+    background-image: radial-gradient(circle closest-side, {{ .palette.comment }} 80%, alpha({{ .palette.comment }}, 0));
+    background-size: 4px 100%;
+}
+{{- /* heights 4..20 px in the 30 px bar, 1 px steps (GTK margins are whole px,
+       odd remainders go to the top so the bar stays centered within half a px) */}}
+{{- range $l := until 17 }}
+{{- $m := sub 26 $l }}
+#music label.bar.l{{ $l }} { margin-top: {{ sub $m (div $m 2) }}px; margin-bottom: {{ div $m 2 }}px; }
+{{- end }}
 
 /* ---------------------------------------------------------------- right */
 #hardware { padding: 0 4px; }
@@ -107,6 +136,7 @@ window#waybar.empty #window { padding: 0; }
 #wireplumber, #network, #bluetooth, #tray {
     padding: 0 10px;
 }
+#custom-wifi-name { padding: 0 6px 0 0; margin-left: -6px; }
 
 #custom-power {
     background: @dark;
@@ -146,7 +176,7 @@ window#waybar.empty #window { padding: 0; }
 /* ---------------------------------------------------------------- hover
    Same effect everywhere: orange text on a slightly darker background.
    Kept last so it wins over the state colors above. */
-#workspaces button, #window, #clock.date, #custom-music,
+#workspaces button, #custom-window, #clock.date, #custom-music,
 #cpu, #temperature, #memory,
 #idle_inhibitor, #custom-power-profile, #custom-brightness, #custom-battery,
 #wireplumber, #network, #bluetooth, #custom-power {

@@ -1,25 +1,68 @@
+# Notifications: dark cards like the bar's center pill, a subtle frame, the
+# app name small and dim above a bold summary that ends in the orange
+# typewriter caret (the desktop's flair). Hyprland slides them in from the
+# right (layer rule "notifications" in hypr/rules.lua).
+# Colors: .chezmoidata/palette.toml, shapes: design.toml
+
 [global]
     follow = mouse
-    width = 350
+    width = (300, 380)
+    height = (0, 220)
     origin = top-right
-    offset = ({{ .design.gaps_out }}, {{ .design.gaps_out }})
+    # below the bar: bar margin + height + gap
+    offset = ({{ .design.gaps_out }}, {{ add .design.gaps_in 6 }})
     notification_limit = 5
-    gap_size = 6
-    padding = 12
-    horizontal_padding = 14
-    frame_width = {{ .design.border }}
-    frame_color = "{{ .palette.accent }}"
-    corner_radius = {{ .design.rounding }}
-    font = {{ .design.font }} 11
-    format = "<b>%s</b>\n%b"
-    icon_position = left
-    max_icon_size = 48
-    background = "{{ .palette.bg }}e6"
+    gap_size = 8
+    indicate_hidden = yes
+    sort = urgency_descending
+
+    # card
+    padding = 14
+    horizontal_padding = 16
+    text_icon_padding = 14
+    frame_width = 1
+    frame_color = "{{ .palette.steel }}"
+    corner_radius = {{ add .design.rounding 2 }}
+    background = "{{ .palette.bg_dark }}f0"
     foreground = "{{ .palette.fg }}"
+    separator_height = 0
+
+    # text
+    font = {{ .design.font }} 10.5
+    markup = full
+    alignment = left
+    vertical_alignment = center
+    line_height = 2
+    ellipsize = end
+    word_wrap = yes
+    show_age_threshold = 120
+    format = "<span size='small' foreground='{{ .palette.comment }}'>%a</span>\n<b>%s</b><span foreground='{{ .palette.accent }}'>▍</span>\n<span foreground='{{ .palette.fg_muted }}'>%b</span>"
+
+    # icon
+    icon_position = left
+    min_icon_size = 32
+    max_icon_size = 40
+    icon_corner_radius = 8
+    enable_recursive_icon_lookup = true
+    icon_theme = Papirus-Dark
+
+    # progress bar (volume, brightness, downloads)
+    progress_bar = true
+    progress_bar_height = 6
+    progress_bar_min_width = 200
+    progress_bar_max_width = 340
+    progress_bar_frame_width = 0
+    progress_bar_corner_radius = 3
+    highlight = "{{ .palette.accent }}"
+
     mouse_left_click = do_action, close_current
-    mouse_right_click = close_all
+    mouse_middle_click = close_all
+    mouse_right_click = close_current
 
 [urgency_low]
+    background = "{{ .palette.bg_dark }}e0"
+    foreground = "{{ .palette.fg_muted }}"
+    format = "<span size='small' foreground='{{ .palette.comment }}'>%a</span>\n<b>%s</b>\n<span foreground='{{ .palette.comment }}'>%b</span>"
     timeout = 4
 
 [urgency_normal]
@@ -27,4 +70,7 @@
 
 [urgency_critical]
     frame_color = "{{ .palette.red }}"
+    frame_width = 2
+    format = "<span size='small' foreground='{{ .palette.red }}'>%a</span>\n<b>%s</b><span foreground='{{ .palette.red }}'>▍</span>\n<span foreground='{{ .palette.fg_muted }}'>%b</span>"
+    highlight = "{{ .palette.red }}"
     timeout = 0

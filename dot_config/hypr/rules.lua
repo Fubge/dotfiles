@@ -61,6 +61,29 @@ hl.on("window.active", function(active)
     end
 end)
 
+-- Spotify floats big and centered on its own special workspace "music": it
+-- appears over the current workspace and never pushes tiled windows around.
+-- Toggle: SUPER+O or a click on the music icon in the bar (~/.local/bin/music show)
+hl.window_rule({
+    name = "spotify",
+    match = { class = "^[Ss]potify$" },
+    float = true,
+    size = v.music.size,
+    center = true,
+    workspace = "special:music",
+})
+
+-- Small tool windows float centered instead of splitting the layout
+for class, size in pairs(v.floating) do
+    hl.window_rule({
+        name = "float-" .. class,
+        match = { class = "^" .. class .. "$" },
+        float = true,
+        size = size,
+        center = true,
+    })
+end
+
 hl.window_rule({
     name = "discord-float",
     match = { class = "^discord$" },
@@ -107,4 +130,11 @@ hl.layer_rule({
     blur = true,
     ignore_alpha = 0.1,
     dim_around = true,
+})
+
+-- Notifications (dunst) slide in from the right edge and out again
+hl.layer_rule({
+    name = "notifications",
+    match = { namespace = "^notifications$" },
+    animation = "slide right",
 })

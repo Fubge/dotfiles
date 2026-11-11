@@ -34,6 +34,7 @@ bind(mod .. " + P", run(v.bin .. "power-profile menu"), "Power profile")
 bind(mod .. " + N", run(v.bin .. "rofi-wifi"), "Wi-Fi")
 bind(mod .. " + SHIFT + B", run(v.bin .. "rofi-bluetooth"), "Bluetooth")
 bind(mod .. " + A", run(v.bin .. "rofi-volume"), "Audio output / mute")
+bind(mod .. " + O", run(v.bin .. "music show"), "Spotify (show / hide)")
 group("Session")
 bind(mod .. " + L", hl.dsp.exec_cmd("loginctl lock-session"), "Lock screen")
 bind(mod .. " + M", hl.dsp.exec_cmd("uwsm stop"), "Log out") -- uwsm stops all apps cleanly
@@ -43,12 +44,13 @@ group("Windows")
 bind(mod .. " + X", function()
     local win = hl.get_active_window()
     if win and v.keepAlive[string.lower(win.class or "")] then
-        -- e.g. Spotify keeps playing; bring it back with SUPER+S or a right click on the song in the bar
-        hl.dispatch(hl.dsp.window.move({ workspace = "special:minimized", follow = false }))
+        -- Spotify: only hide its workspace (keeps playing); back with SUPER+O,
+        -- the music icon in the bar or its right click menu
+        hl.dispatch(hl.dsp.exec_cmd("~/.local/bin/music hide"))
     else
         hl.dispatch(hl.dsp.window.close())
     end
-end, "Close window (Spotify: minimize, keeps playing)")
+end, "Close window (Spotify: hide, keeps playing)")
 bind(mod .. " + SHIFT + X", hl.dsp.window.close(), "Really close (Spotify too)")
 bind(mod .. " + F", hl.dsp.window.float({ action = "toggle" }), "Float / tile window")
 bind(mod .. " + SHIFT + F", hl.dsp.window.fullscreen({ mode = "fullscreen" }), "Fullscreen")

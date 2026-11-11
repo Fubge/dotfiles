@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+# lock-greeting: typewriter greeting for hyprlock (label with cmd[update:40]).
+# Prints the part typed so far, e.g. "guten abend, raphael▍"; once complete,
+# the orange caret blinks like the one next to the clock in the bar.
+# The start time is remembered per hyprlock process, so every lock types anew.
+set -u
+pid=$(pidof -s hyprlock) || exit 0
+state=${XDG_RUNTIME_DIR:-/tmp}/lock-greeting
+now=$(date +%s%3N)
+{ read -r spid start <"$state"; } 2>/dev/null
+if [[ ${spid-} != "$pid" ]]; then
+    start=$now
+    echo "$pid $start" >"$state"
+fi
+elapsed=$((now - start))
+
+hour=$(date +%H)
+hour=${hour#0}
+if   ((hour < 5));  then hello="gute nacht"
+elif ((hour < 11)); then hello="guten morgen"
+elif ((hour < 18)); then hello="guten tag"
+elif ((hour < 22)); then hello="guten abend"
+else                     hello="gute nacht"
+fi
+text="$hello, ${USER}"
+
+delay=500   # ms: let the screen fade in first
+speed=80    # ms per character
+typed=$(((elapsed - delay) / speed))
+((typed < 0)) && typed=0
+caret="<span foreground='{{ .palette.accent }}'>▍</span>"
+# the rest is printed invisibly so the centered label does not shift while typing
+hidden() { printf '<span alpha="1%%">%s</span>' "$1"; }
+if ((typed < ${#text})); then
+    printf '%s%s%s\n' "${text:0:typed}" "$caret" "$(hidden "${text:typed}")"
+elif (((elapsed / 530) % 2 == 0)); then
+    printf '%s%s\n' "$text" "$caret"
+else
+    printf '%s%s\n' "$text" "$(hidden ▍)"   # caret off, same width
+fi

@@ -42,6 +42,14 @@ M.dropdown = {
     move  = { "monitor_w*0.2", "monitor_h*0.05" },
 }
 
+-- Spotify's floating window on special:music (rules.lua)
+M.music = { size = { "monitor_w*0.7", "monitor_h*0.75" } }
+
+-- Tool windows that float centered instead of tiling (regex on the class)
+M.floating = {
+    ["[Bb]itwarden"] = { 1000, 780 },
+}
+
 -- Popups opened from the bar: float under the mouse, just below the bar, and
 -- close when focus leaves. Size per window class.
 M.popup = {

@@ -1,0 +1,68 @@
+"""Typewriter text: the flair of this desktop (terminal clock caret, music title,
+window title, Wi-Fi name, login greeting, lock screen).
+
+A new text is not swapped in: the old one is erased backwards, then the new
+one is typed in with an orange block caret that disappears when done.
+
+    tw = Typewriter()
+    tw.set("Vivaldi")            # start the change
+    markup, busy = tw.frame()    # call often while busy (pango markup)
+"""
+import html
+import time
+
+CARET_COLOR = "{{ .palette.accent }}"
+CARET = "▍"
+NBSP = " "
+
+
+class Typewriter:
+    def __init__(self, type_speed=24, erase_speed=55, pad=False, caret_hold=0.5):
+        """speeds in characters per second; pad=True fills up to the final width
+        with no-break spaces so neighbours do not move while typing.
+        caret_hold: seconds the caret stays after the last character."""
+        self.type_speed, self.erase_speed = type_speed, erase_speed
+        self.pad, self.caret_hold = pad, caret_hold
+        self.shown = ""      # text currently fully visible
+        self.target = ""
+        self.start = 0.0
+        self.erase_from = ""
+
+    def set(self, text, now=None):
+        if text == self.target:
+            return
+        now = time.monotonic() if now is None else now
+        current, _ = self._state(now)
+        self.erase_from, self.target, self.start = current, text, now
+
+    def _state(self, now):
+        """(visible plain text, phase) with phase in erase / type / caret / done."""
+        t = now - self.start
+        # keep the common prefix: only erase what differs
+        common = 0
+        while (common < min(len(self.erase_from), len(self.target))
+               and self.erase_from[common] == self.target[common]):
+            common += 1
+        erase_n = len(self.erase_from) - common
+        erase_t = erase_n / self.erase_speed
+        if t < erase_t:
+            return self.erase_from[:len(self.erase_from) - int(t * self.erase_speed)], "erase"
+        typed = common + int((t - erase_t) * self.type_speed)
+        if typed < len(self.target):
+            return self.target[:typed], "type"
+        type_t = erase_t + (len(self.target) - common) / self.type_speed
+        if t < type_t + self.caret_hold and self.target:
+            return self.target, "caret"
+        return self.target, "done"
+
+    def frame(self, now=None):
+        """(pango markup, still animating)."""
+        now = time.monotonic() if now is None else now
+        text, phase = self._state(now)
+        out = html.escape(text)
+        if phase != "done":
+            out += f"<span color='{CARET_COLOR}'>{CARET}</span>"
+            if self.pad:
+                width = max(len(self.target), len(self.erase_from))
+                out += NBSP * max(0, width - len(text) - 1)
+        return out, phase != "done"

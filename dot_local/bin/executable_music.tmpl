@@ -1,13 +1,21 @@
 #!/usr/bin/env python3
 """Now playing in the bar (waybar custom/music), next to the terminal clock.
 
-  music          watch the player, print one JSON line per frame for waybar
+  music          watch the player; prints the title for custom/music and feeds
+                 the other parts (icon, bars) through FIFOs
+  music part P   print the JSON lines of part P (icon, bar0..bar5) for waybar
   music show     bring the player window here (Spotify), start it if needed
+  music hide     Spotify's own "Minimize to Tray" (keeps playing; SUPER+X)
+  music menu     right click menu: play/pause, next, show, quit (tray stand-in)
 
-Look: a real audio visualizer (cava, 30 fps): six separate bars with gaps in
-a color gradient, like Spotify's own "now playing" bars; on pause they lie
-down flat and the title dims. A new song is typed in like on the terminal clock
-(orange caret), long titles scroll as a marquee.
+Look: a real audio visualizer (cava, at the display's refresh rate). Every bar is its own tiny waybar
+module drawn by CSS (rounded pill, gradient, eased height changes); the script
+only sets a height class l0..l16, so the bars grow from the middle like in the
+Quickshell rices. On pause they shrink to dim dots and the title dims. A new song
+is typed in like on the terminal clock (orange caret), long titles scroll.
+Spotify's tray icon is a "passive" StatusNotifierItem (waybar: show-passive-items).
+Closing its window quits Spotify; hiding goes through the tray menu over D-Bus.
+The bar icon also stays while Spotify runs, its right click menu can quit it.
 cava only runs while music plays. Spotify is preferred over other players.
 """
 import html
@@ -20,15 +28,25 @@ import time
 
 PLAYERS = "spotify,%any"
 WIDTH = 24                    # visible title characters, longer ones scroll
-BARS = 6                      # visualizer bars
-BAR_GLYPHS = "▁▂▃▄▅▆▇█"       # 8 heights, the lowest is the resting line
-BAR_GAP = 3                   # pt between the bars
-FPS = 30
-TYPE_SPEED = 40               # characters per second when a new song appears
-SCROLL_SPEED = 5              # marquee characters per second
+BARS = 6                      # visualizer bars (= custom/music-barN modules)
+LEVELS = 16                   # bar heights l0..l16 (CSS classes in style.css, 1 px steps)
+
+
+def refresh_rate():
+    """Animate as fast as the fastest display refreshes (60 if hyprctl fails)."""
+    try:
+        mons = json.loads(subprocess.run(["hyprctl", "monitors", "-j"], capture_output=True,
+                                         text=True, timeout=2).stdout)
+        return max(30, min(240, round(max(m["refreshRate"] for m in mons))))
+    except Exception:
+        return 60
+
+
+FPS = refresh_rate()          # visualizer frames per second = display refresh rate
+TYPE_SPEED = 22               # characters per second when a new song appears
+SCROLL_SPEED = 4              # marquee characters per second (moves pixel by pixel)
+CHAR_W = 14 * 0.6             # advance of one JetBrains Mono character at the bar's 14 px
 SCROLL_HOLD = 2.0             # seconds the start of a long title stays put
-GRADIENT = ["{{ .palette.cyan }}", "{{ .palette.cyan_bright }}", "{{ .palette.blue_bright }}",
-            "{{ .palette.blue }}", "{{ .palette.magenta }}", "{{ .palette.accent }}"]
 COLORS = {
     "icon": "{{ .palette.green }}",
     "dim": "{{ .palette.comment }}",
@@ -53,11 +71,11 @@ source = auto
 method = raw
 raw_target = /dev/stdout
 data_format = ascii
-ascii_max_range = 7
+ascii_max_range = {LEVELS}
 bar_delimiter = 59
 [smoothing]
-monstercat = 1
-noise_reduction = 77
+monstercat = 0
+noise_reduction = 60
 """
 
 state = {f: "" for f in FIELDS}
@@ -83,7 +101,7 @@ def follow():
 
 
 class Cava:
-    """Runs cava while music plays and keeps `levels` (0-7 per bar) fresh."""
+    """Runs cava while music plays and keeps `levels` (0-LEVELS per bar) fresh."""
 
     def __init__(self):
         self.proc = None
@@ -110,8 +128,46 @@ class Cava:
                 changed.set()
 
 
-def bar(level):
-    return BAR_GLYPHS[max(0, min(7, level))]
+RUN = os.path.join(os.environ.get("XDG_RUNTIME_DIR", "/tmp"), "music")
+PARTS = ["icon"] + [f"bar{i}" for i in range(BARS)]
+
+
+def fifo(name):
+    os.makedirs(RUN, exist_ok=True)
+    path = os.path.join(RUN, name)
+    if not os.path.exists(path):
+        os.mkfifo(path)
+    return path
+
+
+class Parts:
+    """The other bar modules: one FIFO each, `music part NAME` reads it.
+    Opened read-write and non-blocking: never waits for a reader, a missing
+    reader only drops frames. Only changes are sent (every line = a GTK restyle)."""
+
+    def __init__(self):
+        self.fds = {p: os.open(fifo(p), os.O_RDWR | os.O_NONBLOCK) for p in PARTS}
+        self.last = {}
+
+    def send(self, part, text="", tooltip="", cls=""):
+        # several classes must be a list ("a b" would be one class named "a b")
+        line = json.dumps({"text": text, "tooltip": tooltip, "class": cls.split()})
+        if self.last.get(part) != line:
+            try:
+                os.write(self.fds[part], (line + "\n").encode())
+                self.last[part] = line
+            except BlockingIOError:
+                pass
+
+
+def part(name):
+    """`exec` of a waybar part module: pass the FIFO through (cat without cat)."""
+    path = fifo(name)
+    while True:
+        with open(path, "rb", buffering=0) as f:
+            for line in f:
+                sys.stdout.buffer.write(line)
+                sys.stdout.flush()
 
 
 def emit(text="", tooltip="", cls=""):
@@ -138,19 +194,53 @@ def title_text(title, since, playing):
     # one cycle: hold at the start, then scroll once through the whole loop
     cycle = SCROLL_HOLD + len(loop) / SCROLL_SPEED
     phase = t % cycle if playing else 0
-    offset = 0 if phase < SCROLL_HOLD else int((phase - SCROLL_HOLD) * SCROLL_SPEED)
-    return html.escape((loop * 2)[offset:offset + WIDTH]), playing
+    pos = max(0.0, phase - SCROLL_HOLD) * SCROLL_SPEED
+    return marquee(loop * 2, pos), playing
+
+
+def gap(px):
+    """Invisible spacer of px pixels: a zero width space whose letter spacing
+    (1/1024 pt, half of it lands behind the character) makes the room."""
+    return f"<span letter_spacing='{round(px * 2048)}'>\u200b</span>"
+
+
+def marquee(text, pos):
+    """WIDTH characters of text starting at the (fractional) position pos, moved
+    by whole pixels instead of whole characters. The character leaving on the
+    left fades out, the one coming in on the right fades in; spacers on both
+    sides keep the width constant."""
+    k = int(pos)
+    frac = pos - k
+    chars = text[k + 1:k + WIDTH]
+
+    def faded(c, a):
+        return f"<span alpha='{max(1, round(a * 100))}%'>{html.escape(c)}</span>"
+
+    body = faded(chars[0], 1 - frac) + html.escape(chars[1:-1]) + faded(chars[-1], frac)
+    return gap((1 - frac) * CHAR_W) + body + gap(frac * CHAR_W)
 
 
 def watch():
     threading.Thread(target=follow, daemon=True).start()
     cava = Cava()
+    parts = Parts()
     last_title, since, last_out = None, 0.0, None
+
+    def hide_all():
+        for p in PARTS:
+            parts.send(p)
+
     while True:
         with lock:
             s = dict(state)
-        if s["status"] not in ("Playing", "Paused"):
+        active = s["status"] in ("Playing", "Paused")
+        spotify_idle = not active and s["player"] == "spotify" and s["status"]
+        if not active:
             cava.running(False)
+            hide_all()
+            if spotify_idle:  # running without a song: keep the icon as a tray
+                parts.send("icon", span(COLORS["dim"], ICONS["spotify"]),
+                           "Spotify\n\n<small>Click show · Right click menu</small>", "idle")
             emit()
             last_title, last_out = None, None
             changed.wait()
@@ -163,21 +253,24 @@ def watch():
         if title != last_title:
             last_title, since = title, time.monotonic()
 
-        lv = levels[:]
-        viz = "".join(span(GRADIENT[i], bar(lv[i])) if playing else span(COLORS["dim"], BAR_GLYPHS[1])
-                      for i in range(BARS))
-        viz = f"<span letter_spacing='{BAR_GAP * 1024}'>{viz}</span>"
-        shown, moving = title_text(title, since, playing)
-        if not playing:
-            shown = f"<i>{span(COLORS['dim'], shown)}</i>"
-
-        icon = span(COLORS["icon"] if playing else COLORS["dim"],
-                    ICONS.get(s["player"], ICONS["default"]))
         tip = html.escape(title)
         if s["artist"]:
             tip += "\n" + html.escape(" · ".join(x for x in (s["artist"], s["album"]) if x))
-        tip += "\n\n<small>Click play/pause · Right click show · Scroll skip</small>"
-        out = (f"{icon} {viz} {shown}", tip, "playing" if playing else "paused")
+        tip += "\n\n<small>Click play/pause · Right click menu · Scroll skip</small>"
+
+        cls = "playing" if playing else "paused"
+        parts.send("icon", span(COLORS["icon"] if playing else COLORS["dim"],
+                                ICONS.get(s["player"], ICONS["default"])), tip, cls)
+        lv = levels[:]
+        for i in range(BARS):
+            # the text is just a placeholder (empty text hides a module), CSS draws the bar
+            parts.send(f"bar{i}", NBSP, tip,
+                       "bar " + (f"l{max(0, min(LEVELS, lv[i]))}" if playing else "paused"))
+
+        shown, moving = title_text(title, since, playing)
+        if not playing:
+            shown = f"<i>{span(COLORS['dim'], shown)}</i>"
+        out = (shown, tip, cls)
         if out != last_out:  # waybar only redraws when something changed
             emit(*out)
             last_out = out
@@ -194,25 +287,120 @@ def lua_table(**kw):
     return "{" + ", ".join(k + "=" + val(x) for k, x in kw.items()) + "}"
 
 
+def tray_click(label):
+    """Click an entry of Spotify's tray menu (dbusmenu over D-Bus). False if not found."""
+    def call(*args):
+        r = subprocess.run(["busctl", "--user", "--json=short", *args], capture_output=True, text=True)
+        return json.loads(r.stdout)["data"] if r.returncode == 0 and r.stdout else None
+
+    items = call("get-property", "org.kde.StatusNotifierWatcher", "/StatusNotifierWatcher",
+                 "org.kde.StatusNotifierWatcher", "RegisteredStatusNotifierItems") or []
+    item = next((i for i in items if i.endswith("/spotify_client")), None)
+    if not item:
+        return False
+    bus, path = item.split("/", 1)
+    menu = f"/{path}/Menu"
+    layout = call("call", bus, menu, "com.canonical.dbusmenu", "GetLayout", "iias", "--", "0", "-1", "0")
+    for child in (layout or [0, [0, {}, []]])[1][2]:
+        mid, props = child["data"][0], child["data"][1]
+        if props.get("label", {}).get("data") == label:
+            subprocess.run(["busctl", "--user", "call", bus, menu, "com.canonical.dbusmenu",
+                            "Event", "isvu", "--", str(mid), "clicked", "s", "", "0"],
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            return True
+    return False
+
+
+def hypr(cmd):
+    subprocess.run(["hyprctl", "dispatch", cmd], stdout=subprocess.DEVNULL)
+
+
+def music_shown():
+    """Is the special:music workspace (Spotify's place) open on a monitor?"""
+    mons = json.loads(subprocess.run(["hyprctl", "monitors", "-j"],
+                                     capture_output=True, text=True).stdout or "[]")
+    return any(m.get("specialWorkspace", {}).get("name") == "special:music" for m in mons)
+
+
 def show():
-    """Bring the Spotify window to the current workspace (also from minimized)."""
+    """Toggle Spotify: it floats on its own special workspace (special:music) over
+    the current one, so tiled windows never move. Brings it back from the tray
+    or starts it when needed; the window rule puts it in place."""
+    win = spotify_window()
+    if not win:
+        running = subprocess.run(["pgrep", "-x", "spotify"], stdout=subprocess.DEVNULL).returncode == 0
+        if not (running and tray_click("Show Spotify")):
+            subprocess.Popen(["uwsm", "app", "--", "spotify-launcher"],
+                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        return
+    if win["workspace"]["name"] != "special:music":   # e.g. moved away by hand
+        hypr("hl.dsp.window.move(" + lua_table(window="address:" + win["address"],
+                                               workspace="special:music") + ")")
+        if music_shown():
+            return
+    hypr("hl.dsp.workspace.toggle_special('music')")
+    if music_shown():
+        hypr("hl.dsp.focus(" + lua_table(window="address:" + win["address"]) + ")")
+
+
+def hide():
+    """Spotify out of sight, keeps playing (the special workspace closes)."""
+    if music_shown():
+        hypr("hl.dsp.workspace.toggle_special('music')")
+    elif not tray_click("Minimize to Tray"):
+        win = spotify_window()
+        if win:
+            hypr("hl.dsp.window.move(" + lua_table(window="address:" + win["address"],
+                                                   workspace="special:music") + ")")
+
+
+def spotify_window():
     clients = json.loads(subprocess.run(["hyprctl", "clients", "-j"],
                                         capture_output=True, text=True).stdout or "[]")
-    win = next((c for c in clients if c["class"].lower() == "spotify"), None)
-    if not win:
-        subprocess.Popen(["uwsm", "app", "--", "spotify-launcher"],
-                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        return
-    ws = json.loads(subprocess.run(["hyprctl", "activeworkspace", "-j"],
-                                   capture_output=True, text=True).stdout)["id"]
-    addr = win["address"]
-    subprocess.run(["hyprctl", "dispatch",
-                    "hl.dsp.window.move(" + lua_table(window="address:" + addr, workspace=ws,
-                                                      follow=True) + ")"],
-                   stdout=subprocess.DEVNULL)
-    subprocess.run(["hyprctl", "dispatch", "hl.dsp.focus(" + lua_table(window="address:" + addr) + ")"],
-                   stdout=subprocess.DEVNULL)
+    return next((c for c in clients if c["class"].lower() == "spotify"), None)
+
+
+def quit_spotify():
+    """Closing the window really quits Spotify on Linux (even when minimized)."""
+    win = spotify_window()
+    if win:
+        subprocess.run(["hyprctl", "dispatch", "hl.dsp.window.close("
+                        + lua_table(window="address:" + win["address"]) + ")"],
+                       stdout=subprocess.DEVNULL)
+        for _ in range(30):
+            time.sleep(0.1)
+            if subprocess.run(["pgrep", "-x", "spotify"], stdout=subprocess.DEVNULL).returncode:
+                return
+    subprocess.run(["pkill", "-x", "spotify"])
+
+
+def menu():
+    """Right click menu, the tray stand-in (Spotify has no tray icon on Linux)."""
+    status = subprocess.run(["playerctl", "-p", PLAYERS, "status"],
+                            capture_output=True, text=True).stdout.strip()
+    rows = [("\U000F03E4  Pause" if status == "Playing" else "\U000F040A  Play",
+             lambda: subprocess.run(["playerctl", "-p", PLAYERS, "play-pause"])),
+            ("\U000F04AD  Next song", lambda: subprocess.run(["playerctl", "-p", PLAYERS, "next"])),
+            ("\U000F04AE  Previous song",
+             lambda: subprocess.run(["playerctl", "-p", PLAYERS, "previous"])),
+            ("\U000F05AF  Show / hide Spotify", show)]
+    if subprocess.run(["pgrep", "-x", "spotify"], stdout=subprocess.DEVNULL).returncode == 0:
+        rows.append(("\U000F0156  Quit Spotify", quit_spotify))
+    pick = subprocess.run([os.path.expanduser("~/.local/bin/rofi-menu"), "--bar", "Music", ""],
+                          input="\n".join(r[0] for r in rows), capture_output=True, text=True)
+    if pick.stdout.strip().isdigit():
+        rows[int(pick.stdout.strip())][1]()
 
 
 if __name__ == "__main__":
-    show() if sys.argv[1:] == ["show"] else watch()
+    args = sys.argv[1:]
+    if args == ["show"]:
+        show()
+    elif args == ["hide"]:
+        hide()
+    elif args == ["menu"]:
+        menu()
+    elif args[:1] == ["part"] and len(args) == 2:
+        part(args[1])
+    else:
+        watch()

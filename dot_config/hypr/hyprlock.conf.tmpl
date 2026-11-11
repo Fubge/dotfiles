@@ -22,6 +22,18 @@ background {
     brightness = 0.6
 }
 
+# Greeting types itself in (the flair of the bar: orange caret), ~/.local/bin/lock-greeting
+label {
+    monitor =
+    text = cmd[update:40] ~/.local/bin/lock-greeting
+    font_size = 20
+    font_family = $font
+    color = rgba({{ .palette.fg_muted | trimPrefix "#" }}ff)
+    position = 0, 270
+    halign = center
+    valign = center
+}
+
 label {
     monitor =
     text = $TIME

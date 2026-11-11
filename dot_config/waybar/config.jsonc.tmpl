@@ -9,8 +9,8 @@
     "margin-right": {{ .design.gaps_out }},
     "spacing": 0,
 
-    "modules-left":   ["hyprland/workspaces", "hyprland/window"],
-    "modules-center": ["custom/prompt", "clock#hours", "custom/colon", "clock#minutes", "clock#date", "custom/caret", "custom/music"],
+    "modules-left":   ["hyprland/workspaces", "custom/window"],
+    "modules-center": ["custom/prompt", "clock#hours", "custom/colon", "clock#minutes", "clock#date", "custom/caret", "group/music"],
     "modules-right":  ["group/hardware", "group/system", "group/connect", "custom/power"],
 
     // ---------------------------------------------------------------- groups
@@ -26,7 +26,7 @@
     },
     "group/connect": {
         "orientation": "horizontal",
-        "modules": ["wireplumber", "network", "bluetooth", "tray"]
+        "modules": ["wireplumber", "network", "custom/wifi-name", "bluetooth", "tray"]
     },
 
     // ---------------------------------------------------------------- left
@@ -44,20 +44,12 @@
         "on-scroll-up": "hyprctl dispatch 'hl.dsp.focus({workspace = \"e-1\"})'",
         "on-scroll-down": "hyprctl dispatch 'hl.dsp.focus({workspace = \"e+1\"})'"
     },
-    "hyprland/window": {
-        "format": "{class}",
-        "separate-outputs": true,
-        "max-length": 24,
-        // Friendly names instead of raw window classes
-        "rewrite": {
-            "org\\.pulseaudio\\.pavucontrol": "Volume",
-            "vivaldi-stable": "Vivaldi",
-            "org\\.kde\\.dolphin": "Files",
-            "kitty|popup-term|dropdown_terminal": "Terminal",
-            "discord": "Discord",
-            "popup\\.keybinds": "Shortcuts",
-            "popup\\.brightness": "Brightness"
-        }
+    // Focused app, typewriter style: the old name is erased, the new one typed
+    // in with the orange caret (~/.local/bin/bar-flair, friendly names there)
+    "custom/window": {
+        "exec": "~/.local/bin/bar-flair window",
+        "return-type": "json",
+        "tooltip": false
     },
 
     // ---------------------------------------------------------------- center
@@ -90,14 +82,38 @@
         "format": "\u258d",
         "tooltip": false
     },
-    // Now playing (hidden when nothing plays): dancing equalizer, new songs are
-    // typed in, long titles scroll (~/.local/bin/music). Click = play/pause,
-    // right click = show Spotify (also from minimized), scroll = skip
+    // Now playing (hidden when nothing plays): icon, six visualizer bars, title.
+    // One script (~/.local/bin/music, exec of custom/music) drives all parts; the
+    // bars are separate modules so CSS can draw them as rounded pills. The icon
+    // stays while Spotify runs (tray stand-in). Click = play/pause, right click =
+    // menu (show / quit Spotify), scroll = skip
+    "group/music": {
+        "orientation": "horizontal",
+        "modules": ["custom/music-icon"{{ range $i := until 6 }}, "custom/music-bar{{ $i }}"{{ end }}, "custom/music"]
+    },
+    "custom/music-icon": {
+        "exec": "~/.local/bin/music part icon",
+        "return-type": "json",
+        "on-click": "~/.local/bin/music show",
+        "on-click-right": "~/.local/bin/music menu",
+        "on-scroll-up": "playerctl -p spotify,%any next",
+        "on-scroll-down": "playerctl -p spotify,%any previous"
+    },
+{{- range $i := until 6 }}
+    "custom/music-bar{{ $i }}": {
+        "exec": "~/.local/bin/music part bar{{ $i }}",
+        "return-type": "json",
+        "on-click": "playerctl -p spotify,%any play-pause",
+        "on-click-right": "~/.local/bin/music menu",
+        "on-scroll-up": "playerctl -p spotify,%any next",
+        "on-scroll-down": "playerctl -p spotify,%any previous"
+    },
+{{- end }}
     "custom/music": {
         "exec": "~/.local/bin/music",
         "return-type": "json",
         "on-click": "playerctl -p spotify,%any play-pause",
-        "on-click-right": "~/.local/bin/music show",
+        "on-click-right": "~/.local/bin/music menu",
         "on-scroll-up": "playerctl -p spotify,%any next",
         "on-scroll-down": "playerctl -p spotify,%any previous"
     },
@@ -194,8 +210,19 @@
         "on-click": "~/.local/bin/rofi-bluetooth --bar",
         "on-click-right": "~/.local/bin/popup popup-term kitty --class popup-term bluetoothctl"
     },
+    // Wi-Fi name types itself in next to the icon when a connection comes up
+    // ("offline" when it drops) and is erased again after a few seconds
+    "custom/wifi-name": {
+        "exec": "~/.local/bin/bar-flair wifi",
+        "return-type": "json",
+        "tooltip": false
+    },
     "tray": {
         "icon-size": 17,
+        // Spotify's tray icon is hidden: the music icon in the bar replaces it
+        // (click = show/hide, right click = menu). The item still exists, so
+        // ~/.local/bin/music can click its menu over D-Bus.
+        "ignore-list": ["spotify"],
         "spacing": 12
     },
 
