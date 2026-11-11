@@ -98,7 +98,7 @@ Files ending in `.tmpl` are generated from these values.
 - **`SUPER+C`** shows / hides one long-running Claude Code session (kitty on
   `special:claude`, started hidden at login). `SUPER+X` only hides it, `SUPER+SHIFT+X`
   ends it. **`SUPER+SHIFT+C`** = small prompt pill, the question goes into that session.
-- The robot left of the window title shows its state (ready, working dots, orange =
+- The sparkle left of the window title shows its state (ready, twinkling, orange =
   needs you, green = finished while hidden, plus a notification). Right click = new
   chat, resume, restart, quit. Script: `~/.local/bin/claude-pad`.
 - It runs in this repo, not in `~`: Claude Code never remembers the trust prompt for

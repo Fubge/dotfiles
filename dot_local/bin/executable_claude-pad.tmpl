@@ -8,18 +8,21 @@ its own special workspace (special:claude), like Spotify on special:music.
   claude-pad ask       SUPER+SHIFT+C: small prompt pill, the text goes into the
                        running session and the pad opens with the answer
   claude-pad menu      bar right click: new chat, resume, restart, quit
-  claude-pad watch     waybar module custom/claude (robot icon + typewriter)
+  claude-pad watch     waybar module custom/claude (sparkle icon + typewriter)
   claude-pad hook EV   called by Claude Code hooks (~/.claude/settings.json),
                        only inside the pad (CLAUDE_PAD=1), event JSON on stdin
 
 States (file $XDG_RUNTIME_DIR/claude-pad/state, the bar follows via a FIFO):
-  off       no session          robot-off, dim
+  off       no session          sparkle, dim
   starting  window up, Claude not ready yet
-  idle      waiting for a prompt  robot outline
-  busy      working              robot + running dots
-  waiting   needs you (permission, question)  orange confused robot, "needs you"
-  done      finished while the pad was hidden  green happy robot, "done"
+  idle      waiting for a prompt  sparkle outline
+  busy      working              sparkle twinkles (outline <-> filled)
+  waiting   needs you (permission, question)  orange, "needs you"
+  done      finished while the pad was hidden  green, "done"
+The last answer (first paragraph) is kept in $RUN/last: the notification and the
+quick prompt show it, so a reply can go straight back from the prompt pill.
 """
+import html
 import json
 import os
 import select
@@ -35,6 +38,7 @@ WS = "claude"
 RUN = os.path.join(os.environ.get("XDG_RUNTIME_DIR", "/tmp"), "claude-pad")
 SOCK = os.path.join(RUN, "kitty.sock")
 STATE = os.path.join(RUN, "state")
+LAST = os.path.join(RUN, "last")
 FIFO = os.path.join(RUN, "events")
 HOME = os.path.expanduser("~")
 BIN = os.path.join(HOME, ".local/bin")
@@ -45,20 +49,13 @@ WORKDIR = os.path.join(HOME, ".local/share/chezmoi")
 
 COLORS = {
     "dim": "{{ .palette.comment }}",
-    "dots": "{{ .palette.slate }}",
 }
-ICONS = {
-    "off": "\U000F167B",       # nf-md-robot_off_outline
-    "starting": "\U000F167A",  # robot_outline
-    "idle": "\U000F167A",
-    "busy": "\U000F06A9",      # robot
-    "waiting": "\U000F169F",   # robot_confused
-    "done": "\U000F1719",      # robot_happy
-}
+SPARKLE, SPARKLE_FILLED = "\uEC10", "\uEC21"   # nf-cod-sparkle(_filled)
+ICONS = {"off": SPARKLE, "starting": SPARKLE, "idle": SPARKLE,
+         "busy": SPARKLE, "waiting": SPARKLE_FILLED, "done": SPARKLE_FILLED}
 WORDS = {"waiting": "needs you", "done": "done"}
 WORD_HOLD = 4.0      # seconds a word stays before it is erased again
-DOTS = ["", "·", "··", "···"]
-DOTS_FPS = 3
+TWINKLE_FPS = 2.5
 FPS = 60             # while the typewriter moves
 NBSP = " "
 
@@ -193,16 +190,35 @@ def send(text):
 
 
 def ask():
-    query = subprocess.run(["rofi", "-dmenu", "-p", "Claude", "-theme", "overlay",
-                            "-theme-str", ASK_THEME], capture_output=True, text=True).stdout.strip()
-    if not query:
+    """Prompt pill. After an answer or a question from Claude it shows that text
+    above the field, so this is also the reply box. Enter = send and open the
+    pad, Ctrl+Enter = send and stay hidden (the answer comes as a notification)."""
+    state = read_state()
+    theme = ASK_THEME
+    args = []
+    try:
+        with open(LAST) as f:
+            last = f.read().strip()
+    except OSError:
+        last = ""
+    if last and state in ("done", "waiting", "idle"):
+        args = ["-mesg", html.escape(last)]
+        theme += "mainbox { children: [ message, inputbar, textbox-hint ]; }\n"
+    pick = subprocess.run(["rofi", "-dmenu", "-p", "Claude", "-theme", "overlay",
+                           "-kb-accept-custom", "", "-kb-custom-1", "Control+Return",
+                           "-theme-str", theme, *args], capture_output=True, text=True)
+    query = pick.stdout.strip()
+    if not query or pick.returncode not in (0, 10):
         return
     if not window():
         start()
     # the SessionStart hook flips "starting" to "idle" once Claude takes input
     wait_for(lambda: read_state() not in ("off", "starting"), 20)
+    if state == "done":   # the answer was read in the pill
+        set_state("idle")
     send(query)
-    show()
+    if pick.returncode == 0:
+        show()
 
 
 ASK_THEME = """
@@ -210,7 +226,10 @@ window       { location: north; anchor: north; y-offset: {{ sub .design.launcher
 mainbox      { children: [ inputbar, textbox-hint ]; spacing: 12px; }
 box-search   { width: {{ sub .design.websearch_width 40 }}px; }
 entry        { placeholder: "Ask Claude..."; }
-textbox-hint { str: "Enter  ask      ·      Esc  close"; }
+textbox-lens { str: "\uEC10"; }
+textbox-hint { str: "Enter  ask + open    ·    Ctrl+Enter  ask in background    ·    Esc  close"; }
+message      { padding: 0 6px; }
+textbox      { horizontal-align: 0.5; text-color: {{ .palette.fg_muted }}; }
 """
 
 
@@ -243,7 +262,7 @@ def menu():
 
 # --------------------------------------------------------------- hooks
 def last_answer(event):
-    """First line of Claude's last answer (Stop hook input or the transcript)."""
+    """First paragraph of Claude's last answer (Stop hook input or the transcript)."""
     text = event.get("last_assistant_message") or ""
     if not text and event.get("transcript_path"):
         try:
@@ -262,11 +281,15 @@ def last_answer(event):
             if any(parts):
                 text = "\n".join(parts)
                 break
+    para = []
     for line in text.splitlines():
-        line = line.strip().lstrip("#*-> ").strip()
+        line = line.strip().lstrip("#*> ").strip()
         if line:
-            return line[:160]
-    return "Finished."
+            para.append(line)
+        elif para:
+            break
+    para = " ".join(para).replace("**", "").replace("`", "")
+    return (para[:297] + "…" if len(para) > 300 else para) or "Finished."
 
 
 def notify(title, body):
@@ -292,14 +315,22 @@ def hook(name):
         set_state("busy")
     elif name == "ask":                           # AskUserQuestion / permission
         set_state("waiting")
+        msg = event.get("message") or "Waiting for your answer."
+        if name == "ask" and event.get("tool_input", {}).get("questions"):
+            msg = event["tool_input"]["questions"][0].get("question", msg)
+        with open(LAST, "w") as f:
+            f.write(msg)
         if not shown():
-            notify("Claude needs you", event.get("message") or "Waiting for your answer.")
+            notify("Claude needs you", msg)
     elif name == "stop":
+        answer = last_answer(event)
+        with open(LAST, "w") as f:
+            f.write(answer)
         if shown():
             set_state("idle")
         else:
             set_state("done")
-            notify("Claude is done", last_answer(event))
+            notify("Claude is done", answer)
     elif name == "end":
         set_state("off")
 
@@ -333,11 +364,10 @@ def watch():
             tw.set("")
         typed, moving = tw.frame()
         text = ICONS.get(state, ICONS["off"])
+        if state == "busy" and int(now * TWINKLE_FPS) % 2:
+            text = SPARKLE_FILLED
         if typed:
             text += " " + typed
-        elif state == "busy":
-            dots = DOTS[int(now * DOTS_FPS) % len(DOTS)]
-            text += " " + span(COLORS["dots"], dots + NBSP * (3 - len(dots)))
         tip = {"off": "Claude is not running", "starting": "Claude starts…",
                "idle": "Claude is ready", "busy": "Claude is working…",
                "waiting": "Claude needs you", "done": "Claude is done"}.get(state, "")
@@ -346,7 +376,7 @@ def watch():
         if out != last:
             print(out, flush=True)
             last = out
-        timeout = (1 / FPS if moving else 1 / DOTS_FPS if state == "busy"
+        timeout = (1 / FPS if moving else 1 / TWINKLE_FPS if state == "busy"
                    else max(0.05, word_until - now) if word_until else 3)
         if select.select([fd], [], [], timeout)[0]:
             try:
