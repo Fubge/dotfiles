@@ -1,12 +1,15 @@
 /* Colors come from .chezmoidata/palette.toml */
-@define-color dark    {{ .palette.bg }};
-@define-color slate   {{ .palette.slate }};
-@define-color steel   {{ .palette.steel }};
-@define-color fg      {{ .palette.fg }};
-@define-color accent  {{ .palette.accent }};
-@define-color warn    {{ .palette.yellow }};
-@define-color crit    {{ .palette.red }};
-@define-color good    {{ .palette.green }};
+@define-color bg       {{ .palette.bg }};
+@define-color bg_dark  {{ .palette.bg_dark }};
+@define-color bg_alt   {{ .palette.bg_alt }};
+@define-color slate    {{ .palette.slate }};
+@define-color steel    {{ .palette.steel }};
+@define-color fg       {{ .palette.fg }};
+@define-color muted    {{ .palette.fg_muted }};
+@define-color accent   {{ .palette.accent }};
+@define-color warn     {{ .palette.yellow }};
+@define-color crit     {{ .palette.red }};
+@define-color good     {{ .palette.green }};
 
 * {
     font-family: "{{ .design.font }}", "Symbols Nerd Font";
@@ -21,56 +24,44 @@ window#waybar {
 }
 
 tooltip {
-    background: alpha(@dark, 0.95);
+    background: alpha(@bg_dark, 0.95);
     border: 1px solid @accent;
     border-radius: {{ .design.rounding }}px;
 }
 
-/* Every section is its own pill */
-.modules-left, .modules-right {
-    background: @slate;
-    border-radius: 15px;
-}
-.modules-center {
-    background: @dark;
+/* Every section is a dark, slightly see-through pill with a fine rim
+   (same look as rofi, dunst and the lock screen) */
+.modules-left, .modules-center, .modules-right {
+    background: alpha(@bg, 0.88);
+    border: 1px solid alpha(@slate, 0.35);
     border-radius: 15px;
 }
 
-/* Gentle hover feedback on everything clickable */
-#workspaces button, #clock, #mpris, #idle_inhibitor, #power-profiles-daemon,
-#backlight, #battery, #wireplumber, #network, #bluetooth, #custom-power, #cpu {
-    transition: all 250ms ease;
-    border-radius: 12px;
-}
-#clock:hover, #mpris:hover, #idle_inhibitor:hover, #power-profiles-daemon:hover,
-#wireplumber:hover, #network:hover, #bluetooth:hover, #cpu:hover {
-    background: alpha(@fg, 0.12);
+/* Inner groups are a step lighter */
+#workspaces, #system {
+    background: @bg_alt;
+    border-radius: 15px;
 }
 
 /* ---------------------------------------------------------------- left */
-#workspaces {
-    background: @steel;
-    border-radius: 15px;
-    padding: 2px 4px;
-}
+#workspaces { padding: 2px 4px; }
 #workspaces button {
-    color: @fg;
+    color: @muted;
     padding: 0 8px;
     margin: 0 1px;
     background: none;
     box-shadow: none;
 }
-#workspaces button.empty  { color: alpha(@fg, 0.4); }
-#workspaces button:hover  { color: @accent; background: alpha(@dark, 0.25); }
+#workspaces button.empty  { color: alpha(@muted, 0.4); }
 /* Active workspace becomes a wider orange pill */
 #workspaces button.active {
-    color: @dark;
+    color: @bg;
     background: @accent;
     padding: 0 16px;
 }
 #workspaces button.urgent { color: @crit; }
 
-#window { padding: 0 16px; }
+#window { padding: 0 16px; color: @muted; }
 window#waybar.empty #window { padding: 0; }
 
 /* ---------------------------------------------------------------- center */
@@ -85,9 +76,8 @@ window#waybar.empty #window { padding: 0; }
 #mpris.playing { color: @accent; }
 
 /* ---------------------------------------------------------------- right */
-#hardware { padding: 0 4px; }
-#system   { background: @steel; border-radius: 15px; padding: 0 4px; }
-#connect  { padding: 0 4px; }
+#hardware, #connect { padding: 0 4px; }
+#system { padding: 0 4px; }
 
 #cpu, #temperature, #memory,
 #idle_inhibitor, #power-profiles-daemon, #backlight, #battery,
@@ -96,12 +86,9 @@ window#waybar.empty #window { padding: 0; }
 }
 
 #custom-power {
-    background: @dark;
     color: @accent;
-    border-radius: 15px;
     padding: 0 14px 0 12px;
 }
-#custom-power:hover { background: @accent; color: @dark; }
 
 /* ---------------------------------------------------------------- states */
 #idle_inhibitor.activated           { color: @accent; }
@@ -117,9 +104,30 @@ window#waybar.empty #window { padding: 0; }
 
 /* Critical battery pulses red */
 @keyframes pulse {
-    to { background: @crit; color: @dark; }
+    to { background: @crit; color: @bg; }
 }
 #battery.critical:not(.charging) {
     color: @crit;
     animation: pulse 1s ease-in-out infinite alternate;
 }
+
+/* ---------------------------------------------------------------- hover
+   Same effect everywhere: orange text on a slightly lighter background.
+   Kept last so it wins over the state colors above. */
+#workspaces button, #window, #clock, #mpris,
+#cpu, #temperature, #memory,
+#idle_inhibitor, #power-profiles-daemon, #backlight, #battery,
+#wireplumber, #network, #bluetooth, #custom-power {
+    transition: all 250ms ease;
+    border-radius: 12px;
+}
+#workspaces button:hover,
+#clock:hover, #mpris:hover,
+#cpu:hover, #temperature:hover, #memory:hover,
+#idle_inhibitor:hover, #power-profiles-daemon:hover, #backlight:hover, #battery:hover,
+#wireplumber:hover, #network:hover, #bluetooth:hover {
+    color: @accent;
+    background: alpha(@steel, 0.45);
+}
+#workspaces button.active:hover { color: @bg; background: @accent; }
+#custom-power:hover { color: @bg; background: @accent; }
