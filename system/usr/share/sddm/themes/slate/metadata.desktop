@@ -1,0 +1,12 @@
+[SddmGreeterTheme]
+Name=slate
+Description=Login screen matching the desktop palette (generated from the dotfiles)
+Author=Fubge
+License=MIT
+Type=sddm-theme
+Version=1.0
+MainScript=Main.qml
+ConfigFile=theme.conf
+Theme-Id=slate
+Theme-API=2.0
+QtVersion=6

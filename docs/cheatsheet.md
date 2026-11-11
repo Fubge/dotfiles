@@ -71,3 +71,10 @@ All apps read the same two files:
 Edit them (`dots`, then `nvim .chezmoidata/palette.toml`), run `chezmoi apply`,
 then reload: `hyprctl reload`, `systemctl --user restart waybar`, restart kitty/apps.
 Files ending in `.tmpl` are generated from these values.
+
+## Wallpapers
+
+- `SUPER+W` opens the picker: pick an image, or "Shuffle" (new image every 30 min).
+- Your own images: drop them into `~/Pictures/Wallpapers` (subfolders work).
+- `make-wallpapers` re-renders the palette wallpapers (also runs when the palette changes).
+- Login screen background: `login_wallpaper` in `.chezmoidata/design.toml`.

@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+# Generate the SDDM theme config from the palette and copy the login wallpaper.
+# palette: {{ .palette | toJson | sha256sum }}
+# design: {{ .design | toJson | sha256sum }}
+set -euo pipefail
+theme=/usr/share/sddm/themes/slate
+wall="{{ .chezmoi.homeDir }}/Pictures/Wallpapers/{{ .design.login_wallpaper }}"
+[[ -d $theme ]] || { echo "sddm: theme not installed yet"; exit 0; }
+
+tmp=$(mktemp)
+cat > "$tmp" <<CONF
+[General]
+background=background.jpg
+font={{ .design.font }}
+rounding={{ .design.rounding }}
+border={{ .design.border }}
+bg={{ .palette.bg }}
+bg_dark={{ .palette.bg_dark }}
+bg_alt={{ .palette.bg_alt }}
+card=#e6{{ .palette.bg | trimPrefix "#" }}
+fg={{ .palette.fg }}
+fg_muted={{ .palette.fg_muted }}
+comment={{ .palette.comment }}
+accent={{ .palette.accent }}
+steel={{ .palette.steel }}
+red={{ .palette.red }}
+CONF
+sudo install -m 0644 "$tmp" "$theme/theme.conf"
+rm -f "$tmp"
+[[ -f $wall ]] && sudo install -m 0644 "$wall" "$theme/background.jpg"
+echo "sddm: theme.conf + background updated"

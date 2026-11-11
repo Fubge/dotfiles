@@ -6,3 +6,4 @@ gaps_in   = 8                        # between windows
 gaps_out  = 16                       # between windows and screen edge (also bar margins)
 font      = "JetBrainsMono Nerd Font"
 font_ui   = "Noto Sans"
+login_wallpaper = "generated/horizon.jpg"   # relative to ~/Pictures/Wallpapers (SDDM background)
