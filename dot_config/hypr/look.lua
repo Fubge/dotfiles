@@ -45,6 +45,10 @@ hl.config({
 
     misc = {
         force_default_wallpaper = 0, -- Hyprland's built-in wallpaper off, hyprpaper draws ours
+        -- an app opens on the workspace it was started from, even when it takes
+        -- long to start (Steam, Discord) and you switched workspaces meanwhile
+        initial_workspace_tracking = 1,
+        initial_workspace_token_timeout = 120, -- seconds (was 10)
     },
 })
 
