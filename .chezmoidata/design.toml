@@ -1,0 +1,8 @@
+# Shared design tokens: shapes, spacing and fonts used by every app.
+[design]
+rounding  = 12                       # windows, popups, notifications, lock screen
+border    = 2                        # window / popup border width
+gaps_in   = 8                        # between windows
+gaps_out  = 16                       # between windows and screen edge (also bar margins)
+font      = "JetBrainsMono Nerd Font"
+font_ui   = "Noto Sans"

@@ -2,20 +2,20 @@
     follow = mouse
     width = 350
     origin = top-right
-    offset = (15, 15)
+    offset = ({{ .design.gaps_out }}, {{ .design.gaps_out }})
     notification_limit = 5
     gap_size = 6
     padding = 12
     horizontal_padding = 14
-    frame_width = 1
-    frame_color = "#ff7f00"
-    corner_radius = 12
-    font = JetBrainsMono Nerd Font 11
+    frame_width = {{ .design.border }}
+    frame_color = "{{ .palette.accent }}"
+    corner_radius = {{ .design.rounding }}
+    font = {{ .design.font }} 11
     format = "<b>%s</b>\n%b"
     icon_position = left
     max_icon_size = 48
-    background = "#1c2029e6"
-    foreground = "#f8f8f2"
+    background = "{{ .palette.bg }}e6"
+    foreground = "{{ .palette.fg }}"
     mouse_left_click = do_action, close_current
     mouse_right_click = close_all
 
@@ -26,5 +26,5 @@
     timeout = 6
 
 [urgency_critical]
-    frame_color = "#ff5555"
+    frame_color = "{{ .palette.red }}"
     timeout = 0

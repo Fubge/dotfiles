@@ -1,8 +1,8 @@
 # Prompt: rounded pills in the desktop palette, command on the second line.
 #    /  = left / right rounded caps (Nerd Font)
 format = """
-[](fg:#ff7f00)$os[](fg:#ff7f00) \
-[](fg:#626f8c)$directory[](fg:#626f8c)\
+[](fg:{{ .palette.accent }})$os[](fg:{{ .palette.accent }}) \
+[](fg:{{ .palette.steel }})$directory[](fg:{{ .palette.steel }})\
 $git_branch$git_status\
 $fill$cmd_duration$status
 $character"""
@@ -12,12 +12,12 @@ command_timeout = 1000
 
 [os]
 disabled = false
-style = "fg:#1c2029 bg:#ff7f00"
+style = "fg:{{ .palette.bg }} bg:{{ .palette.accent }}"
 format = "[$symbol]($style)"
 symbols.Arch = ""
 
 [directory]
-style = "fg:#f8f8f2 bg:#626f8c"
+style = "fg:{{ .palette.fg }} bg:{{ .palette.steel }}"
 format = "[$path$read_only]($style)"
 read_only = " \U000F033E"
 truncation_length = 3
@@ -26,26 +26,26 @@ home_symbol = "~"
 
 [git_branch]
 symbol = ""
-style = "fg:#1c2029 bg:#808aa2"
-format = " [](fg:#808aa2)[$symbol $branch]($style)"
+style = "fg:{{ .palette.bg }} bg:{{ .palette.slate }}"
+format = " [](fg:{{ .palette.slate }})[$symbol $branch]($style)"
 
 [git_status]
-style = "fg:#1c2029 bg:#808aa2"
-format = "[( $all_status$ahead_behind)]($style)[](fg:#808aa2)"
+style = "fg:{{ .palette.bg }} bg:{{ .palette.slate }}"
+format = "[( $all_status$ahead_behind)]($style)[](fg:{{ .palette.slate }})"
 
 [fill]
 symbol = " "
 
 [cmd_duration]
 min_time = 2000
-style = "fg:#ffcc66"
+style = "fg:{{ .palette.yellow }}"
 format = "[\U000F0954 $duration]($style) "
 
 [status]
 disabled = false
-style = "fg:#ff5555"
+style = "fg:{{ .palette.red }}"
 format = "[\U000F0159 $status]($style)"
 
 [character]
-success_symbol = "[❯](bold fg:#ff7f00)"
-error_symbol = "[❯](bold fg:#ff5555)"
+success_symbol = "[❯](bold fg:{{ .palette.accent }})"
+error_symbol = "[❯](bold fg:{{ .palette.red }})"

@@ -1,15 +1,15 @@
-/* Palette (same as hypr/vars.lua, rofi, dunst, hyprlock) */
-@define-color dark    #1c2029;
-@define-color slate   #808aa2;
-@define-color steel   #626f8c;
-@define-color fg      #f8f8f2;
-@define-color accent  #ff7f00;
-@define-color warn    #ffcc66;
-@define-color crit    #ff5555;
-@define-color good    #a6e3a1;
+/* Colors come from .chezmoidata/palette.toml */
+@define-color dark    {{ .palette.bg }};
+@define-color slate   {{ .palette.slate }};
+@define-color steel   {{ .palette.steel }};
+@define-color fg      {{ .palette.fg }};
+@define-color accent  {{ .palette.accent }};
+@define-color warn    {{ .palette.yellow }};
+@define-color crit    {{ .palette.red }};
+@define-color good    {{ .palette.green }};
 
 * {
-    font-family: "JetBrainsMono Nerd Font", "Symbols Nerd Font";
+    font-family: "{{ .design.font }}", "Symbols Nerd Font";
     font-size: 13px;
     min-height: 0;
     border: none;
@@ -23,7 +23,7 @@ window#waybar {
 tooltip {
     background: alpha(@dark, 0.95);
     border: 1px solid @accent;
-    border-radius: 10px;
+    border-radius: {{ .design.rounding }}px;
 }
 
 /* Every section is its own pill */
@@ -113,7 +113,7 @@ window#waybar.empty #window { padding: 0; }
 #battery.warning:not(.charging)     { color: @warn; }
 #wireplumber.muted, #bluetooth.disabled, #bluetooth.off,
 #network.disconnected               { color: alpha(@fg, 0.45); }
-#bluetooth.connected                { color: #89b4fa; }
+#bluetooth.connected                { color: {{ .palette.blue }}; }
 
 /* Critical battery pulses red */
 @keyframes pulse {

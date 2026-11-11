@@ -3,9 +3,9 @@
 {
     "layer": "top",
     "position": "top",
-    "margin-top": 8,
-    "margin-left": 12,
-    "margin-right": 12,
+    "margin-top": {{ .design.gaps_in }},
+    "margin-left": {{ .design.gaps_out }},
+    "margin-right": {{ .design.gaps_out }},
     "spacing": 0,
 
     "modules-left":   ["hyprland/workspaces", "hyprland/window"],
@@ -66,10 +66,10 @@
             "mode": "month",
             "weeks-pos": "left",
             "format": {
-                "months":   "<span color='#ffead3'><b>{}</b></span>",
-                "weeks":    "<span color='#808aa2'>W{}</span>",
-                "weekdays": "<span color='#ffcc66'><b>{}</b></span>",
-                "today":    "<span color='#ff7f00'><b><u>{}</u></b></span>"
+                "months":   "<span color='{{ .palette.fg }}'><b>{}</b></span>",
+                "weeks":    "<span color='{{ .palette.slate }}'>W{}</span>",
+                "weekdays": "<span color='{{ .palette.yellow }}'><b>{}</b></span>",
+                "today":    "<span color='{{ .palette.accent }}'><b><u>{}</u></b></span>"
             }
         }
     },

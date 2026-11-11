@@ -60,3 +60,14 @@ exit
 | New machine | `gh auth login`, then `chezmoi init --apply Fubge/dotfiles` |
 | Changed something outside `$HOME` (`/etc`, ...) | note it in `docs/system-changes.md` |
 | Roll back the system after a broken update | see `docs/system-changes.md` |
+
+## Change colors, gaps, rounding or fonts
+
+All apps read the same two files:
+
+- `.chezmoidata/palette.toml` - every color (accent, backgrounds, text, ...)
+- `.chezmoidata/design.toml` - rounding, border width, gaps, fonts
+
+Edit them (`dots`, then `nvim .chezmoidata/palette.toml`), run `chezmoi apply`,
+then reload: `hyprctl reload`, `systemctl --user restart waybar`, restart kitty/apps.
+Files ending in `.tmpl` are generated from these values.

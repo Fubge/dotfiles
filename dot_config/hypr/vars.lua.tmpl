@@ -1,4 +1,5 @@
 -- Central place for all values that would otherwise be hardcoded.
+-- Colors and shapes are filled in by chezmoi from .chezmoidata/{palette,design}.toml
 local M = {}
 
 -- Applications ---------------------------------------------------------------
@@ -23,13 +24,13 @@ M.background = {
 
 -- Look -----------------------------------------------------------------------
 M.colors = {
-    accent   = "rgba(ff7f00ff)",
-    inactive = "rgba(646464ff)",
-    shadow   = 0xee1a1a1a,
+    accent   = "rgba({{ .palette.accent | trimPrefix "#" }}ff)",
+    inactive = "rgba({{ .palette.steel | trimPrefix "#" }}ff)",
+    shadow   = "rgba({{ .palette.bg_dark | trimPrefix "#" }}ee)",
 }
-M.gaps     = { inner = 6, outer = 6 }
-M.border   = 1
-M.rounding = 10
+M.gaps     = { inner = {{ .design.gaps_in }}, outer = {{ .design.gaps_out }} }
+M.border   = {{ .design.border }}
+M.rounding = {{ .design.rounding }}
 
 -- Dropdown terminal (Alt+Tab), sizes relative to the monitor -------------------
 M.dropdown = {

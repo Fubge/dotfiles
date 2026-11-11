@@ -1,0 +1,54 @@
+# kitty - colors come from .chezmoidata/palette.toml
+
+font_family      {{ .design.font }}
+font_size        12.0
+
+background_opacity   0.88
+window_padding_width 10
+confirm_os_window_close 0
+enable_audio_bell no
+cursor_shape beam
+# small trail when the cursor jumps
+cursor_trail 3
+shell_integration enabled
+
+# Remote control off: nothing needs it any more (the old /tmp socket was world-readable)
+allow_remote_control no
+
+# Tabs
+tab_bar_edge bottom
+tab_bar_style powerline
+tab_powerline_style round
+
+# Colors ------------------------------------------------------------------
+foreground            {{ .palette.fg }}
+background            {{ .palette.bg }}
+selection_foreground  {{ .palette.bg }}
+selection_background  {{ .palette.slate }}
+cursor                {{ .palette.accent }}
+cursor_text_color     {{ .palette.bg }}
+url_color             {{ .palette.yellow }}
+active_border_color   {{ .palette.accent }}
+inactive_border_color {{ .palette.steel }}
+active_tab_foreground   {{ .palette.bg }}
+active_tab_background   {{ .palette.accent }}
+inactive_tab_foreground {{ .palette.fg }}
+inactive_tab_background {{ .palette.steel }}
+
+# black, red, green, yellow, blue, magenta, cyan, white (normal / bright)
+color0  {{ .palette.bg_alt }}
+color8  {{ .palette.steel }}
+color1  {{ .palette.red }}
+color9  {{ .palette.red_bright }}
+color2  {{ .palette.green }}
+color10 {{ .palette.green_bright }}
+color3  {{ .palette.yellow }}
+color11 {{ .palette.yellow_bright }}
+color4  {{ .palette.blue }}
+color12 {{ .palette.blue_bright }}
+color5  {{ .palette.magenta }}
+color13 {{ .palette.magenta_bright }}
+color6  {{ .palette.cyan }}
+color14 {{ .palette.cyan_bright }}
+color7  {{ .palette.fg_muted }}
+color15 {{ .palette.fg }}

@@ -1,7 +1,7 @@
-# Lock screen, colors match the rest of the desktop (see hypr/vars.lua)
-$font   = JetBrainsMono Nerd Font
-$accent = rgba(ff7f00ff)
-$fg     = rgba(f8f8f2ff)
+# Lock screen, colors come from .chezmoidata/palette.toml
+$font   = {{ .design.font }}
+$accent = rgba({{ .palette.accent | trimPrefix "#" }}ff)
+$fg     = rgba({{ .palette.fg | trimPrefix "#" }}ff)
 
 general {
     hide_cursor = true
@@ -47,14 +47,14 @@ label {
 input-field {
     monitor =
     size = 300, 50
-    outline_thickness = 2
-    inner_color = rgba(1c2029cc)
+    outline_thickness = {{ .design.border }}
+    inner_color = rgba({{ .palette.bg | trimPrefix "#" }}cc)
     outer_color = $accent
-    check_color = rgba(808aa2ff)
-    fail_color  = rgba(ff5555ff)
+    check_color = rgba({{ .palette.slate | trimPrefix "#" }}ff)
+    fail_color  = rgba({{ .palette.red | trimPrefix "#" }}ff)
     font_color  = $fg
     fade_on_empty = false
-    rounding = 15
+    rounding = {{ .design.rounding }}
     font_family = $font
     placeholder_text = Password
     fail_text = $PAMFAIL

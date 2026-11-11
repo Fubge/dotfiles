@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+# KDE apps (Dolphin) read colors and icons from kdeglobals: Breeze Dark,
+# recolored with the desktop palette. Re-runs when the palette changes:
+# palette: {{ .palette | toJson | sha256sum }}
+set -euo pipefail
+src=/usr/share/color-schemes/BreezeDark.colors
+[[ -f $src ]] || exit 0
+
+rgb() { local h=${1#\#}; printf '%d,%d,%d' 0x${h:0:2} 0x${h:2:2} 0x${h:4:2}; }
+
+# Breeze Dark blue accent and backgrounds -> palette
+sed -e "s/61,174,233/$(rgb '{{ .palette.accent }}')/g" \
+    -e "s/20,22,24/$(rgb '{{ .palette.bg_dark }}')/g" \
+    -e "s/32,35,38/$(rgb '{{ .palette.bg }}')/g" \
+    -e "s/41,44,48/$(rgb '{{ .palette.bg_alt }}')/g" \
+    "$src" > "$HOME/.config/kdeglobals"
+printf '\n[General]\nColorScheme=BreezeDark\nTerminalApplication=kitty\n\n[Icons]\nTheme=Papirus-Dark\n' >> "$HOME/.config/kdeglobals"
+
+# Without Plasma, KDE apps pick Breeze Light by default: force Breeze Dark per app,
+# and point them at our recolored kdeglobals.
+for app in dolphinrc; do
+    kwriteconfig6 --file "$app" --group UiSettings --key ColorScheme BreezeDark
+done

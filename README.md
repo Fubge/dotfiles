@@ -32,5 +32,6 @@ See [docs/cheatsheet.md](docs/cheatsheet.md) for the full workflow; `dots-check`
 | `run_onchange_before_10-install-packages.sh.tmpl` | Installs missing packages |
 | `dot_config/` | Ends up in `~/.config/` |
 | `docs/` | Cheatsheet, manual system changes, rollback guide |
+| `.chezmoidata/` | Shared palette and design tokens used by all templates |
 
 Machine-specific values (monitors, sizes, …) live in variables/templates instead of being hardcoded.

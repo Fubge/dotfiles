@@ -5,14 +5,14 @@ configuration {
     display-drun:       "Apps";
     display-run:        "Run";
     display-window:     "Windows";
-    font:               "JetBrainsMono Nerd Font 12";
+    font:               "{{ .design.font }} 12";
 }
 
 * {
-    bg:         #1c2029e6;
-    bg-alt:     #626f8c;
-    fg:         #f8f8f2;
-    accent:     #ff7f00;
+    bg:         {{ .palette.bg }}e6;
+    bg-alt:     {{ .palette.steel }};
+    fg:         {{ .palette.fg }};
+    accent:     {{ .palette.accent }};
 
     background-color: transparent;
     text-color:       @fg;
@@ -21,9 +21,9 @@ configuration {
 window {
     width:            600px;
     background-color: @bg;
-    border:           1px;
+    border:           {{ .design.border }}px;
     border-color:     @accent;
-    border-radius:    15px;
+    border-radius:    {{ .design.rounding }}px;
     padding:          12px;
 }
 
@@ -32,11 +32,11 @@ inputbar {
     spacing:          10px;
     padding:          10px 14px;
     background-color: @bg-alt;
-    border-radius:    10px;
+    border-radius:    8px;
 }
 
 prompt { text-color: @accent; }
-entry  { placeholder: "App or web search..."; placeholder-color: #c0c4ce; }
+entry  { placeholder: "App or web search..."; placeholder-color: {{ .palette.fg_muted }}; }
 
 listview {
     lines:     8;
@@ -48,7 +48,7 @@ listview {
 element {
     padding:       8px 12px;
     spacing:       10px;
-    border-radius: 10px;
+    border-radius: 8px;
 }
 
 element selected.normal {

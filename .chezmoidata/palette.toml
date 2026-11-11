@@ -20,3 +20,10 @@ green     = "#a6e3a1"   # success / charging
 blue      = "#7aa2f7"
 magenta   = "#c49bff"
 cyan      = "#7dcfff"
+# Bright variants (terminal colors 9-14)
+red_bright     = "#ff7b7b"
+green_bright   = "#c3f0bf"
+yellow_bright  = "#ffdd99"
+blue_bright    = "#9bb8ff"
+magenta_bright = "#d8bbff"
+cyan_bright    = "#a8e0ff"

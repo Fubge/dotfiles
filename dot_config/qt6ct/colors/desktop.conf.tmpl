@@ -1,0 +1,11 @@
+{{- /* Order: WindowText, Button, Light, Midlight, Dark, Mid, Text, BrightText, ButtonText,
+       Base, Window, Shadow, Highlight, HighlightedText, Link, LinkVisited, AlternateBase,
+       NoRole, ToolTipBase, ToolTipText, PlaceholderText */ -}}
+{{- $p := .palette -}}
+{{- $c := list $p.fg $p.bg_alt $p.slate $p.steel $p.bg_dark $p.steel $p.fg $p.fg $p.fg $p.bg_dark $p.bg "#000000" $p.accent $p.bg $p.blue $p.magenta $p.bg_alt $p.fg $p.bg_dark $p.fg $p.comment -}}
+{{- $d := list $p.comment $p.bg_alt $p.slate $p.steel $p.bg_dark $p.steel $p.comment $p.fg $p.comment $p.bg_dark $p.bg "#000000" $p.steel $p.fg_muted $p.blue $p.magenta $p.bg_alt $p.fg $p.bg_dark $p.fg $p.comment -}}
+# Generated from .chezmoidata/palette.toml
+[ColorScheme]
+active_colors={{ range $i, $x := $c }}{{ if $i }}, {{ end }}#ff{{ $x | trimPrefix "#" }}{{ end }}
+disabled_colors={{ range $i, $x := $d }}{{ if $i }}, {{ end }}#ff{{ $x | trimPrefix "#" }}{{ end }}
+inactive_colors={{ range $i, $x := $c }}{{ if $i }}, {{ end }}#ff{{ $x | trimPrefix "#" }}{{ end }}

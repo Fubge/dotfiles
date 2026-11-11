@@ -4,9 +4,9 @@ position=top-left
 round_corners=10
 background_alpha=0.5
 font_size=20
-text_color=f8f8f2
-gpu_color=ff7f00
-cpu_color=808aa2
+text_color={{ .palette.fg | trimPrefix "#" }}
+gpu_color={{ .palette.accent | trimPrefix "#" }}
+cpu_color={{ .palette.slate | trimPrefix "#" }}
 
 fps
 frametime
