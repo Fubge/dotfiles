@@ -122,10 +122,9 @@ window#waybar.empty #window { padding: 0; }
 #cpu.high, #memory.high             { color: @warn; }
 #temperature.critical               { color: @crit; }
 /* Battery (~/.local/bin/battery): fills up green while charging,
-   calm blue when held by the charge limit, one yellow spark when the plug
-   clicks in */
+   just a green plug once done (full or held by the charge limit), one
+   yellow spark when the plug clicks in */
 #custom-battery.charging, #custom-battery.full { color: @good; }
-#custom-battery.plugged             { color: {{ .palette.cyan_bright }}; }
 #custom-battery.plug                { color: @warn; }
 #custom-battery.warning             { color: @warn; }
 #wireplumber.muted, #bluetooth.disabled, #bluetooth.off,

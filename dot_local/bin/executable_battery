@@ -5,10 +5,12 @@ Icon only, percent and times in the tooltip. Ten level steps everywhere:
   draining  plain battery; class warning (<=25%) / critical (<=10%, pulses red)
   charging  the bolt battery fills up in a loop from the current level to full,
             like a phone. The loop runs faster the more watts go in.
-  plugged   held by the charge limit: plain battery in blue, no animation
-  full      battery with a heart
-While plugged in, a small plug sits next to the battery (charging, held, full),
-so one glance tells whether the laptop is on the cable. Plugging in, the plug
+  done      plugged in and nothing left to charge (full, or held by the charge
+            limit: it only charges again below the start threshold): the
+            battery steps aside and only a green plug remains, "on the cable,
+            all good". Level in the tooltip.
+While charging, a small plug sits next to the battery, so one glance tells
+whether the laptop is on the cable. Plugging in, the plug
 slides in from the side and clicks into place (one short yellow spark, class
 plug); unplugging, it drifts away and fades out. No constant motion besides
 the charging fill.
@@ -28,7 +30,6 @@ PLAIN = ["\U000F007A", "\U000F007B", "\U000F007C", "\U000F007D", "\U000F007E",
          "\U000F007F", "\U000F0080", "\U000F0081", "\U000F0082", "\U000F0079"]
 BOLT = ["\U000F089C", "\U000F0086", "\U000F0087", "\U000F0088", "\U000F089D",
         "\U000F0089", "\U000F089E", "\U000F008A", "\U000F008B", "\U000F0085"]
-HEART = "\U000F120F"
 PLUG, UNPLUG = "\U000F06A5", "\U000F06A6"
 
 ANIM_FRAME = 0.11   # seconds per frame of the plug in/out animation
@@ -148,13 +149,15 @@ def main():
             if not extra:
                 frame += 1
                 wait = frame_time(s["watts"])
-        elif s["kind"] == "full":
-            emit(HEART, "full", tip, True, extra)
-        elif s["kind"] == "plugged":
-            emit(PLAIN[step(s["cap"])], "plugged", tip, True, extra)
-        else:
+        elif s["kind"] == "discharging":
             cls = "critical" if s["cap"] <= 10 else "warning" if s["cap"] <= 25 else "discharging"
             emit(PLAIN[step(s["cap"])], cls, tip, False, extra)
+        elif extra:
+            # Plugged in while done: the plug slides in next to the battery,
+            # then the battery steps aside
+            emit(PLAIN[step(s["cap"])], "full", tip, True, extra)
+        else:
+            emit(PLUG, "full", tip)
 
         ready, _, _ = select.select([udev.stdout], [], [], max(0.05, wait))
         if ready:
