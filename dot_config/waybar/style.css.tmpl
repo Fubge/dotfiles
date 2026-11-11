@@ -62,15 +62,20 @@ tooltip {
 window#waybar.empty #window { padding: 0; }
 
 /* ---------------------------------------------------------------- center */
-/* Clock face + time share one pill; the face takes the time-of-day color */
-#custom-clockface { padding: 0 2px 0 16px; font-size: 16px; }
-#custom-clockface.morning { color: {{ .palette.yellow_bright }}; }
-#custom-clockface.day     { color: {{ .palette.yellow }}; }
-#custom-clockface.evening { color: @accent; }
-#custom-clockface.night   { color: {{ .palette.cyan_bright }}; }
-#clock {
-    padding: 0 2px 0 8px;
+/* Terminal clock: prompt colored by the time of day, segment digits,
+   blinking colon and caret (custom modules in config.jsonc) */
+#custom-prompt { padding: 0 8px 0 16px; font-weight: bold; }
+#custom-prompt.morning { color: {{ .palette.yellow_bright }}; }
+#custom-prompt.day     { color: {{ .palette.yellow }}; }
+#custom-prompt.evening { color: @accent; }
+#custom-prompt.night   { color: {{ .palette.cyan_bright }}; }
+#custom-hours, #custom-minutes { font-family: "Noto Sans Symbols 2"; font-size: 16px; }
+#custom-colon {
+    padding: 0 1px;
+    font-weight: bold;
+    animation: caret-blink 1s ease-in-out infinite alternate;
 }
+#clock { padding: 0 2px 0 10px; }
 /* Soft blinking caret, like a terminal waiting for input */
 @keyframes caret-blink {
     from { opacity: 1; }

@@ -10,7 +10,7 @@
     "spacing": 0,
 
     "modules-left":   ["hyprland/workspaces", "hyprland/window"],
-    "modules-center": ["custom/clockface", "clock", "custom/caret", "mpris"],
+    "modules-center": ["custom/prompt", "custom/hours", "custom/colon", "custom/minutes", "clock", "custom/caret", "mpris"],
     "modules-right":  ["group/hardware", "group/system", "group/connect", "custom/power"],
 
     // ---------------------------------------------------------------- groups
@@ -61,18 +61,19 @@
     },
 
     // ---------------------------------------------------------------- center
-    // Clock face of the current hour, colored by the time of day (script: ~/.local/bin/clockface)
-    "custom/clockface": {
-        "exec": "~/.local/bin/clockface",
-        "return-type": "json",
-        "interval": 30
-    },
+    // Terminal-style clock:  ❯ 17:45 // Mi 11. Nov▍
+    // Prompt (colored by time of day), seven-segment hours and minutes,
+    // a blinking colon and a blinking caret. Script: ~/.local/bin/clockface
+    "custom/prompt":  { "exec": "~/.local/bin/clockface watch prompt",  "return-type": "json" },
+    "custom/hours":   { "exec": "~/.local/bin/clockface watch hours",   "return-type": "json" },
+    "custom/colon":   { "format": ":", "tooltip": false },
+    "custom/minutes": { "exec": "~/.local/bin/clockface watch minutes", "return-type": "json" },
     "clock": {
-        // Terminal look: bold time, the date as a code comment, then a
-        // blinking caret (custom/caret). Click hides the date
+        // Only the date, written as a code comment (the time is drawn by the
+        // modules above). Hover shows the calendar, click hides the date
         "locale": "{{ .locale.clock }}",
-        "format": "<b>{0:%H:%M}</b>  <span color='{{ .palette.comment }}'>// {0:L%a %d. %b}</span>",
-        "format-alt": "<b>{0:%H:%M}</b>",
+        "format": "<span color='{{ .palette.comment }}'>// {0:L%a %d. %b}</span>",
+        "format-alt": "",
         "tooltip-format": "<tt><small>{calendar}</small></tt>",
         "calendar": {
             "mode": "month",
