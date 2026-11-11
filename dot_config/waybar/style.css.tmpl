@@ -84,18 +84,18 @@ window#waybar.empty #window { padding: 0; }
 }
 #custom-caret {
     color: @accent;
-    padding: 0 16px 0 3px;
+    padding: 0 6px 0 3px;
     animation: soft-blink 0.9s ease-in-out infinite alternate;
 }
 @keyframes soft-blink {
     from { opacity: 1; }
     to   { opacity: 0.15; }
 }
-#mpris {
-    padding: 0 16px 0 10px;
-    color: @slate;
+/* now playing: colors come from the script (pango), only the frame here */
+#custom-music {
+    padding: 0 12px 0 8px;
+    color: {{ .palette.fg_muted }};
 }
-#mpris.playing { color: @accent; }
 
 /* ---------------------------------------------------------------- right */
 #hardware { padding: 0 4px; }
@@ -146,7 +146,7 @@ window#waybar.empty #window { padding: 0; }
 /* ---------------------------------------------------------------- hover
    Same effect everywhere: orange text on a slightly darker background.
    Kept last so it wins over the state colors above. */
-#workspaces button, #window, #clock.date, #mpris,
+#workspaces button, #window, #clock.date, #custom-music,
 #cpu, #temperature, #memory,
 #idle_inhibitor, #custom-power-profile, #custom-brightness, #custom-battery,
 #wireplumber, #network, #bluetooth, #custom-power {
@@ -154,7 +154,7 @@ window#waybar.empty #window { padding: 0; }
     border-radius: 12px;
 }
 #workspaces button:hover,
-#clock.date:hover, #mpris:hover,
+#clock.date:hover, #custom-music:hover,
 #cpu:hover, #temperature:hover, #memory:hover,
 #idle_inhibitor:hover, #custom-power-profile:hover, #custom-brightness:hover, #custom-battery:hover,
 #wireplumber:hover, #network:hover, #bluetooth:hover {

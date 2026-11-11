@@ -40,7 +40,16 @@ bind(mod .. " + M", hl.dsp.exec_cmd("uwsm stop"), "Log out") -- uwsm stops all a
 
 -- Windows
 group("Windows")
-bind(mod .. " + X", hl.dsp.window.close(), "Close window")
+bind(mod .. " + X", function()
+    local win = hl.get_active_window()
+    if win and v.keepAlive[string.lower(win.class or "")] then
+        -- e.g. Spotify keeps playing; bring it back with SUPER+S or a right click on the song in the bar
+        hl.dispatch(hl.dsp.window.move({ workspace = "special:minimized", follow = false }))
+    else
+        hl.dispatch(hl.dsp.window.close())
+    end
+end, "Close window (Spotify: minimize, keeps playing)")
+bind(mod .. " + SHIFT + X", hl.dsp.window.close(), "Really close (Spotify too)")
 bind(mod .. " + F", hl.dsp.window.float({ action = "toggle" }), "Float / tile window")
 bind(mod .. " + SHIFT + F", hl.dsp.window.fullscreen({ mode = "fullscreen" }), "Fullscreen")
 bind(mod .. " + CTRL + Return", hl.dsp.layout("swapwithmaster master"), "Main window")

@@ -11,6 +11,9 @@ M.fileManager = "dolphin"
 -- App launcher; text without a matching app is searched on the web
 M.menu        = "rofi -show combi -modes combi,web:" .. os.getenv("HOME") .. "/.local/bin/rofi-web-mode -combi-modes web,drun -display-combi Apps -theme launcher"
 M.bin         = os.getenv("HOME") .. "/.local/bin/"
+-- Apps that keep running in the background: SUPER+X only minimizes them
+-- (lowercase window classes). SUPER+SHIFT+X really closes them.
+M.keepAlive   = { spotify = true }
 
 -- Startup layout: workspace 1 stays empty --------------------------------------
 M.startup = {

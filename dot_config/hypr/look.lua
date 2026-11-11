@@ -49,6 +49,9 @@ hl.config({
         -- long to start (Steam, Discord) and you switched workspaces meanwhile
         initial_workspace_tracking = 1,
         initial_workspace_token_timeout = 120, -- seconds (was 10)
+        -- a window that asks for focus gets it, e.g. the browser when an app
+        -- opens a link (Spotify login redirect): jumps to its workspace
+        focus_on_activate = true,
     },
 })
 

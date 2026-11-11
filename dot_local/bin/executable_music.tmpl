@@ -1,0 +1,158 @@
+#!/usr/bin/env python3
+"""Now playing in the bar (waybar custom/music), next to the terminal clock.
+
+  music          watch the player, print one JSON line per frame for waybar
+  music show     bring the player window here (Spotify), start it if needed
+
+Look: a little equalizer dances while music plays, each bar in its own color;
+on pause the bars lie flat and the title dims. A new song is typed in like on
+the terminal clock (orange caret), long titles scroll as a marquee.
+Spotify is preferred over other players (browser videos).
+"""
+import html
+import json
+import random
+import subprocess
+import sys
+import threading
+import time
+
+PLAYERS = "spotify,%any"
+WIDTH = 24                     # visible title characters, longer ones scroll
+FPS = 8
+BARS = "▁▂▃▄▅▆▇"
+BAR_COLORS = ["{{ .palette.cyan }}", "{{ .palette.blue }}", "{{ .palette.magenta }}", "{{ .palette.accent }}"]
+COLORS = {
+    "icon": "{{ .palette.green }}",
+    "dim": "{{ .palette.comment }}",
+    "caret": "{{ .palette.accent }}",
+}
+ICONS = {"spotify": "\U000F04C7", "default": "\U000F075A"}  # nf-md-spotify / music-note
+SEP = "   ·   "
+FIELDS = ["status", "player", "artist", "title", "album"]
+FMT = "\x1f".join("{" * 2 + f + "}" * 2  # playerctl format fields
+                 for f in ["status", "playerName", "artist", "title", "album"])
+
+state = {f: "" for f in FIELDS}
+lock = threading.Lock()
+changed = threading.Event()
+
+
+def follow():
+    """Keep `state` in sync with playerctl (one line per change)."""
+    while True:
+        proc = subprocess.Popen(
+            ["playerctl", "-p", PLAYERS, "--follow", "metadata", "--format", FMT],
+            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
+        for line in proc.stdout:
+            parts = line.rstrip("\n").split("\x1f")
+            with lock:
+                state.update(dict(zip(FIELDS, parts)) if len(parts) == 5
+                             else {f: "" for f in FIELDS})
+            changed.set()
+        proc.wait()
+        time.sleep(2)
+
+
+def emit(text="", tooltip="", cls=""):
+    print(json.dumps({"text": text, "tooltip": tooltip, "class": cls}), flush=True)
+
+
+def span(color, text):
+    return f"<span color='{color}'>{text}</span>"
+
+
+def watch():
+    threading.Thread(target=follow, daemon=True).start()
+    levels = [1, 3, 2, 4]
+    targets = levels[:]
+    last_title, typed, offset, hold = None, 0, 0, 0
+    while True:
+        with lock:
+            s = dict(state)
+        if s["status"] not in ("Playing", "Paused"):
+            emit()
+            last_title = None
+            changed.wait()
+            changed.clear()
+            continue
+
+        playing = s["status"] == "Playing"
+        title = s["title"] or "…"
+        if title != last_title:
+            last_title, typed, offset, hold = title, 0, 0, FPS * 2
+
+        # equalizer: every bar walks towards its own random target
+        if playing:
+            for i in range(4):
+                if levels[i] == targets[i]:
+                    targets[i] = random.randint(0, len(BARS) - 1)
+                step = 1 if targets[i] > levels[i] else -1
+                levels[i] += step * min(2, abs(targets[i] - levels[i]))
+            bars = "".join(span(c, BARS[l]) for c, l in zip(BAR_COLORS, levels))
+        else:
+            bars = span(COLORS["dim"], BARS[1] * 4)  # resting, flat
+
+        # title: typewriter on a new song, then marquee when too long
+        typing = typed < min(len(title), WIDTH)
+        if typing:
+            typed += 2
+            # pad to the final width (no-break spaces) so the clock does not move
+            pad = "\u00a0" * max(0, min(len(title), WIDTH) - typed - 1)
+            shown = html.escape(title[:typed]) + span(COLORS["caret"], "▍") + pad
+        elif len(title) > WIDTH:
+            loop = title + SEP
+            if playing:
+                if hold:
+                    hold -= 1
+                else:
+                    offset = (offset + 1) % len(loop)
+                    if offset == 0:
+                        hold = FPS * 2
+            shown = html.escape((loop * 2)[offset:offset + WIDTH])
+        else:
+            shown = html.escape(title)
+        if not playing:
+            shown = f"<i>{span(COLORS['dim'], shown)}</i>"
+
+        icon = ICONS.get(s["player"], ICONS["default"])
+        icon = span(COLORS["icon"] if playing else COLORS["dim"], icon)
+        tip = html.escape(title)
+        if s["artist"]:
+            tip += "\n" + html.escape(" · ".join(x for x in (s["artist"], s["album"]) if x))
+        tip += "\n\n<small>Click play/pause · Right click show · Scroll skip</small>"
+        emit(f"{icon} {bars} {shown}", tip, "playing" if playing else "paused")
+
+        animating = playing or typing
+        if changed.wait(1 / FPS if animating else None):
+            changed.clear()
+
+
+def lua_table(**kw):
+    """{k='v', n=1, b=true} for hyprctl dispatch (Lua dispatchers)."""
+    def val(x):
+        return "true" if x is True else str(x) if isinstance(x, int) else "'" + x + "'"
+    return "{" + ", ".join(k + "=" + val(x) for k, x in kw.items()) + "}"
+
+
+def show():
+    """Bring the Spotify window to the current workspace (also from minimized)."""
+    clients = json.loads(subprocess.run(["hyprctl", "clients", "-j"],
+                                        capture_output=True, text=True).stdout or "[]")
+    win = next((c for c in clients if c["class"].lower() == "spotify"), None)
+    if not win:
+        subprocess.Popen(["uwsm", "app", "--", "spotify-launcher"],
+                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        return
+    ws = json.loads(subprocess.run(["hyprctl", "activeworkspace", "-j"],
+                                   capture_output=True, text=True).stdout)["id"]
+    addr = win["address"]
+    subprocess.run(["hyprctl", "dispatch",
+                    "hl.dsp.window.move(" + lua_table(window="address:" + addr, workspace=ws, follow=True) + ")"],
+                   stdout=subprocess.DEVNULL)
+    subprocess.run(["hyprctl", "dispatch", "hl.dsp.focus(" + lua_table(window="address:" + addr) + ")"],
+                   stdout=subprocess.DEVNULL)
+
+
+if __name__ == "__main__":
+    show() if sys.argv[1:] == ["show"] else watch()

@@ -10,7 +10,7 @@
     "spacing": 0,
 
     "modules-left":   ["hyprland/workspaces", "hyprland/window"],
-    "modules-center": ["custom/prompt", "clock#hours", "custom/colon", "clock#minutes", "clock#date", "custom/caret", "mpris"],
+    "modules-center": ["custom/prompt", "clock#hours", "custom/colon", "clock#minutes", "clock#date", "custom/caret", "custom/music"],
     "modules-right":  ["group/hardware", "group/system", "group/connect", "custom/power"],
 
     // ---------------------------------------------------------------- groups
@@ -90,15 +90,16 @@
         "format": "\u258d",
         "tooltip": false
     },
-    // Current song (hidden when nothing plays). Click = play/pause, scroll = skip
-    "mpris": {
-        "format": "{player_icon} {title}",
-        "format-paused": "{status_icon} <i>{title}</i>",
-        "title-len": 24,
-        "player-icons": { "default": "\udb81\udf5a", "spotify": "\udb81\udcc7", "firefox": "\udb81\uddc3", "vivaldi": "\udb81\uddc3" },
-        "status-icons": { "paused": "\udb80\udfe4" },
-        "on-scroll-up": "playerctl next",
-        "on-scroll-down": "playerctl previous"
+    // Now playing (hidden when nothing plays): dancing equalizer, new songs are
+    // typed in, long titles scroll (~/.local/bin/music). Click = play/pause,
+    // right click = show Spotify (also from minimized), scroll = skip
+    "custom/music": {
+        "exec": "~/.local/bin/music",
+        "return-type": "json",
+        "on-click": "playerctl -p spotify,%any play-pause",
+        "on-click-right": "~/.local/bin/music show",
+        "on-scroll-up": "playerctl -p spotify,%any next",
+        "on-scroll-down": "playerctl -p spotify,%any previous"
     },
 
     // ---------------------------------------------------------------- hardware
