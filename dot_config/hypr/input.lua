@@ -3,7 +3,7 @@ local v = require("vars")
 hl.config({
     input = {
         kb_layout = v.keyboard.layout,
-        kb_options = v.keyboard.options, -- Caps Lock <-> Escape (great for Neovim)
+        kb_options = v.keyboard.options, -- key swaps, see vars.lua
         follow_mouse = 0, -- focus changes on click, not on hover
         float_switch_override_focus = 0, -- ...also between floating and tiled windows
         sensitivity = 0,

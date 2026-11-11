@@ -44,7 +44,7 @@ hl.config({
     },
 
     misc = {
-        force_default_wallpaper = -1, -- until hyprpaper arrives in phase 4
+        force_default_wallpaper = 0, -- Hyprland's built-in wallpaper off, hyprpaper draws ours
     },
 })
 

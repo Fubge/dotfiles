@@ -78,3 +78,16 @@ Files ending in `.tmpl` are generated from these values.
 - Your own images: drop them into `~/Pictures/Wallpapers` (subfolders work).
 - `make-wallpapers` re-renders the palette wallpapers (also runs when the palette changes).
 - Login screen background: `login_wallpaper` in `.chezmoidata/design.toml`.
+
+## Shortcuts and menus
+
+- **SUPER is the left Alt key** (next to the space bar): left Alt and the Windows key
+  are swapped (`altwin:swap_lalt_lwin` in `hypr/vars.lua`), so apps get Alt from the
+  Windows key. While a game runs with `gamemoderun %command%` the swap is undone.
+- **`SUPER+H`** lists every shortcut (built live from the descriptions in `hypr/binds.lua`).
+- The small menus (Wi-Fi `SUPER+N`, Bluetooth `SUPER+SHIFT+B`, audio `SUPER+A`, power
+  profile `SUPER+P`, power `SUPER+Escape`) open in the middle of the screen; clicking the
+  same icon in the bar opens them under the mouse. All of them go through `rofi-menu`
+  and share the style in `rofi/menu.rasi`; the search field only appears for long lists.
+- Clicking the brightness icon opens a slider. The slider and the shortcut overview are
+  small GTK4 scripts (`brightness-popup`, `keybinds`) styled by `popups/style.css`.

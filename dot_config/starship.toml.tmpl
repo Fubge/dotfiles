@@ -1,11 +1,13 @@
-# Prompt: rounded pills in the desktop palette, command on the second line.
+# Prompt: rounded pills in the desktop palette, command on the same line.
 #    /  = left / right rounded caps (Nerd Font)
 format = """
 [](fg:{{ .palette.accent }})$os[](fg:{{ .palette.accent }}) \
 [](fg:{{ .palette.steel }})$directory[](fg:{{ .palette.steel }})\
-$git_branch$git_status\
-$fill$cmd_duration$status
+$git_branch$git_status \
 $character"""
+
+# Command duration and exit code sit at the right edge of the prompt line.
+right_format = "$cmd_duration$status"
 
 add_newline = true
 command_timeout = 1000
