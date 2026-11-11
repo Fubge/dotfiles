@@ -10,5 +10,4 @@ mangohud              # FPS / temps overlay (Shift+F12 toggles)
 lib32-mangohud
 gamescope             # micro-compositor: upscaling, frame limits, HDR
 modrinth-app          # Minecraft launcher (Modrinth modpacks / servers)
-lutris                # GOG, Epic, Battle.net, ... (Wine / Proton)
 umu-launcher          # run Windows games with Proton outside Steam (umu-run)

@@ -1,0 +1,12 @@
+# Copy of /usr/share/applications/spotify-launcher.desktop named just "Spotify" (the package calls it "Spotify (Launcher)")
+[Desktop Entry]
+Type=Application
+Name=Spotify
+GenericName=Music Player
+Icon=spotify-launcher
+TryExec=spotify-launcher
+Exec=spotify-launcher %U
+Terminal=false
+MimeType=x-scheme-handler/spotify;
+Categories=Audio;Music;Player;AudioVideo;
+StartupWMClass=Spotify

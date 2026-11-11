@@ -96,13 +96,13 @@ Files ending in `.tmpl` are generated from these values.
 ## Gaming
 
 - **Nothing to set up per game.** `game-watch` (started with Hyprland) spots games by
-  how they run, not by name: started by a launcher (Steam, Modrinth App, Lutris,
+  how they run, not by name: started by a launcher (Steam, Modrinth App,
   `umu-run`, gamescope, ...), running under Wine/Proton, or Minecraft. It turns on
   GameMode for them: performance power profile, ends when the game exits
   (`gamemode-hook`). While a game window has focus, left Alt is a normal Alt key.
 - **`SUPER+G`** marks / unmarks the focused window as a game, for anything not caught.
 - Steam launch option: just `mangohud %command%` (no `gamemoderun`).
 - Minecraft: **Modrinth App** (instances: Vanilla or Fabric + Sodium for more FPS).
-- Other stores (GOG, Epic, Battle.net): **Lutris**; a single `.exe`: `umu-run game.exe`
+- A single Windows `.exe` (GOG, ...): `umu-run game.exe`
   (uses GE-Proton). A new launcher only needs its process name in `LAUNCHERS` in
   `~/.local/bin/game-watch`.
