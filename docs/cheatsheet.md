@@ -93,6 +93,24 @@ Files ending in `.tmpl` are generated from these values.
 - Clicking the brightness icon opens a slider. The slider and the shortcut overview are
   small GTK4 scripts (`brightness-popup`, `keybinds`) styled by `popups/style.css`.
 
+## Claude scratchpad
+
+- **`SUPER+C`** shows / hides one long-running Claude Code session (kitty on
+  `special:claude`, started hidden at login). `SUPER+X` only hides it, `SUPER+SHIFT+X`
+  ends it. **`SUPER+SHIFT+C`** = small prompt pill, the question goes into that session.
+- The robot left of the window title shows its state (ready, working dots, orange =
+  needs you, green = finished while hidden, plus a notification). Right click = new
+  chat, resume, restart, quit. Script: `~/.local/bin/claude-pad`.
+- It runs in this repo, not in `~`: Claude Code never remembers the trust prompt for
+  the home folder. Its memory folder is a symlink so it shares the home one:
+  `~/.claude/projects/-home-<user>--local-share-chezmoi/memory -> ../-home-<user>/memory`.
+- The state comes from hooks in `~/.claude/settings.json` (not in this repo: Claude
+  Code rewrites that file). On a new machine add for each event
+  `[ -z "$CLAUDE_PAD" ] || ~/.local/bin/claude-pad hook EV`:
+  SessionStart `start`, UserPromptSubmit `prompt`, PostToolUse `tool`, Stop `stop`,
+  SessionEnd `end`, PreToolUse (matcher `AskUserQuestion`) and Notification
+  (matcher `permission_prompt|elicitation_dialog`) `ask`.
+
 ## Gaming
 
 - **Nothing to set up per game.** `game-watch` (started with Hyprland) spots games by

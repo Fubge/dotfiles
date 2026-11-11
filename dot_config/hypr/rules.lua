@@ -73,6 +73,19 @@ hl.window_rule({
     workspace = "special:music",
 })
 
+-- Claude Code scratchpad: one long-running session on special:claude, same frame
+-- as the overlays. "silent": started hidden at login; SUPER+C / the bar robot
+-- shows it (~/.local/bin/claude-pad)
+hl.window_rule({
+    name = "claude-pad",
+    match = { class = "^" .. v.claude.class .. "$" },
+    float = true,
+    size = v.overlay.size,
+    move = { "monitor_w*0.5-" .. v.overlay.size[1] // 2, tostring(v.overlay.top) },
+    rounding = v.overlay.rounding,
+    workspace = "special:claude silent",
+})
+
 -- Small tool windows float centered instead of splitting the layout
 for class, size in pairs(v.floating) do
     hl.window_rule({

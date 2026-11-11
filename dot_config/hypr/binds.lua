@@ -36,6 +36,8 @@ bind(mod .. " + V", run(v.bin .. "rofi-clipboard"), "Clipboard history")
 bind(mod .. " + Return", run(v.bin .. "rofi-websearch"), "Web search")
 bind(mod .. " + W", run(v.bin .. "wallpaper pick"), "Wallpaper picker")
 bind(mod .. " + H", run(v.bin .. "keybinds"), "This overview")
+bind(mod .. " + C", hl.dsp.exec_cmd(v.bin .. "claude-pad toggle"), "Claude (show / hide)")
+bind(mod .. " + SHIFT + C", hl.dsp.exec_cmd(v.bin .. "claude-pad ask"), "Quick question to Claude")
 
 -- Menus (the same menus open under the mouse when clicked in the bar)
 group("Menus")
@@ -62,7 +64,7 @@ bind(mod .. " + X", function()
     else
         hl.dispatch(hl.dsp.window.close())
     end
-end, "Close window (Spotify / Discord: keep running)")
+end, "Close window (Spotify / Discord / Claude: keep running)")
 bind(mod .. " + SHIFT + X", hl.dsp.window.close(), "Really close (Spotify too)")
 bind(mod .. " + F", hl.dsp.window.float({ action = "toggle" }), "Float / tile window")
 bind(mod .. " + SHIFT + F", hl.dsp.window.fullscreen({ mode = "fullscreen" }), "Fullscreen")

@@ -1,0 +1,367 @@
+#!/usr/bin/env python3
+"""Claude Code as a scratchpad: one long-running session in a floating kitty on
+its own special workspace (special:claude), like Spotify on special:music.
+
+  claude-pad toggle    SUPER+C / bar click: show or hide it (starts it if needed)
+  claude-pad hide      out of sight, the session keeps running (SUPER+X)
+  claude-pad start     start it hidden (login autostart)
+  claude-pad ask       SUPER+SHIFT+C: small prompt pill, the text goes into the
+                       running session and the pad opens with the answer
+  claude-pad menu      bar right click: new chat, resume, restart, quit
+  claude-pad watch     waybar module custom/claude (robot icon + typewriter)
+  claude-pad hook EV   called by Claude Code hooks (~/.claude/settings.json),
+                       only inside the pad (CLAUDE_PAD=1), event JSON on stdin
+
+States (file $XDG_RUNTIME_DIR/claude-pad/state, the bar follows via a FIFO):
+  off       no session          robot-off, dim
+  starting  window up, Claude not ready yet
+  idle      waiting for a prompt  robot outline
+  busy      working              robot + running dots
+  waiting   needs you (permission, question)  orange confused robot, "needs you"
+  done      finished while the pad was hidden  green happy robot, "done"
+"""
+import json
+import os
+import select
+import subprocess
+import sys
+import time
+
+sys.path.insert(0, os.path.expanduser("~/.local/lib/flair"))
+from typewriter import Typewriter  # noqa: E402
+
+CLASS = "claude_pad"
+WS = "claude"
+RUN = os.path.join(os.environ.get("XDG_RUNTIME_DIR", "/tmp"), "claude-pad")
+SOCK = os.path.join(RUN, "kitty.sock")
+STATE = os.path.join(RUN, "state")
+FIFO = os.path.join(RUN, "events")
+HOME = os.path.expanduser("~")
+BIN = os.path.join(HOME, ".local/bin")
+# Claude Code never remembers the trust prompt for the home folder itself, so the
+# pad starts in the dotfiles repo (trusted once, for good). Its memory folder is
+# a symlink to the home one (~/.claude/projects/-home-USER/memory), so both share it
+WORKDIR = os.path.join(HOME, ".local/share/chezmoi")
+
+COLORS = {
+    "dim": "{{ .palette.comment }}",
+    "dots": "{{ .palette.slate }}",
+}
+ICONS = {
+    "off": "\U000F167B",       # nf-md-robot_off_outline
+    "starting": "\U000F167A",  # robot_outline
+    "idle": "\U000F167A",
+    "busy": "\U000F06A9",      # robot
+    "waiting": "\U000F169F",   # robot_confused
+    "done": "\U000F1719",      # robot_happy
+}
+WORDS = {"waiting": "needs you", "done": "done"}
+WORD_HOLD = 4.0      # seconds a word stays before it is erased again
+DOTS = ["", "·", "··", "···"]
+DOTS_FPS = 3
+FPS = 60             # while the typewriter moves
+NBSP = " "
+
+
+# --------------------------------------------------------------- helpers
+def hypr(cmd):
+    subprocess.run(["hyprctl", "dispatch", cmd], stdout=subprocess.DEVNULL)
+
+
+def lua_table(**kw):
+    """{k='v', b=false} for hyprctl dispatch (Lua dispatchers)."""
+    def val(x):
+        return str(x).lower() if isinstance(x, bool) else "'" + x + "'"
+    return "{" + ", ".join(k + "=" + val(x) for k, x in kw.items()) + "}"
+
+
+def hypr_json(what):
+    out = subprocess.run(["hyprctl", what, "-j"], capture_output=True, text=True).stdout
+    try:
+        return json.loads(out or "[]")
+    except ValueError:
+        return []
+
+
+def window():
+    return next((c for c in hypr_json("clients") if c["class"] == CLASS), None)
+
+
+def shown():
+    return any(m.get("specialWorkspace", {}).get("name") == "special:" + WS
+               for m in hypr_json("monitors"))
+
+
+def read_state():
+    try:
+        with open(STATE) as f:
+            return f.read().strip() or "off"
+    except OSError:
+        return "off"
+
+
+def set_state(state):
+    os.makedirs(RUN, exist_ok=True)
+    with open(STATE, "w") as f:
+        f.write(state)
+    # wake the bar module; nobody listening (waybar down) is fine
+    try:
+        fd = os.open(FIFO, os.O_WRONLY | os.O_NONBLOCK)
+        os.write(fd, b"\n")
+        os.close(fd)
+    except OSError:
+        pass
+
+
+def kitty(*args, text=None):
+    return subprocess.run(["kitty", "@", "--to", "unix:" + SOCK, *args], input=text,
+                          capture_output=True, text=True).returncode == 0
+
+
+# --------------------------------------------------------------- window
+def start():
+    """Start the session (hidden: the window rule opens it silently)."""
+    if window():
+        return
+    os.makedirs(RUN, exist_ok=True)
+    try:
+        os.unlink(SOCK)
+    except OSError:
+        pass
+    set_state("starting")
+    # started from inside another Claude session (e.g. while testing): drop its
+    # markers, else the pad counts as a child session and saves no transcripts
+    env = {k: v for k, v in os.environ.items()
+           if not (k.startswith("CLAUDE") or k == "CLAUDECODE")}
+    subprocess.Popen(
+        ["uwsm", "app", "--", "kitty", "--class", CLASS, "--directory", WORKDIR,
+         "-o", "allow_remote_control=socket-only", "--listen-on", "unix:" + SOCK,
+         # Claude Code's own terminal notifications: the hooks send better ones
+         "-o", 'filter_notification title:"Claude Code"',
+         "env", "CLAUDE_PAD=1", "claude"],
+        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True, env=env)
+
+
+def wait_for(check, timeout):
+    end = time.monotonic() + timeout
+    while time.monotonic() < end:
+        result = check()
+        if result:
+            return result
+        time.sleep(0.1)
+    return None
+
+
+def show():
+    win = window() or (start() or wait_for(window, 8))
+    if not win:
+        return
+    if win["workspace"]["name"] != "special:" + WS:   # moved away by hand
+        hypr("hl.dsp.window.move(" + lua_table(window="address:" + win["address"],
+                                               workspace="special:" + WS, follow=False) + ")")
+    if not shown():
+        hypr(f"hl.dsp.workspace.toggle_special('{WS}')")
+    hypr("hl.dsp.focus(" + lua_table(window="address:" + win["address"]) + ")")
+    if read_state() == "done":   # seen now
+        set_state("idle")
+
+
+def hide():
+    if shown():
+        hypr(f"hl.dsp.workspace.toggle_special('{WS}')")
+
+
+def toggle():
+    if window() and shown():
+        hide()
+    else:
+        show()
+
+
+def send(text):
+    """Type text into the session and submit it (Enter goes separately, so it
+    is not taken as part of a paste)."""
+    before = read_state()
+    kitty("send-text", "--match", "all", "--stdin", text=text)
+    # Enter again until the prompt hook reports work: right after the start the
+    # input box can swallow the first one. Commands like /clear fire no hook.
+    for _ in range(4 if before == "idle" and not text.startswith("/") else 1):
+        time.sleep(0.4)
+        kitty("send-text", "--match", "all", "\\r")
+        if wait_for(lambda: read_state() != before, 1.5):
+            break
+
+
+def ask():
+    query = subprocess.run(["rofi", "-dmenu", "-p", "Claude", "-theme", "overlay",
+                            "-theme-str", ASK_THEME], capture_output=True, text=True).stdout.strip()
+    if not query:
+        return
+    if not window():
+        start()
+    # the SessionStart hook flips "starting" to "idle" once Claude takes input
+    wait_for(lambda: read_state() not in ("off", "starting"), 20)
+    send(query)
+    show()
+
+
+ASK_THEME = """
+window       { location: north; anchor: north; y-offset: {{ sub .design.launcher_top 30 }}px; width: {{ .design.websearch_width }}px; height: 0; padding: 20px 20px 12px 20px; }
+mainbox      { children: [ inputbar, textbox-hint ]; spacing: 12px; }
+box-search   { width: {{ sub .design.websearch_width 40 }}px; }
+entry        { placeholder: "Ask Claude..."; }
+textbox-hint { str: "Enter  ask      ·      Esc  close"; }
+"""
+
+
+def quit_pad():
+    win = window()
+    if win:
+        hypr("hl.dsp.window.close(" + lua_table(window="address:" + win["address"]) + ")")
+    set_state("off")
+
+
+def restart():
+    quit_pad()
+    wait_for(lambda: not window(), 5)
+    show()
+
+
+def menu():
+    running = window() is not None
+    rows = [("\U000F05AF  Show / hide", toggle),
+            ("\U000F0415  New chat (/clear)", lambda: (show(), send("/clear"))),
+            ("\U000F0450  Resume a chat", lambda: (show(), send("/resume")))]
+    if running:
+        rows += [("\U000F0709  Restart Claude", restart),
+                 ("\U000F0156  Quit Claude", quit_pad)]
+    pick = subprocess.run([os.path.join(BIN, "rofi-menu"), "--bar", "Claude", ""],
+                          input="\n".join(r[0] for r in rows), capture_output=True, text=True)
+    if pick.stdout.strip().isdigit():
+        rows[int(pick.stdout.strip())][1]()
+
+
+# --------------------------------------------------------------- hooks
+def last_answer(event):
+    """First line of Claude's last answer (Stop hook input or the transcript)."""
+    text = event.get("last_assistant_message") or ""
+    if not text and event.get("transcript_path"):
+        try:
+            with open(event["transcript_path"]) as f:
+                lines = f.readlines()[-200:]
+        except OSError:
+            lines = []
+        for line in reversed(lines):
+            try:
+                msg = json.loads(line).get("message", {})
+            except ValueError:
+                continue
+            if msg.get("role") != "assistant" or not isinstance(msg.get("content"), list):
+                continue
+            parts = [c.get("text", "") for c in msg["content"] if c.get("type") == "text"]
+            if any(parts):
+                text = "\n".join(parts)
+                break
+    for line in text.splitlines():
+        line = line.strip().lstrip("#*-> ").strip()
+        if line:
+            return line[:160]
+    return "Finished."
+
+
+def notify(title, body):
+    """Notification whose click opens the pad (waits in its own process)."""
+    subprocess.Popen(
+        ["sh", "-c", 'a=$(notify-send -a Claude -i "$3" -A open=Open "$1" "$2"); '
+                     '[ "$a" = open ] && exec "$4" show',
+         "sh", title, body, "utilities-terminal", os.path.join(BIN, "claude-pad")],
+        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+
+
+def hook(name):
+    try:
+        event = json.load(sys.stdin)
+    except ValueError:
+        event = {}
+    state = read_state()
+    if name == "start":
+        set_state("idle")
+    elif name == "prompt":
+        set_state("busy")
+    elif name == "tool" and state == "waiting":   # permission given, works on
+        set_state("busy")
+    elif name == "ask":                           # AskUserQuestion / permission
+        set_state("waiting")
+        if not shown():
+            notify("Claude needs you", event.get("message") or "Waiting for your answer.")
+    elif name == "stop":
+        if shown():
+            set_state("idle")
+        else:
+            set_state("done")
+            notify("Claude is done", last_answer(event))
+    elif name == "end":
+        set_state("off")
+
+
+# --------------------------------------------------------------- bar
+def span(color, text):
+    return f"<span color='{color}'>{text}</span>"
+
+
+def watch():
+    os.makedirs(RUN, exist_ok=True)
+    if not os.path.exists(FIFO):
+        os.mkfifo(FIFO)
+    fd = os.open(FIFO, os.O_RDWR | os.O_NONBLOCK)   # RDWR: never sees EOF
+    tw = Typewriter(pad=True)
+    state, word_until, last, next_alive = None, 0.0, None, 0.0
+    while True:
+        now = time.monotonic()
+        if now >= next_alive:   # session gone without a SessionEnd hook (killed)
+            next_alive = now + 3
+            if read_state() != "off" and not window():
+                set_state("off")
+        new = read_state()
+        if new != state:
+            state = new
+            word = WORDS.get(state, "")
+            tw.set(word)
+            word_until = now + len(word) / tw.type_speed + WORD_HOLD if word else 0
+        if word_until and now >= word_until:
+            word_until = 0
+            tw.set("")
+        typed, moving = tw.frame()
+        text = ICONS.get(state, ICONS["off"])
+        if typed:
+            text += " " + typed
+        elif state == "busy":
+            dots = DOTS[int(now * DOTS_FPS) % len(DOTS)]
+            text += " " + span(COLORS["dots"], dots + NBSP * (3 - len(dots)))
+        tip = {"off": "Claude is not running", "starting": "Claude starts…",
+               "idle": "Claude is ready", "busy": "Claude is working…",
+               "waiting": "Claude needs you", "done": "Claude is done"}.get(state, "")
+        out = json.dumps({"text": text, "class": state,
+                          "tooltip": tip + "\n\n<small>Click show · Right click menu</small>"})
+        if out != last:
+            print(out, flush=True)
+            last = out
+        timeout = (1 / FPS if moving else 1 / DOTS_FPS if state == "busy"
+                   else max(0.05, word_until - now) if word_until else 3)
+        if select.select([fd], [], [], timeout)[0]:
+            try:
+                os.read(fd, 4096)
+            except OSError:
+                pass
+
+
+if __name__ == "__main__":
+    cmds = {"toggle": toggle, "show": show, "hide": hide, "start": start,
+            "ask": ask, "menu": menu, "watch": watch}
+    args = sys.argv[1:]
+    if len(args) == 2 and args[0] == "hook":
+        hook(args[1])
+    elif len(args) == 1 and args[0] in cmds:
+        cmds[args[0]]()
+    else:
+        sys.exit(__doc__)

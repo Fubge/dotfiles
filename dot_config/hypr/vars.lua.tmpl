@@ -18,6 +18,7 @@ M.bin         = os.getenv("HOME") .. "/.local/bin/"
 M.keepAlive   = {
     spotify = hl.dsp.exec_cmd(M.bin .. "music hide"),
     discord = hl.dsp.focus({ workspace = "previous" }),
+    claude_pad = hl.dsp.exec_cmd(M.bin .. "claude-pad hide"),
 }
 
 -- Workspaces: 1 desktop (stays empty), 2 browser, 3 Neovim, 4 YouTube,
@@ -36,6 +37,7 @@ M.background = {
     "wl-paste --watch cliphist store",   -- clipboard history
     M.bin .. "game-watch",                -- GameMode + normal Alt key for every game
     M.bin .. "youtube-autostart",         -- YouTube app window on workspace 4 (rules.lua)
+    M.bin .. "claude-pad start",          -- Claude session waits hidden on special:claude
 }
 
 -- Look -----------------------------------------------------------------------
@@ -57,6 +59,10 @@ M.dropdown = {
 
 -- Spotify's floating window on special:music (rules.lua)
 M.music = { size = { "monitor_w*0.7", "monitor_h*0.75" } }
+
+-- Claude scratchpad (~/.local/bin/claude-pad) floats on special:claude in the
+-- overlay frame (M.overlay), but stays open when focus leaves
+M.claude = { class = "claude_pad" }
 
 -- Tool windows that float centered instead of tiling (regex on the class)
 M.floating = {

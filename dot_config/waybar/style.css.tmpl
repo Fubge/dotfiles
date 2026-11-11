@@ -69,6 +69,13 @@ tooltip {
 
 #custom-window { padding: 0 16px; }
 
+/* Claude robot (~/.local/bin/claude-pad): dim when off, orange when it needs
+   you, green when it finished while hidden */
+#custom-claude          { padding: 0 10px; margin-left: 6px; }
+#custom-claude.off      { color: alpha(@fg, 0.45); }
+#custom-claude.waiting  { color: @accent; }
+#custom-claude.done     { color: @good; }
+
 /* ---------------------------------------------------------------- center */
 /* Terminal clock:  ❯ 17:48  // Mi 11. Nov▍
    Same font and size everywhere (no extra padding top or bottom), so the
@@ -193,7 +200,7 @@ tooltip {
 /* ---------------------------------------------------------------- hover
    Same effect everywhere: orange text on a slightly darker background.
    Kept last so it wins over the state colors above. */
-#workspaces button, #custom-window, #clock.date, #custom-music,
+#workspaces button, #custom-window, #clock.date, #custom-music, #custom-claude,
 #cpu, #temperature, #memory,
 #idle_inhibitor, #custom-power-profile, #custom-brightness, #custom-battery,
 #wireplumber, #network, #bluetooth, #custom-power {
@@ -201,7 +208,7 @@ tooltip {
     border-radius: 12px;
 }
 #workspaces button:hover,
-#clock.date:hover, #custom-music:hover,
+#clock.date:hover, #custom-music:hover, #custom-claude:hover,
 #cpu:hover, #temperature:hover, #memory:hover,
 #idle_inhibitor:hover, #custom-power-profile:hover, #custom-brightness:hover, #custom-battery:hover,
 #wireplumber:hover, #network:hover, #bluetooth:hover {

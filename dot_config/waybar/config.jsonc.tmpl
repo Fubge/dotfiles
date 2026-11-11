@@ -12,7 +12,7 @@
     "margin-right": {{ .design.gaps_out }},
     "spacing": 0,
 
-    "modules-left":   ["hyprland/workspaces", "custom/window"],
+    "modules-left":   ["hyprland/workspaces", "custom/claude", "custom/window"],
     "modules-center": ["custom/prompt", "clock#hours", "custom/colon", "clock#minutes", "clock#date", "custom/caret", "group/music"],
     "modules-right":  ["group/hardware", "group/system", "group/connect", "custom/power"],
 
@@ -54,6 +54,14 @@
     },
     // Focused app, typewriter style: the old name is erased, the new one typed
     // in with the orange caret (~/.local/bin/bar-flair, friendly names there)
+    // Claude scratchpad state as a robot (~/.local/bin/claude-pad watch):
+    // ready / working (dots) / needs you (orange) / done while hidden (green)
+    "custom/claude": {
+        "exec": "~/.local/bin/claude-pad watch",
+        "return-type": "json",
+        "on-click": "~/.local/bin/claude-pad toggle",
+        "on-click-right-release": "~/.local/bin/claude-pad menu"
+    },
     "custom/window": {
         "exec": "~/.local/bin/bar-flair window",
         "return-type": "json",

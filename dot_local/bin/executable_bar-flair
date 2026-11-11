@@ -29,6 +29,7 @@ NAMES = [
     (r"org\.kde\.dolphin", "Files"),
     (r"kitty|popup-term|dropdown_terminal", "Terminal"),
     (r"discord", "Discord"),
+    (r"claude_pad", "Claude"),
     (r"[Ss]potify", "Spotify"),
     (r"popup\.keybinds", "Shortcuts"),
     (r"popup\.brightness", "Brightness"),
