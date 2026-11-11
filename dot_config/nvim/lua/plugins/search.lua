@@ -40,6 +40,18 @@ map("n", "<leader>sc", function() builtin.files(nil, { source = { cwd = vim.fn.s
 map("n", "<leader><leader>", extra.oldfiles, { desc = "Recent files" })
 map("n", "<leader>b",  builtin.buffers,    { desc = "Open buffers" })
 
--- File explorer: opens at the current file. Inside: h/l = up/into, = to save changes
-map("n", "<leader>e", function() MiniFiles.open(vim.api.nvim_buf_get_name(0)) end,
-    { desc = "File explorer" })
+-- File explorer: <leader>e toggles it (opens at the current file).
+-- Inside: h/l = up/into, edit lines to rename/delete/create, = saves changes, q or <Esc> closes.
+map("n", "<leader>e", function()
+    if not MiniFiles.close() then
+        local file = vim.api.nvim_buf_get_name(0)
+        MiniFiles.open(file ~= "" and file or nil)
+    end
+end, { desc = "File explorer (toggle)" })
+
+vim.api.nvim_create_autocmd("User", {
+    pattern = "MiniFilesBufferCreate",
+    callback = function(args)
+        vim.keymap.set("n", "<Esc>", MiniFiles.close, { buffer = args.data.buf_id, desc = "Close explorer" })
+    end,
+})
