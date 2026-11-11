@@ -78,7 +78,7 @@ window#waybar.empty #window { padding: 0; }
 #connect  { padding: 0 4px; }
 
 #cpu, #temperature, #memory,
-#idle_inhibitor, #power-profiles-daemon, #backlight, #battery,
+#idle_inhibitor, #custom-power-profile, #custom-brightness, #battery,
 #wireplumber, #network, #bluetooth, #tray {
     padding: 0 9px;
 }
@@ -92,8 +92,8 @@ window#waybar.empty #window { padding: 0; }
 
 /* ---------------------------------------------------------------- states */
 #idle_inhibitor.activated           { color: @accent; }
-#power-profiles-daemon.performance  { color: @accent; }
-#power-profiles-daemon.power-saver  { color: @good; }
+#custom-power-profile.performance  { color: @accent; }
+#custom-power-profile.power-saver  { color: @good; }
 #cpu.high, #memory.high             { color: @warn; }
 #temperature.critical               { color: @crit; }
 #battery.charging, #battery.plugged { color: @good; }
@@ -101,6 +101,9 @@ window#waybar.empty #window { padding: 0; }
 #wireplumber.muted, #bluetooth.disabled, #bluetooth.off,
 #network.disconnected               { color: alpha(@fg, 0.45); }
 #bluetooth.connected                { color: {{ .palette.blue }}; }
+/* Brightness tells the time of day: cool moon, plain cloud, warm sun */
+#custom-brightness.night            { color: {{ .palette.cyan_bright }}; }
+#custom-brightness.sun              { color: {{ .palette.yellow }}; }
 
 /* Critical battery pulses red */
 @keyframes pulse {
@@ -116,7 +119,7 @@ window#waybar.empty #window { padding: 0; }
    Kept last so it wins over the state colors above. */
 #workspaces button, #window, #clock, #mpris,
 #cpu, #temperature, #memory,
-#idle_inhibitor, #power-profiles-daemon, #backlight, #battery,
+#idle_inhibitor, #custom-power-profile, #custom-brightness, #battery,
 #wireplumber, #network, #bluetooth, #custom-power {
     transition: all 250ms ease;
     border-radius: 12px;
@@ -124,7 +127,7 @@ window#waybar.empty #window { padding: 0; }
 #workspaces button:hover,
 #clock:hover, #mpris:hover,
 #cpu:hover, #temperature:hover, #memory:hover,
-#idle_inhibitor:hover, #power-profiles-daemon:hover, #backlight:hover, #battery:hover,
+#idle_inhibitor:hover, #custom-power-profile:hover, #custom-brightness:hover, #battery:hover,
 #wireplumber:hover, #network:hover, #bluetooth:hover {
     color: @accent;
     background: alpha(@dark, 0.3);

@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+# Screen brightness for the bar, as perceived brightness (square-root curve, like
+# the brightness keys: brightnessctl -e2). 1% = the darkest hardware step
+# (raw 1; raw 0 switches the panel off), 100% = full. Same numbers as the slider.
+# (waybar's own backlight module shows the raw value: 41% looks like "3%")
+#   brightness status -> one JSON line for the waybar custom module
+#   brightness watch  -> a JSON line now and after every change (udev event)
+set -uo pipefail
+dev=/sys/class/backlight/intel_backlight
+
+# Icon only (percent in the tooltip), a little day cycle:
+#   1-33% moon and stars, 34-66% sun behind a cloud, 67-100% full sun
+# class night / cloud / sun colors it (waybar style.css)
+icons=($'\U000F0594' $'\U000F0595' $'\U000F05A8')
+classes=(night cloud sun)
+
+status() {
+    local p i
+    p=$(awk -v c="$(<"$dev/brightness")" -v m="$(<"$dev/max_brightness")" \
+        'BEGIN { print (c < 1 ? 0 : int(((c - 1) / (m - 1)) ^ 0.5 * 99 + 1.5)) }')
+    i=$(( p <= 33 ? 0 : p <= 66 ? 1 : 2 ))
+    printf '{"text": "%s", "class": "%s", "tooltip": "Brightness %d%%\\nClick for a slider, scroll to change"}\n' \
+        "${icons[i]}" "${classes[i]}" "$p"
+}
+
+case ${1-status} in
+status) status ;;
+watch)
+    status
+    udevadm monitor --kernel --subsystem-match=backlight | while read -r line; do
+        [[ $line == *change* ]] && status
+    done
+    ;;
+esac

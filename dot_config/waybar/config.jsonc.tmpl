@@ -21,7 +21,7 @@
     },
     "group/system": {
         "orientation": "horizontal",
-        "modules": ["idle_inhibitor", "power-profiles-daemon", "backlight", "battery"]
+        "modules": ["idle_inhibitor", "custom/power-profile", "custom/brightness", "battery"]
     },
     "group/connect": {
         "orientation": "horizontal",
@@ -53,14 +53,16 @@
             "vivaldi-stable": "Vivaldi",
             "org\\.kde\\.dolphin": "Files",
             "kitty|popup-term|dropdown_terminal": "Terminal",
-            "discord": "Discord"
+            "discord": "Discord",
+            "popup\\.keybinds": "Shortcuts",
+            "popup\\.brightness": "Brightness"
         }
     },
 
     // ---------------------------------------------------------------- center
     "clock": {
         "format": "{:%H:%M}",
-        "format-alt": "\udb80\udced  {:%a, %d. %b}",
+        "format-alt": "\udb80\udced {:%a, %d. %b}",
         "tooltip-format": "<tt><small>{calendar}</small></tt>",
         "calendar": {
             "mode": "month",
@@ -75,8 +77,8 @@
     },
     // Current song (hidden when nothing plays). Click = play/pause, scroll = skip
     "mpris": {
-        "format": "{player_icon}  {title}",
-        "format-paused": "{status_icon}  <i>{title}</i>",
+        "format": "{player_icon} {title}",
+        "format-paused": "{status_icon} <i>{title}</i>",
         "title-len": 24,
         "player-icons": { "default": "\udb81\udf5a", "spotify": "\udb81\udcc7", "firefox": "\udb81\uddc3", "vivaldi": "\udb81\uddc3" },
         "status-icons": { "paused": "\udb80\udfe4" },
@@ -86,7 +88,7 @@
 
     // ---------------------------------------------------------------- hardware
     "cpu": {
-        "format": "\udb83\udee0  {usage}%",
+        "format": "\udb83\udee0 {usage}%",
         "interval": 2,
         "states": { "high": 80 }
     },
@@ -94,10 +96,10 @@
         "hwmon-path-abs": "/sys/devices/platform/coretemp.0/hwmon",
         "input-filename": "temp1_input",
         "critical-threshold": 90,
-        "format": "\udb81\udd0f  {temperatureC}°"
+        "format": "\udb81\udd0f {temperatureC}°"
     },
     "memory": {
-        "format": "\udb80\udf5b  {used:0.1f}/{total:0.0f} GB",
+        "format": "\udb80\udf5b {used:0.1f}/{total:0.0f} GB",
         "tooltip-format": "Swap: {swapUsed:0.1f}/{swapTotal:0.0f} GB",
         "interval": 5,
         "states": { "high": 85 }
@@ -111,39 +113,43 @@
         "tooltip-format-activated": "Staying awake",
         "tooltip-format-deactivated": "Idle as usual"
     },
-    "power-profiles-daemon": {
-        "format": "{icon}",
-        "tooltip-format": "Power profile: {profile}\nClick to switch",
-        "format-icons": {
-            "performance": "\udb81\udcc5",
-            "balanced": "\udb83\udf85",
-            "power-saver": "\udb80\udf2a"
-        }
+    // Click opens a small menu with the three profiles (script: ~/.local/bin/power-profile)
+    "custom/power-profile": {
+        "exec": "~/.local/bin/power-profile status",
+        "return-type": "json",
+        "interval": 5,
+        "signal": 8,
+        "on-click": "~/.local/bin/power-profile menu --bar"
     },
-    "backlight": {
-        "device": "intel_backlight",
-        "format": "{icon}  {percent}%",
-        "format-icons": ["\udb81\udd94", "\udb81\udd99", "\udb81\udda8"],
-        "on-scroll-up": "brightnessctl -e4 -n2 set 2%+",
-        "on-scroll-down": "brightnessctl -e4 -n2 set 2%-",
-        "tooltip-format": "Brightness {percent}% (scroll to change)"
+    // Perceived brightness (same numbers as the slider and the brightness keys);
+    // the built-in backlight module would show the raw value. Script: ~/.local/bin/brightness
+    "custom/brightness": {
+        "exec": "~/.local/bin/brightness watch",
+        "return-type": "json",
+        // Icon only (moon / cloud / sun by level), the script picks it
+        "on-scroll-up": "brightnessctl -e2 -n1 set 2%+",
+        "on-scroll-down": "brightnessctl -e2 -n1 set 2%-",
+        "on-click": "~/.local/bin/popup popup.brightness ~/.local/bin/brightness-popup"
     },
     "battery": {
         "states": { "warning": 25, "critical": 10 },
-        "format": "{icon}  {capacity}%",
-        "format-charging": "\udb80\udc84  {capacity}%",
-        "format-plugged": "\udb81\udea5  {capacity}%",
+        "format": "{icon} {capacity}%",
+        "format-charging": "\udb80\udc84 {capacity}%",
+        "format-plugged": "\udb81\udea5 {capacity}%",
         "format-icons": ["\udb80\udc7a", "\udb80\udc7c", "\udb80\udc7e", "\udb80\udc80", "\udb80\udc79"],
         "tooltip-format": "{timeTo}\n{power:.1f} W"
     },
 
     // ---------------------------------------------------------------- connect
     "wireplumber": {
-        "format": "{icon}  {volume}%",
-        "format-muted": "\udb81\udf5f",
+        // Material speakers; the glyphs are
+        // drawn small, so they get a larger size
+        "format": "<span size='larger'>{icon}</span>",   // icon only, percent in the tooltip
+        "tooltip-format": "Volume {volume}%\n{node_name}\nClick: outputs, right click: mute",
+        "format-muted": "<span size='larger'>\udb81\udf5f</span>",
         "format-icons": ["\udb81\udd7f", "\udb81\udd80", "\udb81\udd7e"],
         "scroll-step": 2,
-        "on-click": "~/.local/bin/popup org.pulseaudio.pavucontrol pavucontrol",
+        "on-click": "~/.local/bin/rofi-volume --bar",
         "on-click-right": "wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle"
     },
     // Icon only (signal strength); name and speed in the tooltip
@@ -154,7 +160,7 @@
         "format-disconnected": "\udb82\udd2e",
         "tooltip-format-wifi": "{essid} ({signalStrength}%)\n{ipaddr}\n\udb80\udc45 {bandwidthDownBytes}   \udb80\udc5d {bandwidthUpBytes}",
         "tooltip-format-ethernet": "{ifname}\n{ipaddr}",
-        "on-click": "~/.local/bin/rofi-wifi",
+        "on-click": "~/.local/bin/rofi-wifi --bar",
         "on-click-right": "~/.local/bin/popup popup-term kitty --class popup-term nmtui",
         "interval": 5
     },
@@ -165,7 +171,8 @@
         "format-connected": "\udb80\udcb1 {num_connections}",
         "tooltip-format-connected": "{device_enumerate}",
         "tooltip-format-enumerate-connected": "{device_alias} {device_battery_percentage}%",
-        "on-click": "~/.local/bin/popup popup-term kitty --class popup-term bluetoothctl"
+        "on-click": "~/.local/bin/rofi-bluetooth --bar",
+        "on-click-right": "~/.local/bin/popup popup-term kitty --class popup-term bluetoothctl"
     },
     "tray": {
         "icon-size": 16,
@@ -175,6 +182,6 @@
     "custom/power": {
         "format": "\udb81\udc25",
         "tooltip": false,
-        "on-click": "~/.local/bin/rofi-power"
+        "on-click": "~/.local/bin/rofi-power --bar"
     }
 }

@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+# Power profile for the bar and SUPER+P.
+#   power-profile status       -> JSON for the waybar custom module (icon, tooltip, class)
+#   power-profile menu [--bar] -> the three profiles, current one highlighted
+# The bar module refreshes on signal 8 (sent after a change) and every few seconds
+# (the charger udev rule and gamemode also switch profiles).
+set -uo pipefail
+menu() { "$HOME/.local/bin/rofi-menu" "$@"; }
+
+profiles=(performance balanced power-saver)
+names=("Performance" "Balanced" "Power saver")
+icons=($'\U000F04C5' $'\U000F0F85' $'\U000F032A')
+
+current=$(powerprofilesctl get 2>/dev/null) || current=""
+cur_idx=""
+for i in "${!profiles[@]}"; do
+    [[ ${profiles[i]} == "$current" ]] && cur_idx=$i
+done
+
+case ${1-status} in
+status)
+    [[ -z $cur_idx ]] && { echo '{"text": "", "class": "unavailable"}'; exit 0; }
+    printf '{"text": "%s", "tooltip": "Power profile: %s", "class": "%s"}\n' \
+        "${icons[cur_idx]}" "${names[cur_idx]}" "$current"
+    ;;
+menu)
+    bar=(); [[ ${2-} == --bar ]] && bar=(--bar)
+    labels=()
+    for i in "${!profiles[@]}"; do labels+=("${icons[i]}  ${names[i]}"); done
+    idx=$(printf '%s\n' "${labels[@]}" | menu "${bar[@]}" --compact "Power profile" "" \
+        ${cur_idx:+-a "$cur_idx" -selected-row "$cur_idx"}) || exit 0
+    [[ -z $idx ]] && exit 0
+    powerprofilesctl set "${profiles[idx]}"
+    pkill -RTMIN+8 -x waybar
+    ;;
+esac
