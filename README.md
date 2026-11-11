@@ -4,14 +4,21 @@ Arch Linux + Hyprland on a ThinkPad X9-15p, managed with [chezmoi](https://www.c
 
 ## New system
 
+After the base Arch install (partitions, LUKS, btrfs subvolumes, UKI, GRUB,
+user with sudo, network), as that user:
+
 ```sh
-sudo pacman -S --needed git chezmoi
-chezmoi init --apply Fubge/dotfiles
+sudo pacman -S --needed git github-cli
+gh auth login                       # the repo is private
+gh repo clone Fubge/dotfiles ~/.local/share/chezmoi
+~/.local/share/chezmoi/bootstrap.sh # --dry-run shows what it would do
 ```
 
-`chezmoi apply` installs every package from `packages/*.txt` that is missing
-(official repos only, no AUR helper) and re-runs automatically whenever a list changes.
-A `bootstrap.sh` for services and system files will follow.
+`bootstrap.sh` enables multilib, runs `chezmoi apply` (all packages from
+`packages/*.txt`, official repos only, no AUR helper; dotfiles; root files from
+`system/`; SDDM and GRUB themes; user services), enables the system services,
+sets up ufw and snapper and switches the shell to zsh. It is idempotent: on a
+finished system it only reports "already ...".
 
 ## Daily use
 

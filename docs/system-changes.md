@@ -1,8 +1,9 @@
 # System changes outside of $HOME
 
 Files under `system/` in this repo are installed to `/` automatically by
-`run_onchange_after_40-system-files.sh.tmpl` (needs sudo). Everything in the
-table below was changed by hand; `bootstrap.sh` will automate these later.
+`run_onchange_after_40-system-files.sh.tmpl` (needs sudo). The second table
+below is handled by `bootstrap.sh` (pacman.conf, services, ufw, snapper, shell, groups);
+only fstab and the GRUB tweaks come from the base install and the GRUB theme script.
 
 | Managed file (from `system/`) | Purpose |
 |---|---|

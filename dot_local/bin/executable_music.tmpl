@@ -386,6 +386,9 @@ def menu():
             ("\U000F05AF  Show / hide Spotify", show)]
     if subprocess.run(["pgrep", "-x", "spotify"], stdout=subprocess.DEVNULL).returncode == 0:
         rows.append(("\U000F0156  Quit Spotify", quit_spotify))
+    # opened by a right click: rofi closes on a click outside its window, and the
+    # release of that very right click (over the bar) counted as one -> let go first
+    time.sleep(0.25)
     pick = subprocess.run([os.path.expanduser("~/.local/bin/rofi-menu"), "--bar", "Music", ""],
                           input="\n".join(r[0] for r in rows), capture_output=True, text=True)
     if pick.stdout.strip().isdigit():
