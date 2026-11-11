@@ -4,24 +4,31 @@
   music          watch the player, print one JSON line per frame for waybar
   music show     bring the player window here (Spotify), start it if needed
 
-Look: a little equalizer dances while music plays, each bar in its own color;
-on pause the bars lie flat and the title dims. A new song is typed in like on
-the terminal clock (orange caret), long titles scroll as a marquee.
-Spotify is preferred over other players (browser videos).
+Look: a real audio visualizer (cava, 30 fps): six separate bars with gaps in
+a color gradient, like Spotify's own "now playing" bars; on pause they lie
+down flat and the title dims. A new song is typed in like on the terminal clock
+(orange caret), long titles scroll as a marquee.
+cava only runs while music plays. Spotify is preferred over other players.
 """
 import html
 import json
-import random
+import os
 import subprocess
 import sys
 import threading
 import time
 
 PLAYERS = "spotify,%any"
-WIDTH = 24                     # visible title characters, longer ones scroll
-FPS = 8
-BARS = "▁▂▃▄▅▆▇"
-BAR_COLORS = ["{{ .palette.cyan }}", "{{ .palette.blue }}", "{{ .palette.magenta }}", "{{ .palette.accent }}"]
+WIDTH = 24                    # visible title characters, longer ones scroll
+BARS = 6                      # visualizer bars
+BAR_GLYPHS = "▁▂▃▄▅▆▇█"       # 8 heights, the lowest is the resting line
+BAR_GAP = 3                   # pt between the bars
+FPS = 30
+TYPE_SPEED = 40               # characters per second when a new song appears
+SCROLL_SPEED = 5              # marquee characters per second
+SCROLL_HOLD = 2.0             # seconds the start of a long title stays put
+GRADIENT = ["{{ .palette.cyan }}", "{{ .palette.cyan_bright }}", "{{ .palette.blue_bright }}",
+            "{{ .palette.blue }}", "{{ .palette.magenta }}", "{{ .palette.accent }}"]
 COLORS = {
     "icon": "{{ .palette.green }}",
     "dim": "{{ .palette.comment }}",
@@ -31,9 +38,30 @@ ICONS = {"spotify": "\U000F04C7", "default": "\U000F075A"}  # nf-md-spotify / mu
 SEP = "   ·   "
 FIELDS = ["status", "player", "artist", "title", "album"]
 FMT = "\x1f".join("{" * 2 + f + "}" * 2  # playerctl format fields
-                 for f in ["status", "playerName", "artist", "title", "album"])
+                  for f in ["status", "playerName", "artist", "title", "album"])
+NBSP = " "
+
+CAVA_CONF = f"""
+[general]
+framerate = {FPS}
+bars = {BARS}
+autosens = 1
+[input]
+method = pipewire
+source = auto
+[output]
+method = raw
+raw_target = /dev/stdout
+data_format = ascii
+ascii_max_range = 7
+bar_delimiter = 59
+[smoothing]
+monstercat = 1
+noise_reduction = 77
+"""
 
 state = {f: "" for f in FIELDS}
+levels = [0] * BARS
 lock = threading.Lock()
 changed = threading.Event()
 
@@ -54,6 +82,38 @@ def follow():
         time.sleep(2)
 
 
+class Cava:
+    """Runs cava while music plays and keeps `levels` (0-7 per bar) fresh."""
+
+    def __init__(self):
+        self.proc = None
+        run = os.environ.get("XDG_RUNTIME_DIR", "/tmp")
+        self.conf = os.path.join(run, "music-cava.conf")
+        with open(self.conf, "w") as f:
+            f.write(CAVA_CONF)
+
+    def running(self, on):
+        if on and not self.proc:
+            self.proc = subprocess.Popen(["cava", "-p", self.conf], stdout=subprocess.PIPE,
+                                         stderr=subprocess.DEVNULL, text=True)
+            threading.Thread(target=self.read, args=(self.proc,), daemon=True).start()
+        elif not on and self.proc:
+            self.proc.terminate()
+            self.proc = None
+            levels[:] = [0] * len(levels)
+
+    def read(self, proc):
+        for line in proc.stdout:
+            vals = [int(x) for x in line.strip().rstrip(";").split(";") if x.isdigit()]
+            if len(vals) == len(levels) and proc is self.proc:
+                levels[:] = vals
+                changed.set()
+
+
+def bar(level):
+    return BAR_GLYPHS[max(0, min(7, level))]
+
+
 def emit(text="", tooltip="", cls=""):
     print(json.dumps({"text": text, "tooltip": tooltip, "class": cls}), flush=True)
 
@@ -62,69 +122,68 @@ def span(color, text):
     return f"<span color='{color}'>{text}</span>"
 
 
+def title_text(title, since, playing):
+    """Typewriter for a new song, then a marquee when the title is too long.
+    Returns the markup and whether it still changes over time."""
+    final = min(len(title), WIDTH)
+    typed = int((time.monotonic() - since) * TYPE_SPEED)
+    if typed < final:
+        # pad to the final width so the clock next to it does not move
+        pad = NBSP * max(0, final - typed - 1)
+        return html.escape(title[:typed]) + span(COLORS["caret"], "▍") + pad, True
+    if len(title) <= WIDTH:
+        return html.escape(title), False
+    loop = title + SEP
+    t = time.monotonic() - since - final / TYPE_SPEED
+    # one cycle: hold at the start, then scroll once through the whole loop
+    cycle = SCROLL_HOLD + len(loop) / SCROLL_SPEED
+    phase = t % cycle if playing else 0
+    offset = 0 if phase < SCROLL_HOLD else int((phase - SCROLL_HOLD) * SCROLL_SPEED)
+    return html.escape((loop * 2)[offset:offset + WIDTH]), playing
+
+
 def watch():
     threading.Thread(target=follow, daemon=True).start()
-    levels = [1, 3, 2, 4]
-    targets = levels[:]
-    last_title, typed, offset, hold = None, 0, 0, 0
+    cava = Cava()
+    last_title, since, last_out = None, 0.0, None
     while True:
         with lock:
             s = dict(state)
         if s["status"] not in ("Playing", "Paused"):
+            cava.running(False)
             emit()
-            last_title = None
+            last_title, last_out = None, None
             changed.wait()
             changed.clear()
             continue
 
         playing = s["status"] == "Playing"
+        cava.running(playing)
         title = s["title"] or "…"
         if title != last_title:
-            last_title, typed, offset, hold = title, 0, 0, FPS * 2
+            last_title, since = title, time.monotonic()
 
-        # equalizer: every bar walks towards its own random target
-        if playing:
-            for i in range(4):
-                if levels[i] == targets[i]:
-                    targets[i] = random.randint(0, len(BARS) - 1)
-                step = 1 if targets[i] > levels[i] else -1
-                levels[i] += step * min(2, abs(targets[i] - levels[i]))
-            bars = "".join(span(c, BARS[l]) for c, l in zip(BAR_COLORS, levels))
-        else:
-            bars = span(COLORS["dim"], BARS[1] * 4)  # resting, flat
-
-        # title: typewriter on a new song, then marquee when too long
-        typing = typed < min(len(title), WIDTH)
-        if typing:
-            typed += 2
-            # pad to the final width (no-break spaces) so the clock does not move
-            pad = "\u00a0" * max(0, min(len(title), WIDTH) - typed - 1)
-            shown = html.escape(title[:typed]) + span(COLORS["caret"], "▍") + pad
-        elif len(title) > WIDTH:
-            loop = title + SEP
-            if playing:
-                if hold:
-                    hold -= 1
-                else:
-                    offset = (offset + 1) % len(loop)
-                    if offset == 0:
-                        hold = FPS * 2
-            shown = html.escape((loop * 2)[offset:offset + WIDTH])
-        else:
-            shown = html.escape(title)
+        lv = levels[:]
+        viz = "".join(span(GRADIENT[i], bar(lv[i])) if playing else span(COLORS["dim"], BAR_GLYPHS[1])
+                      for i in range(BARS))
+        viz = f"<span letter_spacing='{BAR_GAP * 1024}'>{viz}</span>"
+        shown, moving = title_text(title, since, playing)
         if not playing:
             shown = f"<i>{span(COLORS['dim'], shown)}</i>"
 
-        icon = ICONS.get(s["player"], ICONS["default"])
-        icon = span(COLORS["icon"] if playing else COLORS["dim"], icon)
+        icon = span(COLORS["icon"] if playing else COLORS["dim"],
+                    ICONS.get(s["player"], ICONS["default"]))
         tip = html.escape(title)
         if s["artist"]:
             tip += "\n" + html.escape(" · ".join(x for x in (s["artist"], s["album"]) if x))
         tip += "\n\n<small>Click play/pause · Right click show · Scroll skip</small>"
-        emit(f"{icon} {bars} {shown}", tip, "playing" if playing else "paused")
+        out = (f"{icon} {viz} {shown}", tip, "playing" if playing else "paused")
+        if out != last_out:  # waybar only redraws when something changed
+            emit(*out)
+            last_out = out
 
-        animating = playing or typing
-        if changed.wait(1 / FPS if animating else None):
+        # playing: redraw with every cava frame (or the title timer); paused: on change
+        if changed.wait(1 / FPS if (playing or moving) else None):
             changed.clear()
 
 
@@ -148,7 +207,8 @@ def show():
                                    capture_output=True, text=True).stdout)["id"]
     addr = win["address"]
     subprocess.run(["hyprctl", "dispatch",
-                    "hl.dsp.window.move(" + lua_table(window="address:" + addr, workspace=ws, follow=True) + ")"],
+                    "hl.dsp.window.move(" + lua_table(window="address:" + addr, workspace=ws,
+                                                      follow=True) + ")"],
                    stdout=subprocess.DEVNULL)
     subprocess.run(["hyprctl", "dispatch", "hl.dsp.focus(" + lua_table(window="address:" + addr) + ")"],
                    stdout=subprocess.DEVNULL)

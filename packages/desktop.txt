@@ -38,6 +38,7 @@ grim
 slurp
 brightnessctl
 playerctl
+cava
 
 # Wallpapers: ImageMagick makes the menu thumbnails and login screen copies
 imagemagick
