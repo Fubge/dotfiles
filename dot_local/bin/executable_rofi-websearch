@@ -1,9 +1,0 @@
-#!/usr/bin/env bash
-# SUPER+Return: type a query, search the web
-query=$(rofi -dmenu -p "Web" -theme overlay -theme-str '
-    window       { height: 0; }
-    mainbox      { children: [ inputbar, textbox-hint ]; }
-    entry        { placeholder: "Search the web..."; }
-    textbox-hint { str: "Enter  search      ·      Esc  close"; }
-') || exit 0
-exec "$HOME/.local/bin/websearch" "$query"

@@ -2,6 +2,15 @@
    (overlay.rasi: size, position, search pill, footer). Only the grid lives here. */
 @import "overlay.rasi"
 
+/* compact and centered on the screen, unlike the other overlays */
+window {
+    location: center;
+    anchor:   center;
+    y-offset: 0;
+    width:    {{ .design.launcher_width }}px;
+    height:   {{ .design.launcher_height }}px;
+}
+
 entry { placeholder: "Search apps or the web"; }
 
 listview {

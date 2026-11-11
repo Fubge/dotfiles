@@ -8,8 +8,14 @@ font      = "JetBrainsMono Nerd Font"
 font_ui   = "Noto Sans"
 login_wallpaper = "default.png"   # relative to ~/Pictures/Wallpapers; first SDDM background only, then SUPER+W Shift+Enter
 
-# Big overlays (app launcher, wallpaper picker, shortcuts, clipboard) share one
-# frame: same size, centered on the screen, same search pill. Logical px
-# (screen is 1440x900). The web search uses the width only (one row, centered).
-overlay_width  = 1000
-overlay_height = 640
+# Big centered overlays (wallpaper picker, shortcuts, clipboard) all share
+# one frame: same size, same top edge, same search pill
+overlay_width  = 1300
+overlay_height = 760
+overlay_top    = 70                  # px from the top of the screen
+
+# Exceptions, both centered on the screen: the app launcher is a compact grid,
+# the web search a single search pill
+launcher_width  = 820
+launcher_height = 540
+websearch_width = 560

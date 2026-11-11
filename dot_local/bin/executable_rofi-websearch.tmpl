@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# SUPER+Return: type a query, search the web (small search pill, centered)
+query=$(rofi -dmenu -p "Web" -theme overlay -theme-str '
+    window       { location: center; anchor: center; y-offset: 0; width: {{ .design.websearch_width }}px; height: 0; padding: 18px 20px 12px 20px; }
+    mainbox      { children: [ inputbar, textbox-hint ]; spacing: 12px; }
+    box-search   { width: {{ sub .design.websearch_width 40 }}px; }
+    entry        { placeholder: "Search the web..."; }
+    textbox-hint { str: "Enter  search      ·      Esc  close"; }
+') || exit 0
+exec "$HOME/.local/bin/websearch" "$query"
