@@ -10,19 +10,22 @@ set -euo pipefail
 src="{{ .chezmoi.sourceDir }}/system"
 
 cd "$src"
-# The console font is baked into the UKI, so rebuild it when vconsole.conf changes
-cmp -s etc/vconsole.conf /etc/vconsole.conf && rebuild_uki=false || rebuild_uki=true
+# Console font and kernel command line are baked into the UKI: rebuild it when they change
+rebuild_uki=false
+for f in etc/vconsole.conf etc/kernel/cmdline; do
+    cmp -s "$f" "/$f" || rebuild_uki=true
+done
 
 find . -type f | while read -r f; do
     dest="/${f#./}"
     mode=0644
-    [[ $dest == */bin/* ]] && mode=0755
+    [[ $dest == */bin/* || $dest == /etc/grub.d/* ]] && mode=0755
     sudo install -D -m "$mode" -o root -g root "$f" "$dest"
     echo "system: installed $dest"
 done
 
 if $rebuild_uki; then
-    echo "system: vconsole.conf changed, rebuilding UKI"
+    echo "system: console font or kernel cmdline changed, rebuilding UKI"
     sudo mkinitcpio -P
 fi
 

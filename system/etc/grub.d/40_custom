@@ -1,0 +1,18 @@
+#!/bin/sh
+exec tail -n +3 $0
+# Boot menu entries. --class picks the icon from the GRUB theme.
+# Both live on the EFI partition (UUID D679-77CD).
+
+menuentry "Arch Linux" --class arch {
+    insmod part_gpt
+    insmod fat
+    search --no-floppy --fs-uuid --set=root D679-77CD
+    chainloader /EFI/Linux/arch-linux.efi
+}
+
+menuentry "Windows 11" --class windows {
+    insmod part_gpt
+    insmod fat
+    search --no-floppy --fs-uuid --set=root D679-77CD
+    chainloader /EFI/Microsoft/Boot/bootmgfw.efi
+}
