@@ -62,29 +62,34 @@ tooltip {
 window#waybar.empty #window { padding: 0; }
 
 /* ---------------------------------------------------------------- center */
-/* Terminal clock: prompt colored by the time of day, segment digits,
-   blinking colon and caret (custom modules in config.jsonc) */
-#custom-prompt { padding: 0 8px 0 16px; font-weight: bold; }
+/* Terminal clock:  ❯ 17:48  // Mi 11. Nov▍
+   Same font and size everywhere (no extra padding top or bottom), so the
+   separate modules line up on one baseline. */
+#custom-prompt { padding: 0 9px 0 16px; font-weight: bold; }
 #custom-prompt.morning { color: {{ .palette.yellow_bright }}; }
 #custom-prompt.day     { color: {{ .palette.yellow }}; }
 #custom-prompt.evening { color: @accent; }
 #custom-prompt.night   { color: {{ .palette.cyan_bright }}; }
-#custom-hours, #custom-minutes { font-family: "Noto Sans Symbols 2"; font-size: 16px; }
-#custom-colon {
-    padding: 0 1px;
+#clock.hours, #clock.minutes, #custom-colon {
+    padding: 0;
     font-weight: bold;
-    animation: caret-blink 1s ease-in-out infinite alternate;
 }
-#clock { padding: 0 2px 0 10px; }
-/* Soft blinking caret, like a terminal waiting for input */
-@keyframes caret-blink {
-    from { opacity: 1; }
-    to   { opacity: 0.1; }
+#custom-colon {
+    color: @accent;
+    animation: soft-blink 1s ease-in-out infinite alternate;
+}
+#clock.date {
+    padding: 0 1px 0 12px;
+    color: {{ .palette.comment }};
 }
 #custom-caret {
     color: @accent;
-    padding: 0 16px 0 2px;
-    animation: caret-blink 0.9s ease-in-out infinite alternate;
+    padding: 0 16px 0 3px;
+    animation: soft-blink 0.9s ease-in-out infinite alternate;
+}
+@keyframes soft-blink {
+    from { opacity: 1; }
+    to   { opacity: 0.15; }
 }
 #mpris {
     padding: 0 16px 0 10px;
@@ -138,7 +143,7 @@ window#waybar.empty #window { padding: 0; }
 /* ---------------------------------------------------------------- hover
    Same effect everywhere: orange text on a slightly darker background.
    Kept last so it wins over the state colors above. */
-#workspaces button, #window, #clock, #mpris,
+#workspaces button, #window, #clock.date, #mpris,
 #cpu, #temperature, #memory,
 #idle_inhibitor, #custom-power-profile, #custom-brightness, #battery,
 #wireplumber, #network, #bluetooth, #custom-power {
@@ -146,7 +151,7 @@ window#waybar.empty #window { padding: 0; }
     border-radius: 12px;
 }
 #workspaces button:hover,
-#clock:hover, #mpris:hover,
+#clock.date:hover, #mpris:hover,
 #cpu:hover, #temperature:hover, #memory:hover,
 #idle_inhibitor:hover, #custom-power-profile:hover, #custom-brightness:hover, #battery:hover,
 #wireplumber:hover, #network:hover, #bluetooth:hover {

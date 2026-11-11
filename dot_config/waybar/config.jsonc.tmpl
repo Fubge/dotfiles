@@ -10,7 +10,7 @@
     "spacing": 0,
 
     "modules-left":   ["hyprland/workspaces", "hyprland/window"],
-    "modules-center": ["custom/prompt", "custom/hours", "custom/colon", "custom/minutes", "clock", "custom/caret", "mpris"],
+    "modules-center": ["custom/prompt", "clock#hours", "custom/colon", "clock#minutes", "clock#date", "custom/caret", "mpris"],
     "modules-right":  ["group/hardware", "group/system", "group/connect", "custom/power"],
 
     // ---------------------------------------------------------------- groups
@@ -61,19 +61,19 @@
     },
 
     // ---------------------------------------------------------------- center
-    // Terminal-style clock:  ❯ 17:45 // Mi 11. Nov▍
-    // Prompt (colored by time of day), seven-segment hours and minutes,
-    // a blinking colon and a blinking caret. Script: ~/.local/bin/clockface
-    "custom/prompt":  { "exec": "~/.local/bin/clockface watch prompt",  "return-type": "json" },
-    "custom/hours":   { "exec": "~/.local/bin/clockface watch hours",   "return-type": "json" },
-    "custom/colon":   { "format": ":", "tooltip": false },
-    "custom/minutes": { "exec": "~/.local/bin/clockface watch minutes", "return-type": "json" },
-    "clock": {
-        // Only the date, written as a code comment (the time is drawn by the
-        // modules above). Hover shows the calendar, click hides the date
+    // Terminal-style clock:  ❯ 17:48  // Mi 11. Nov▍
+    // One font and size for every piece so they share a baseline.
+    // The prompt takes the time-of-day color (script: ~/.local/bin/clockface);
+    // colon and caret blink via CSS, which is why they are separate modules.
+    "custom/prompt": { "exec": "~/.local/bin/clockface", "return-type": "json" },
+    "clock#hours":   { "format": "{0:%H}", "tooltip": false },
+    "custom/colon":  { "format": ":", "tooltip": false },
+    "clock#minutes": { "format": "{0:%M}", "tooltip": false },
+    "clock#date": {
+        // The date as a code comment. Hover shows the calendar, click hides the date
         "locale": "{{ .locale.clock }}",
-        "format": "<span color='{{ .palette.comment }}'>// {0:L%a %d. %b}</span>",
-        "format-alt": "",
+        "format": "// {0:L%a %d. %b}",
+        "format-alt": "//",
         "tooltip-format": "<tt><small>{calendar}</small></tt>",
         "calendar": {
             "mode": "month",
@@ -86,7 +86,6 @@
             }
         }
     },
-    // Blinking block caret after the clock (blink lives in style.css)
     "custom/caret": {
         "format": "\u258d",
         "tooltip": false

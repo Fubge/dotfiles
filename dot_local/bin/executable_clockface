@@ -1,36 +1,14 @@
 #!/usr/bin/env bash
-# Pieces of the terminal-style clock in the middle of the bar:
-#   clockface watch prompt   -> "❯", class morning / day / evening / night (colored in style.css)
-#   clockface watch hours    -> hours as seven-segment digits
-#   clockface watch minutes  -> minutes as seven-segment digits
-# Each prints one JSON line per minute for a waybar custom module (between
-# the hours and minutes sits custom/colon, which blinks via CSS).
-seg=($'\U0001FBF0' $'\U0001FBF1' $'\U0001FBF2' $'\U0001FBF3' $'\U0001FBF4'
-     $'\U0001FBF5' $'\U0001FBF6' $'\U0001FBF7' $'\U0001FBF8' $'\U0001FBF9')
-
-digits() {   # "17" -> two segment glyphs
-    printf '%s%s' "${seg[${1:0:1}]}" "${seg[${1:1:1}]}"
-}
-
-line() {
-    local h m class
-    read -r h m < <(date '+%H %M')
-    case $1 in
-        prompt)
-            h=$((10#$h))
-            if   (( h >= 5  && h < 11 )); then class=morning
-            elif (( h >= 11 && h < 17 )); then class=day
-            elif (( h >= 17 && h < 22 )); then class=evening
-            else class=night
-            fi
-            printf '{"text": "❯", "class": "%s", "tooltip": "%s"}\n' "$class" "$class" ;;
-        hours)   printf '{"text": "%s", "tooltip": false}\n' "$(digits "$h")" ;;
-        minutes) printf '{"text": "%s", "tooltip": false}\n' "$(digits "$m")" ;;
-    esac
-}
-
-[[ $1 == watch && -n $2 ]] || { echo "usage: clockface watch prompt|hours|minutes" >&2; exit 1; }
+# Prompt sign in front of the bar clock (waybar custom/prompt).
+# Prints one JSON line per minute; the class (morning / day / evening /
+# night) colors the sign in style.css, like the brightness day cycle.
 while :; do
-    line "$2"
+    h=$((10#$(date +%H)))
+    if   (( h >= 5  && h < 11 )); then class=morning
+    elif (( h >= 11 && h < 17 )); then class=day
+    elif (( h >= 17 && h < 22 )); then class=evening
+    else class=night
+    fi
+    printf '{"text": "❯", "class": "%s", "tooltip": false}\n' "$class"
     sleep $((60 - 10#$(date +%S)))
 done
