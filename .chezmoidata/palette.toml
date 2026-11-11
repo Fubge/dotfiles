@@ -6,8 +6,8 @@
 bg_dark   = "#161a21"
 bg        = "#1c2029"
 bg_alt    = "#262b36"
-steel     = "#626f8c"   # secondary surfaces (bar pills, selections)
-slate     = "#808aa2"   # primary surfaces / muted text
+steel     = "#596690"   # secondary surfaces (bar pills, selections)
+slate     = "#7583a8"   # primary surfaces / muted text
 # Text
 fg        = "#f8f8f2"
 fg_muted  = "#c0c4ce"

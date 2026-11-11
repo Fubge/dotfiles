@@ -1,15 +1,12 @@
 /* Colors come from .chezmoidata/palette.toml */
-@define-color bg       {{ .palette.bg }};
-@define-color bg_dark  {{ .palette.bg_dark }};
-@define-color bg_alt   {{ .palette.bg_alt }};
-@define-color slate    {{ .palette.slate }};
-@define-color steel    {{ .palette.steel }};
-@define-color fg       {{ .palette.fg }};
-@define-color muted    {{ .palette.fg_muted }};
-@define-color accent   {{ .palette.accent }};
-@define-color warn     {{ .palette.yellow }};
-@define-color crit     {{ .palette.red }};
-@define-color good     {{ .palette.green }};
+@define-color dark    {{ .palette.bg }};
+@define-color slate   {{ .palette.slate }};
+@define-color steel   {{ .palette.steel }};
+@define-color fg      {{ .palette.fg }};
+@define-color accent  {{ .palette.accent }};
+@define-color warn    {{ .palette.yellow }};
+@define-color crit    {{ .palette.red }};
+@define-color good    {{ .palette.green }};
 
 * {
     font-family: "{{ .design.font }}", "Symbols Nerd Font";
@@ -24,44 +21,44 @@ window#waybar {
 }
 
 tooltip {
-    background: alpha(@bg_dark, 0.95);
+    background: alpha(@dark, 0.95);
     border: 1px solid @accent;
     border-radius: {{ .design.rounding }}px;
 }
 
-/* Every section is a dark, slightly see-through pill with a fine rim
-   (same look as rofi, dunst and the lock screen) */
-.modules-left, .modules-center, .modules-right {
-    background: alpha(@bg, 0.88);
-    border: 1px solid alpha(@slate, 0.35);
+/* Every section is its own pill */
+.modules-left, .modules-right {
+    background: @slate;
     border-radius: 15px;
 }
-
-/* Inner groups are a step lighter */
-#workspaces, #system {
-    background: @bg_alt;
+.modules-center {
+    background: @dark;
     border-radius: 15px;
 }
 
 /* ---------------------------------------------------------------- left */
-#workspaces { padding: 2px 4px; }
+#workspaces {
+    background: @steel;
+    border-radius: 15px;
+    padding: 2px 4px;
+}
 #workspaces button {
-    color: @muted;
+    color: @fg;
     padding: 0 8px;
     margin: 0 1px;
     background: none;
     box-shadow: none;
 }
-#workspaces button.empty  { color: alpha(@muted, 0.4); }
+#workspaces button.empty  { color: alpha(@fg, 0.4); }
 /* Active workspace becomes a wider orange pill */
 #workspaces button.active {
-    color: @bg;
+    color: @dark;
     background: @accent;
     padding: 0 16px;
 }
 #workspaces button.urgent { color: @crit; }
 
-#window { padding: 0 16px; color: @muted; }
+#window { padding: 0 16px; }
 window#waybar.empty #window { padding: 0; }
 
 /* ---------------------------------------------------------------- center */
@@ -76,8 +73,9 @@ window#waybar.empty #window { padding: 0; }
 #mpris.playing { color: @accent; }
 
 /* ---------------------------------------------------------------- right */
-#hardware, #connect { padding: 0 4px; }
-#system { padding: 0 4px; }
+#hardware { padding: 0 4px; }
+#system   { background: @steel; border-radius: 15px; padding: 0 4px; }
+#connect  { padding: 0 4px; }
 
 #cpu, #temperature, #memory,
 #idle_inhibitor, #power-profiles-daemon, #backlight, #battery,
@@ -86,7 +84,9 @@ window#waybar.empty #window { padding: 0; }
 }
 
 #custom-power {
+    background: @dark;
     color: @accent;
+    border-radius: 15px;
     padding: 0 14px 0 12px;
 }
 
@@ -104,7 +104,7 @@ window#waybar.empty #window { padding: 0; }
 
 /* Critical battery pulses red */
 @keyframes pulse {
-    to { background: @crit; color: @bg; }
+    to { background: @crit; color: @dark; }
 }
 #battery.critical:not(.charging) {
     color: @crit;
@@ -112,7 +112,7 @@ window#waybar.empty #window { padding: 0; }
 }
 
 /* ---------------------------------------------------------------- hover
-   Same effect everywhere: orange text on a slightly lighter background.
+   Same effect everywhere: orange text on a slightly darker background.
    Kept last so it wins over the state colors above. */
 #workspaces button, #window, #clock, #mpris,
 #cpu, #temperature, #memory,
@@ -127,7 +127,7 @@ window#waybar.empty #window { padding: 0; }
 #idle_inhibitor:hover, #power-profiles-daemon:hover, #backlight:hover, #battery:hover,
 #wireplumber:hover, #network:hover, #bluetooth:hover {
     color: @accent;
-    background: alpha(@steel, 0.45);
+    background: alpha(@dark, 0.3);
 }
-#workspaces button.active:hover { color: @bg; background: @accent; }
-#custom-power:hover { color: @bg; background: @accent; }
+#workspaces button.active:hover { color: @dark; background: @accent; }
+#custom-power:hover { color: @dark; background: @accent; }
