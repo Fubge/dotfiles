@@ -92,8 +92,8 @@ bind(mod .. " + Tab", function()
             return
         end
     end
+    -- Not running: just start it, the window rule opens the special workspace
     hl.dispatch(hl.dsp.exec_cmd(v.launch .. v.terminal .. " --class " .. v.dropdown.class))
-    hl.dispatch(hl.dsp.workspace.toggle_special("dropdown"))
 end, "Dropdown terminal")
 
 group("Screenshots")

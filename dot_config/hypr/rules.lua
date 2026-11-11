@@ -1,13 +1,14 @@
 local v = require("vars")
 
--- Dropdown terminal lives on its own special workspace
+-- Dropdown terminal lives on its own special workspace. Not "silent": on the
+-- first launch the workspace only opens once the window exists (no empty flash)
 hl.window_rule({
     name = "dropdown-terminal",
     match = { class = "^" .. v.dropdown.class .. "$" },
     float = true,
     size = v.dropdown.size,
     move = v.dropdown.move,
-    workspace = "special:dropdown silent",
+    workspace = "special:dropdown",
     stay_focused = true,
 })
 

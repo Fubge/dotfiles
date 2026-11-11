@@ -103,7 +103,7 @@ window#waybar.empty #window { padding: 0; }
 #connect  { padding: 0 4px; }
 
 #cpu, #temperature, #memory,
-#idle_inhibitor, #custom-power-profile, #custom-brightness, #battery,
+#idle_inhibitor, #custom-power-profile, #custom-brightness, #custom-battery,
 #wireplumber, #network, #bluetooth, #tray {
     padding: 0 10px;
 }
@@ -121,9 +121,13 @@ window#waybar.empty #window { padding: 0; }
 #custom-power-profile.power-saver  { color: @good; }
 #cpu.high, #memory.high             { color: @warn; }
 #temperature.critical               { color: @crit; }
-#battery.charging, #battery.full    { color: @good; }
-#battery.plugged                    { color: {{ .palette.cyan_bright }}; }
-#battery.warning:not(.charging)     { color: @warn; }
+/* Battery (~/.local/bin/battery): fills up green while charging,
+   calm blue when held by the charge limit, plug flashes yellow on plug-in */
+#custom-battery.charging, #custom-battery.full { color: @good; }
+#custom-battery.plugged             { color: {{ .palette.cyan_bright }}; }
+#custom-battery.plug                { color: @warn; }
+#custom-battery.unplug              { color: alpha(@fg, 0.45); }
+#custom-battery.warning             { color: @warn; }
 #wireplumber.muted, #bluetooth.disabled, #bluetooth.off,
 #network.disconnected               { color: alpha(@fg, 0.45); }
 #bluetooth.connected                { color: {{ .palette.blue }}; }
@@ -135,7 +139,7 @@ window#waybar.empty #window { padding: 0; }
 @keyframes pulse {
     to { background: @crit; color: @dark; }
 }
-#battery.critical:not(.charging) {
+#custom-battery.critical {
     color: @crit;
     animation: pulse 1s ease-in-out infinite alternate;
 }
@@ -145,7 +149,7 @@ window#waybar.empty #window { padding: 0; }
    Kept last so it wins over the state colors above. */
 #workspaces button, #window, #clock.date, #mpris,
 #cpu, #temperature, #memory,
-#idle_inhibitor, #custom-power-profile, #custom-brightness, #battery,
+#idle_inhibitor, #custom-power-profile, #custom-brightness, #custom-battery,
 #wireplumber, #network, #bluetooth, #custom-power {
     transition: all 250ms ease;
     border-radius: 12px;
@@ -153,7 +157,7 @@ window#waybar.empty #window { padding: 0; }
 #workspaces button:hover,
 #clock.date:hover, #mpris:hover,
 #cpu:hover, #temperature:hover, #memory:hover,
-#idle_inhibitor:hover, #custom-power-profile:hover, #custom-brightness:hover, #battery:hover,
+#idle_inhibitor:hover, #custom-power-profile:hover, #custom-brightness:hover, #custom-battery:hover,
 #wireplumber:hover, #network:hover, #bluetooth:hover {
     color: @accent;
     background: alpha(@dark, 0.3);

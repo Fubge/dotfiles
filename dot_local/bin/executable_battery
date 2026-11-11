@@ -1,0 +1,149 @@
+#!/usr/bin/env python3
+"""Battery icon for the bar (waybar custom module, one JSON line per change).
+
+Icon only, percent and times in the tooltip. Ten level steps everywhere:
+  draining  plain battery; class warning (<=25%) / critical (<=10%, pulses red)
+  charging  the bolt battery fills up in a loop from the current level to full,
+            like a phone. The loop runs faster the more watts go in.
+  plugged   held by the charge limit: plain battery in blue, no animation
+  full      battery with a heart
+While plugged in, a small plug sits next to the battery (charging, held, full),
+so one glance tells whether the laptop is on the cable. Plugging in or out
+shows a big plug for a moment (class plug / unplug).
+
+Waits for udev power_supply events, so it sleeps while nothing changes.
+"""
+import json
+import select
+import subprocess
+import time
+from pathlib import Path
+
+BAT = Path("/sys/class/power_supply/BAT0")
+AC = Path("/sys/class/power_supply/AC/online")
+
+PLAIN = ["\U000F007A", "\U000F007B", "\U000F007C", "\U000F007D", "\U000F007E",
+         "\U000F007F", "\U000F0080", "\U000F0081", "\U000F0082", "\U000F0079"]
+BOLT = ["\U000F089C", "\U000F0086", "\U000F0087", "\U000F0088", "\U000F089D",
+        "\U000F0089", "\U000F089E", "\U000F008A", "\U000F008B", "\U000F0085"]
+HEART = "\U000F120F"
+PLUG, UNPLUG = "\U000F06A5", "\U000F06A6"
+
+PLUG_MOMENT = 1.5   # seconds the plug shows after plugging in or out
+IDLE_POLL = 60      # fallback refresh without udev events (capacity drift)
+
+
+def read(name, default=""):
+    try:
+        return (BAT / name).read_text().strip()
+    except OSError:
+        return default
+
+
+def state():
+    cap = int(read("capacity", "0"))
+    status = read("status")
+    try:
+        ac = AC.read_text().strip() == "1"
+    except OSError:
+        ac = status == "Charging"
+    watts = int(read("power_now", "0")) / 1e6
+    now, full = int(read("energy_now", "0")), int(read("energy_full", "1"))
+    limit = int(read("charge_control_end_threshold", "100"))
+    if status == "Charging":
+        kind = "charging"
+    elif status == "Full" or (ac and cap >= 99):
+        kind = "full"
+    elif ac:
+        kind = "plugged"
+    else:
+        kind = "discharging"
+    return dict(cap=cap, kind=kind, ac=ac, watts=watts, now=now, full=full, limit=limit)
+
+
+def hours(h):
+    m = round(h * 60)
+    return f"{m // 60}h {m % 60:02d}min" if m >= 60 else f"{m}min"
+
+
+def tooltip(s):
+    lines = [f"Battery {s['cap']}%"]
+    w = s["watts"]
+    if s["kind"] == "charging":
+        target = s["full"] * s["limit"] / 100
+        if w > 0.5 and target > s["now"]:
+            lines.append(f"{s['limit']}% in {hours((target - s['now']) / 1e6 / w)}")
+        lines.append(f"Charging with {w:.1f} W")
+    elif s["kind"] == "discharging":
+        if w > 0.5:
+            lines.append(f"{hours(s['now'] / 1e6 / w)} left")
+        lines.append(f"{w:.1f} W")
+    elif s["kind"] == "plugged":
+        lines.append(f"Plugged in, held at {s['limit']}% to spare the battery")
+    else:
+        lines.append("Full, plugged in")
+    return "\n".join(lines)
+
+
+def step(cap):
+    return min(9, max(0, round(cap * 9 / 100)))
+
+
+def frame_time(watts):
+    # Fast charger -> quick fill, trickle -> slow fill
+    return 0.35 if watts >= 45 else 0.6 if watts >= 15 else 1.0
+
+
+def emit(text, cls, tip, ac=False):
+    if ac:
+        text += f" <span size='smaller'>{PLUG}</span>"
+    print(json.dumps({"text": text, "class": cls, "tooltip": tip}), flush=True)
+
+
+def main():
+    udev = subprocess.Popen(
+        ["udevadm", "monitor", "--kernel", "--subsystem-match=power_supply"],
+        stdout=subprocess.PIPE, text=True)
+    last_ac = None
+    frame = 0
+    plug_until = 0.0
+    while True:
+        s = state()
+        if last_ac is not None and s["ac"] != last_ac:
+            plug_until = time.monotonic() + PLUG_MOMENT
+            frame = 0
+        last_ac = s["ac"]
+        tip = tooltip(s)
+        wait = IDLE_POLL
+
+        if time.monotonic() < plug_until:
+            emit(PLUG if s["ac"] else UNPLUG, "plug" if s["ac"] else "unplug", tip)
+            wait = plug_until - time.monotonic()
+        elif s["kind"] == "charging":
+            # Fill loop: current step .. full, at least three frames,
+            # the full icon stays a beat longer before it starts over
+            first = min(step(s["cap"]), 7)
+            frames = list(range(first, 10)) + [9]
+            frame %= len(frames)
+            emit(BOLT[frames[frame]], "charging", tip, ac=True)
+            frame += 1
+            wait = frame_time(s["watts"])
+        elif s["kind"] == "full":
+            emit(HEART, "full", tip, ac=True)
+        elif s["kind"] == "plugged":
+            emit(PLAIN[step(s["cap"])], "plugged", tip, ac=True)
+        else:
+            cls = "critical" if s["cap"] <= 10 else "warning" if s["cap"] <= 25 else "discharging"
+            emit(PLAIN[step(s["cap"])], cls, tip)
+
+        ready, _, _ = select.select([udev.stdout], [], [], max(0.05, wait))
+        if ready:
+            if not udev.stdout.readline():
+                return  # udevadm died, waybar restarts us
+            time.sleep(0.2)  # let a burst of events settle
+            while select.select([udev.stdout], [], [], 0)[0]:
+                udev.stdout.readline()
+
+
+if __name__ == "__main__":
+    main()
