@@ -1,0 +1,84 @@
+#!/usr/bin/env bash
+# wallpaper: choose and switch wallpapers (hyprpaper backend).
+#   wallpaper pick        grid menu with previews (SUPER+W)
+#   wallpaper set FILE    set a specific image (stays until changed)
+#   wallpaper shuffle     switch to shuffle mode: random image now and every 30 min
+#   wallpaper tick        called by the timer; changes image only in shuffle mode
+# Images come from ~/Pictures/Wallpapers (incl. subfolders) and the Arch wallpaper package.
+set -uo pipefail
+
+dirs=("$HOME/Pictures/Wallpapers" "/usr/share/backgrounds/archlinux")
+state="${XDG_STATE_HOME:-$HOME/.local/state}/wallpaper"
+thumbs="${XDG_CACHE_HOME:-$HOME/.cache}/wallpaper-thumbs"
+mkdir -p "$state" "$thumbs"
+
+list_images() {
+    find -L "${dirs[@]}" -type f \( -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' -o -iname '*.webp' \) \
+        2>/dev/null | sort
+}
+
+apply() {
+    ln -sfn "$1" "$state/current"            # hyprpaper.conf points here (used at login)
+    hyprctl hyprpaper wallpaper ",$1" >/dev/null
+}
+
+set_fixed() {
+    echo fixed > "$state/mode"
+    apply "$1"
+}
+
+random_image() {
+    local current
+    current=$(readlink "$state/current" 2>/dev/null)
+    list_images | grep -vxF "$current" | shuf -n 1
+}
+
+thumbnail() {   # cached 480x300 preview for the menu
+    local thumb="$thumbs/$(printf '%s' "$1" | md5sum | cut -c1-16).jpg"
+    [[ -f $thumb && $thumb -nt $1 ]] ||
+        magick "$1[0]" -thumbnail 480x300^ -gravity center -extent 480x300 -quality 85 "$thumb" 2>/dev/null
+    printf '%s' "$thumb"
+}
+
+pick() {
+    mapfile -t images < <(list_images)
+    if ((${#images[@]} > 0)) && [[ -n $(for i in "${images[@]}"; do t="$thumbs/$(printf '%s' "$i" | md5sum | cut -c1-16).jpg"; [[ -f $t ]] || echo x; done | head -1) ]]; then
+        notify-send -t 2000 "Wallpapers" "Creating previews..."
+    fi
+
+    local mode; mode=$(cat "$state/mode" 2>/dev/null || echo fixed)
+    {
+        printf '%s\0icon\x1f%s\n' "Shuffle$([[ $mode == shuffle ]] && echo ' (on)')" "media-playlist-shuffle"
+        for img in "${images[@]}"; do
+            name=$(basename "${img%.*}")
+            printf '%s\0icon\x1f%s\n' "$name" "$(thumbnail "$img")"
+        done
+    } | rofi -dmenu -i -show-icons -format i -p "Wallpaper" -theme-str '
+        window   { width: 78%; }
+        listview { columns: 4; lines: 3; flow: horizontal; spacing: 10px; }
+        element  { orientation: vertical; padding: 8px; spacing: 6px; }
+        element-icon { size: 170px; }
+        entry    { placeholder: "Filter by name..."; }
+        element-text { horizontal-align: 0.5; }
+    ' | {
+        read -r idx || exit 0
+        if [[ $idx == 0 ]]; then
+            shuffle
+        else
+            set_fixed "${images[idx - 1]}"
+        fi
+    }
+}
+
+shuffle() {
+    echo shuffle > "$state/mode"
+    apply "$(random_image)"
+}
+
+case "${1:-pick}" in
+    pick) pick ;;
+    set) [[ -f ${2:-} ]] && set_fixed "$(realpath "$2")" || { echo "usage: wallpaper set FILE" >&2; exit 1; } ;;
+    shuffle) shuffle ;;
+    tick) [[ $(cat "$state/mode" 2>/dev/null) == shuffle ]] && apply "$(random_image)" ;;
+    *) sed -n '2,7p' "$0"; exit 1 ;;
+esac

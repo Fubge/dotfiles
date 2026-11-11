@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# Regenerate the palette wallpapers whenever the palette changes.
+# palette: {{ .palette | toJson | sha256sum }}
+# generator: {{ include "dot_local/bin/executable_make-wallpapers.tmpl" | sha256sum }}
+set -euo pipefail
+"$HOME/.local/bin/make-wallpapers"
+systemctl --user enable --now wallpaper-shuffle.timer

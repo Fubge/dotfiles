@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
-# Create the wallpaper folder and put a default image in it if it is empty.
+# Create the wallpaper folder and pick a first wallpaper.
 set -euo pipefail
 dir="{{ .chezmoi.homeDir }}/Pictures/Wallpapers"
-mkdir -p "$dir"
-if [[ -z $(ls -A "$dir") ]]; then
-    cp /usr/share/hypr/wall2.png "$dir/default.png"
+state="{{ .chezmoi.homeDir }}/.local/state/wallpaper"
+mkdir -p "$dir" "$state"
+if [[ ! -e $state/current ]]; then
+    first=$(find -L "$dir" /usr/share/backgrounds/archlinux -type f \( -iname '*.jpg' -o -iname '*.png' \) 2>/dev/null | head -1)
+    [[ -n $first ]] && ln -sfn "$first" "$state/current" && echo fixed > "$state/mode"
 fi

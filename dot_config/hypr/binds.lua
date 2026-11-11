@@ -14,6 +14,7 @@ hl.bind(mod .. " + V", run(v.bin .. "rofi-clipboard"))
 hl.bind(mod .. " + Return", run(v.bin .. "rofi-websearch"))
 hl.bind(mod .. " + Escape", run(v.bin .. "rofi-power"))
 hl.bind(mod .. " + L", hl.dsp.exec_cmd("loginctl lock-session"))
+hl.bind(mod .. " + W", run(v.bin .. "wallpaper pick"))
 
 -- Windows
 hl.bind(mod .. " + X", hl.dsp.window.close())

@@ -51,10 +51,18 @@ element {
     border-radius: 8px;
 }
 
-element selected.normal {
+/* Unselected rows: no background (rofi's default theme would paint them light) */
+element normal.normal, element alternate.normal,
+element normal.active, element alternate.active,
+element normal.urgent, element alternate.urgent {
+    background-color: transparent;
+    text-color:       @fg;
+}
+
+element selected.normal, element selected.active, element selected.urgent {
     background-color: @bg-alt;
     text-color:       @accent;
 }
 
-element-icon { size: 1.3em; }
-element-text { text-color: inherit; vertical-align: 0.5; }
+element-icon { size: 1.3em; background-color: transparent; }
+element-text { text-color: inherit; background-color: transparent; vertical-align: 0.5; }

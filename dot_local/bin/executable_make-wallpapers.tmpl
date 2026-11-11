@@ -1,0 +1,85 @@
+#!/usr/bin/env bash
+# make-wallpapers: render wallpapers in the desktop palette (.chezmoidata/palette.toml)
+# into ~/Pictures/Wallpapers/generated. Re-run automatically by chezmoi when the
+# palette changes. Usage: make-wallpapers [width height]
+set -euo pipefail
+
+W=${1:-3840}
+H=${2:-2400}
+out="$HOME/Pictures/Wallpapers/generated"
+tmp=$(mktemp -d)
+trap 'rm -rf "$tmp"' EXIT
+mkdir -p "$out"
+
+bg_dark="{{ .palette.bg_dark }}"
+bg="{{ .palette.bg }}"
+bg_alt="{{ .palette.bg_alt }}"
+steel="{{ .palette.steel }}"
+slate="{{ .palette.slate }}"
+accent="{{ .palette.accent }}"
+blue="{{ .palette.blue }}"
+magenta="{{ .palette.magenta }}"
+symbols=$(fc-match "Symbols Nerd Font" -f '%{file}')
+
+# Soft shapes are drawn small, blurred, then scaled up: fast and perfectly smooth.
+sw=$((W / 8)) sh=$((H / 8))
+smooth() { magick "$1" -blur 0x"$2" -resize "${W}x${H}!" "$3"; }
+# Fine film grain against banding; output as 8-bit JPEG (small files)
+grain() { magick "$1" -attenuate 0.2 +noise Gaussian -colorspace sRGB -depth 8 -quality 92 "${1%.*}.jpg" && rm -f "$1"; }
+
+echo "make-wallpapers: ${W}x${H} -> $out"
+
+# 1. slate: diagonal gradient from the darkest background to steel blue
+magick -size "${W}x${H}" xc: -sparse-color Barycentric \
+    "0,0 $bg_dark  %[fx:w],%[fx:h] $steel  0,%[fx:h] $bg" "$tmp/slate.png"
+cp "$tmp/slate.png" "$out/slate.png"
+grain "$out/slate.png"
+
+# 2. ember: dark night with an orange glow rising from the bottom right
+magick -size "${sw}x${sh}" xc:"$bg_dark" \
+    -fill "$bg_alt" -draw "circle $((sw / 6)),$((sh / 8)) $((sw / 6)),$((-sh / 6))" \
+    -fill "$accent" -draw "circle $((sw * 4 / 5)),$((sh * 6 / 5)) $((sw * 4 / 5)),$((sh * 3 / 4))" \
+    "$tmp/ember.png"
+smooth "$tmp/ember.png" 80 "$out/ember.png"
+magick "$out/ember.png" -modulate 75,85 "$out/ember.png"
+grain "$out/ember.png"
+
+# 3. aurora: blue and magenta lights over a dark background
+magick -size "${sw}x${sh}" xc:"$bg_dark" \
+    -fill "$blue" -draw "ellipse $((sw / 3)),$((sh / 3)) $((sw / 3)),$((sh / 10)) 0,360" \
+    -fill "$magenta" -draw "ellipse $((sw * 2 / 3)),$((sh / 2)) $((sw / 4)),$((sh / 12)) 0,360" \
+    -fill "$steel" -draw "ellipse $((sw / 2)),$((sh * 9 / 10)) $((sw / 2)),$((sh / 8)) 0,360" \
+    "$tmp/aurora.png"
+smooth "$tmp/aurora.png" 45 "$out/aurora.png"
+magick "$out/aurora.png" -modulate 85,125 "$out/aurora.png"
+grain "$out/aurora.png"
+
+# 4. arch: big, quiet Arch logo on the slate gradient
+magick "$tmp/slate.png" -font "$symbols" -pointsize $((H * 2 / 5)) -gravity center \
+    -fill "$(magick xc:"$slate" -alpha set -channel A -evaluate set 22% +channel -format '%[pixel:p{0,0}]' info:)" \
+    -annotate +0+0 $'' -depth 8 -quality 92 "$out/arch.jpg"
+
+# 5. clouds: soft fractal clouds tinted from dark to steel
+magick -size "${sw}x${sh}" -seed 7 plasma:fractal -colorspace Gray -auto-level \
+    +level-colors "$bg_dark","$steel" "$tmp/clouds.png"
+smooth "$tmp/clouds.png" 6 "$out/clouds.png"
+grain "$out/clouds.png"
+
+# 6. dots: fine dot grid with a vignette
+d=$((W / 64))
+magick -size "${d}x${d}" xc:"$bg" -fill "$steel" \
+    -draw "circle $((d / 2)),$((d / 2)) $((d / 2)),$((d / 2 + d / 10 + 1))" "$tmp/tile.png"
+magick -size "${W}x${H}" tile:"$tmp/tile.png" \
+    \( -size "${W}x${H}" radial-gradient:"rgba(0,0,0,0)"-"$bg_dark" \) -composite \
+    -depth 8 -quality 92 "$out/dots.jpg"
+
+# 7. horizon: thin orange horizon line glowing under a dark sky
+magick -size "${sw}x$((sh * 7 / 10))" gradient:"$bg_dark"-"$steel" \
+    \( -size "${sw}x$((sh - sh * 7 / 10))" gradient:"$bg"-"$bg_dark" \) -append \
+    -fill "$accent" -draw "ellipse $((sw / 2)),$((sh * 7 / 10)) $((sw * 2 / 5)),$((sh / 100 + 1)) 0,360" \
+    "$tmp/horizon.png"
+smooth "$tmp/horizon.png" 3 "$out/horizon.png"
+grain "$out/horizon.png"
+
+rm -f "$out"/*.png
+echo "make-wallpapers: $(ls "$out" | wc -l) wallpapers ready"

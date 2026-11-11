@@ -1,0 +1,7 @@
+[Unit]
+Description=Change the wallpaper (shuffle mode only)
+After=hyprpaper.service
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/bin/wallpaper tick

@@ -1,10 +1,9 @@
-# Wallpaper: every image in ~/Pictures/Wallpapers, rotated every 30 minutes.
-# Drop your own images into that folder.
+# Wallpaper is managed by ~/.local/bin/wallpaper (SUPER+W).
+# At login hyprpaper shows the last chosen image via this symlink.
 splash = false
 
 wallpaper {
     monitor =
-    path = {{ .chezmoi.homeDir }}/Pictures/Wallpapers
+    path = {{ .chezmoi.homeDir }}/.local/state/wallpaper/current
     fit_mode = cover
-    timeout = 1800
 }
