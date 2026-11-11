@@ -84,12 +84,13 @@ for class, size in pairs(v.floating) do
     })
 end
 
+-- Discord has its own workspace 5 (chat) and opens there, tiled full size.
+-- Title must end in "Discord": the updater splash at login ("Discord Updater")
+-- should not pull you over to workspace 5.
 hl.window_rule({
-    name = "discord-float",
-    match = { class = "^discord$" },
-    float = true,
-    size = { "monitor_w*0.6", "monitor_h*0.65" },
-    center = true,
+    name = "discord",
+    match = { class = "^discord$", title = ".*Discord$" },
+    workspace = "5",
 })
 
 -- Ignore maximize requests from apps
@@ -106,12 +107,12 @@ hl.window_rule({
     no_focus = true,
 })
 
--- Games: Steam games (steam_app_*) and gamescope open on workspace 5,
+-- Games: Steam games (steam_app_*) and gamescope open on workspace 4,
 -- may tear (lower latency) and skip animations.
 hl.window_rule({
     name = "games",
     match = { class = "^(steam_app_.*|gamescope)$" },
-    workspace = "5",
+    workspace = "4",
     immediate = true,
     no_anim = true,
 })

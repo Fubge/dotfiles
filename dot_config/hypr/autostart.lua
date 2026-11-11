@@ -13,9 +13,24 @@ local function open_on(workspace, cmd, class)
     hl.exec_cmd(v.launch .. cmd)
 end
 
+-- Opens `cmd` and runs `hide` once its first window matching `class` appears
+local function open_hidden(cmd, class, hide)
+    local sub
+    sub = hl.on("window.open", function(win)
+        if win and win.class and win.class:lower():find(class, 1, true) then
+            hl.exec_cmd(hide)
+            sub:remove()
+        end
+    end)
+    hl.exec_cmd(v.launch .. cmd)
+end
+
 hl.on("hyprland.start", function()
     for _, app in ipairs(v.startup) do
         open_on(app.workspace, app.cmd, app.class)
+    end
+    for _, app in ipairs(v.hidden) do
+        open_hidden(app.cmd, app.class, app.hide)
     end
     for _, cmd in ipairs(v.background) do
         hl.exec_cmd(v.launch .. cmd)
