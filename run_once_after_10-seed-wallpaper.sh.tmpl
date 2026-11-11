@@ -5,6 +5,6 @@ dir="{{ .chezmoi.homeDir }}/Pictures/Wallpapers"
 state="{{ .chezmoi.homeDir }}/.local/state/wallpaper"
 mkdir -p "$dir" "$state"
 if [[ ! -e $state/current ]]; then
-    first=$(find -L "$dir" /usr/share/backgrounds/archlinux -type f \( -iname '*.jpg' -o -iname '*.png' \) 2>/dev/null | head -1)
+    first=$(find -L "$dir" -type f \( -iname '*.jpg' -o -iname '*.png' \) 2>/dev/null | head -1)
     [[ -n $first ]] && ln -sfn "$first" "$state/current" && echo fixed > "$state/mode"
 fi

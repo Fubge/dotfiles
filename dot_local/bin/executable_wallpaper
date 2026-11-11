@@ -6,10 +6,10 @@
 #   wallpaper shuffle     switch to shuffle mode: random image now and every 30 min
 #   wallpaper tick        called by the timer; changes image only in shuffle mode
 # In the menu: Enter = desktop, Shift+Enter = login screen, Ctrl+Enter = both.
-# Images come from ~/Pictures/Wallpapers (incl. subfolders) and the Arch wallpaper package.
+# Images come from ~/Pictures/Wallpapers (incl. subfolders; generated/ = make-wallpapers).
 set -uo pipefail
 
-dirs=("$HOME/Pictures/Wallpapers" "/usr/share/backgrounds/archlinux")
+dirs=("$HOME/Pictures/Wallpapers")
 state="${XDG_STATE_HOME:-$HOME/.local/state}/wallpaper"
 thumbs="${XDG_CACHE_HOME:-$HOME/.cache}/wallpaper-thumbs"
 login_dir=/var/lib/login-wallpaper   # user-owned, read by the SDDM theme "slate"

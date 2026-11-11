@@ -19,6 +19,8 @@ slate="{{ .palette.slate }}"
 accent="{{ .palette.accent }}"
 blue="{{ .palette.blue }}"
 magenta="{{ .palette.magenta }}"
+fg_muted="{{ .palette.fg_muted }}"
+yellow="{{ .palette.yellow }}"
 symbols=$(fc-match "Symbols Nerd Font" -f '%{file}')
 
 # Soft shapes are drawn small, blurred, then scaled up: fast and perfectly smooth.
@@ -54,11 +56,6 @@ smooth "$tmp/aurora.png" 45 "$out/aurora.png"
 magick "$out/aurora.png" -modulate 85,125 "$out/aurora.png"
 grain "$out/aurora.png"
 
-# 4. arch: big, quiet Arch logo on the slate gradient
-magick "$tmp/slate.png" -font "$symbols" -pointsize $((H * 2 / 5)) -gravity center \
-    -fill "$(magick xc:"$slate" -alpha set -channel A -evaluate set 22% +channel -format '%[pixel:p{0,0}]' info:)" \
-    -annotate +0+0 $'' -depth 8 -quality 92 "$out/arch.jpg"
-
 # 5. clouds: soft fractal clouds tinted from dark to steel
 magick -size "${sw}x${sh}" -seed 7 plasma:fractal -colorspace Gray -auto-level \
     +level-colors "$bg_dark","$steel" "$tmp/clouds.png"
@@ -81,5 +78,166 @@ magick -size "${sw}x$((sh * 7 / 10))" gradient:"$bg_dark"-"$steel" \
 smooth "$tmp/horizon.png" 3 "$out/horizon.png"
 grain "$out/horizon.png"
 
-rm -f "$out"/*.png
+# 8-12. scenes drawn with numpy: ridges (layered mountains, sun glow), tides
+# (stacked waves, one orange edge), contours (topographic map, one orange line),
+# synth (striped sun over a perspective grid), night (stars, crescent moon)
+bg_dark=$bg_dark bg=$bg bg_alt=$bg_alt steel=$steel slate=$slate accent=$accent \
+magenta=$magenta fg_muted=$fg_muted yellow=$yellow \
+python3 -I - "$out" "$W" "$H" <<'PY'
+import os
+import sys
+import numpy as np
+from PIL import Image
+
+OUT, W, H = sys.argv[1], int(sys.argv[2]), int(sys.argv[3])
+P = {k: os.environ[k] for k in
+     ("bg_dark", "bg", "bg_alt", "steel", "slate", "accent", "magenta", "fg_muted", "yellow")}
+C = {k: np.array([int(v[i:i + 2], 16) for i in (1, 3, 5)], float) / 255 for k, v in P.items()}
+rng = np.random.default_rng(7)
+yy, xx = np.mgrid[0:H, 0:W]
+X, Y = xx / W, yy / H
+
+
+def mix(a, b, t):
+    t = np.asarray(t, float)[..., None] if np.ndim(t) else t
+    return a * (1 - t) + b * t
+
+
+def noise2(scale, octaves=4, seed=0):
+    r = np.random.default_rng(seed)
+    out = np.zeros((H, W))
+    amp, tot = 1.0, 0.0
+    for o in range(octaves):
+        gw, gh = max(2, int(scale * 2 ** o * W / H)), max(2, int(scale * 2 ** o))
+        g = Image.fromarray(r.random((gh, gw)).astype(np.float32), mode="F")
+        out += amp * np.asarray(g.resize((W, H), Image.BICUBIC), float)
+        tot += amp
+        amp *= 0.5
+    return out / tot
+
+
+def noise1(n, scale, octaves=5, seed=0):
+    r = np.random.default_rng(seed)
+    out = np.zeros(n)
+    amp, tot = 1.0, 0.0
+    for o in range(octaves):
+        k = max(2, int(scale * 2 ** o))
+        pts = r.random(k + 1)
+        out += amp * np.interp(np.linspace(0, k, n), np.arange(k + 1), pts)
+        tot += amp
+        amp *= 0.5
+    return out / tot
+
+
+def glow(cx, cy, r):
+    d = np.hypot((X - cx) * W / H, Y - cy)
+    return np.exp(-(d / r) ** 2)
+
+
+def save(img, name):
+    img = np.clip(img + rng.normal(0, 0.006, img.shape), 0, 1)  # grain against banding
+    Image.fromarray((img * 255 + 0.5).astype(np.uint8)).save(f"{OUT}/{name}.jpg", quality=92)
+
+
+def aa_fill(img, mask_sd, color, alpha=1.0):
+    """mask_sd: signed distance in pixels (>0 inside); 1px antialias."""
+    a = np.clip(mask_sd + 0.5, 0, 1)[..., None] * alpha
+    return img * (1 - a) + color * a
+
+
+# 1. ridges: layered mountains in haze, orange sun glow behind
+sky = mix(C["bg_dark"], C["steel"], np.clip(Y / 0.62, 0, 1) ** 1.6)
+img = sky + C["accent"][None, None] * (0.55 * glow(0.68, 0.6, 0.22))[..., None]
+img += C["yellow"][None, None] * (0.35 * glow(0.68, 0.6, 0.05))[..., None]
+layers = 5
+for i in range(layers):
+    t = i / (layers - 1)
+    base = 0.50 + 0.11 * i
+    amp = 0.20 - 0.025 * i
+    ridge = base - amp * (noise1(W, 2 + i, seed=11 + i) - 0.3)
+    col = mix(mix(C["steel"], C["bg_alt"], 0.35), C["bg_dark"], t ** 0.8)
+    img = aa_fill(img, (yy - ridge[None, :] * H), col)
+save(img, "ridges")
+
+# 2. tides: stacked waves, one edge catches orange light
+img = mix(C["bg_dark"], C["bg"], Y)[...]
+n = 9
+for i in range(n):
+    t = i / (n - 1)
+    y0 = 0.22 + 0.085 * i
+    wave = (y0 + 0.035 * np.sin(X[0] * (5 + i * 0.7) + i * 1.3)
+            + 0.02 * np.sin(X[0] * (11 - i * 0.5) + i * 2.1)) * H
+    col = mix(mix(C["steel"], C["bg_alt"], 0.3), C["bg_dark"], t ** 0.7)
+    img = aa_fill(img, yy - wave[None, :], col)
+    if i == 3:
+        edge = np.exp(-((yy - wave[None, :]) / 1.6) ** 2) * (0.5 + 0.5 * np.sin(X * 3.2 - 0.6))
+        img = img * (1 - edge[..., None]) + C["accent"] * edge[..., None]
+save(img, "tides")
+
+# 3. contours: topographic map, one orange contour line
+f = noise2(1.8, 3, seed=3)
+lv = f * 16
+frac = np.abs(lv - np.round(lv))
+gy, gx = np.gradient(lv)
+dist = frac / (np.hypot(gx, gy) + 1e-6)  # distance to the line in px
+img = mix(C["bg_dark"], C["bg"], noise2(1.2, 2, seed=5))
+line = np.clip(1.6 - dist, 0, 1)
+img = mix(img, C["steel"], line * 0.55)
+hl = np.clip(1.8 - np.abs(lv - 10.0) / (np.hypot(gx, gy) + 1e-6), 0, 1)
+img = mix(img, C["accent"], hl)
+save(img, "contours")
+
+# 4. synth: striped sun over a perspective grid
+hz = 0.62
+img = mix(C["bg_dark"], mix(C["steel"], C["magenta"], 0.25), np.clip(Y / hz, 0, 1) ** 2.2)
+sd = (0.23 - np.hypot((X - 0.5) * W / H, Y - 0.47)) * H
+sun = mix(C["yellow"], C["accent"], np.clip((Y - 0.27) / 0.25, 0, 1))
+gaps = (Y > 0.5) & (np.sin((Y - 0.5) * 220 * (1 + (Y - 0.5) * 6)) > 0.4)
+sd = np.where(gaps, -1, sd)
+sd = np.where(Y > hz, -1, sd)
+img = img * (1 - np.clip(sd + 0.5, 0, 1)[..., None]) + sun * np.clip(sd + 0.5, 0, 1)[..., None]
+img += C["accent"] * (0.25 * glow(0.5, hz, 0.3))[..., None]
+floor = Y > hz
+d = np.where(floor, Y - hz, 1.0) + 1e-4
+k = 0.08
+wx = (X - 0.5) * k / d * 9           # world x, lines every unit
+wz = k / d * 3                        # world depth
+px_x = (k / d * 9) / W                # world units per pixel
+px_z = (k / d ** 2 * 3) / H
+lx = np.abs(wx - np.round(wx)) / px_x
+lz = np.abs(wz - np.round(wz)) / px_z
+grid = np.clip(1.4 - np.minimum(lx, lz), 0, 1)
+grid *= np.clip((Y - hz) * 8, 0, 1) * np.clip(1.2 - (px_z * 2.5), 0, 1) ** 0  # fade near horizon
+grid = np.where(px_z > 0.6, 0.35 * np.clip(1.4 - lx, 0, 1), grid)  # depth lines merge -> keep verticals
+floor_col = mix(C["bg_dark"], C["bg"], 0.5)
+img = np.where(floor[..., None], floor_col, img)
+img = mix(img, mix(C["magenta"], C["slate"], 0.5), grid * floor * 0.8)
+img += C["accent"] * (np.exp(-((Y - hz) * H / 3) ** 2) * 0.9)[..., None]
+save(img, "synth")
+
+# 5. night: starfield, faint band, crescent moon over a dark ridge
+img = mix(C["bg_dark"], mix(C["bg_dark"], C["steel"], 0.5), np.clip(Y, 0, 1) ** 1.5)
+band = np.exp(-(((Y - 0.9 + X * 0.7) / 0.18) ** 2)) * noise2(3, 4, seed=9)
+img = mix(img, C["slate"], band * 0.25)
+nstars = int(W * H / 2500)
+sx, sy = rng.random(nstars) * W, rng.random(nstars) * H * 0.85
+sz = rng.random(nstars) ** 6 * 1.8 + 0.4
+br = rng.random(nstars) * 0.6 + 0.3
+star = np.zeros((H, W))
+for x, y, s, b in zip(sx, sy, sz, br):
+    x0, x1, y0, y1 = int(max(0, x - 4)), int(min(W, x + 5)), int(max(0, y - 4)), int(min(H, y + 5))
+    star[y0:y1, x0:x1] += b * np.exp(-((xx[y0:y1, x0:x1] - x) ** 2 + (yy[y0:y1, x0:x1] - y) ** 2) / (s * s))
+img = mix(img, C["fg_muted"], np.clip(star, 0, 1))
+mx, my, mr = 0.74, 0.24, 0.065
+moon = (mr - np.hypot((X - mx) * W / H, Y - my)) * H
+cut = (mr * 0.92 - np.hypot((X - mx - 0.022) * W / H, Y - my + 0.02)) * H
+sd = np.minimum(moon, -cut)
+img += C["yellow"] * (0.12 * glow(mx, my, 0.16))[..., None]
+img = aa_fill(img, sd, mix(C["fg_muted"], C["yellow"], 0.25))
+ridge = 0.86 - 0.06 * (noise1(W, 3, seed=21) - 0.3)
+img = aa_fill(img, yy - ridge[None, :] * H, C["bg_dark"])
+save(img, "night")
+PY
+
+rm -f "$out"/*.png "$out/arch.jpg"
 echo "make-wallpapers: $(ls "$out" | wc -l) wallpapers ready"

@@ -39,9 +39,9 @@ slurp
 brightnessctl
 playerctl
 
-# Wallpapers (official Arch set) + ImageMagick (generates palette wallpapers, thumbnails)
-archlinux-wallpaper
+# Wallpapers: ImageMagick + numpy render the palette wallpapers (make-wallpapers), thumbnails
 imagemagick
+python-numpy
 
 # Fonts
 ttf-jetbrains-mono-nerd
