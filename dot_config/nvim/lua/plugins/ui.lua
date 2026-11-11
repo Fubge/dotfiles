@@ -58,6 +58,7 @@ require("which-key").setup({
     preset = "helix",
     spec = {
         { "<leader>s", group = "Search" },
+        { "<leader>e", desc = "File explorer" },
         { "<leader>g", group = "Git" },
         { "<leader>c", group = "Code" },
     },

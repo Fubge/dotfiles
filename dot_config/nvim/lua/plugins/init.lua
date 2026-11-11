@@ -4,3 +4,5 @@
 -- Exact versions are pinned in ~/.config/nvim/nvim-pack-lock.json (tracked in the repo).
 
 require("plugins.ui")
+require("plugins.search")
+require("plugins.treesitter")
