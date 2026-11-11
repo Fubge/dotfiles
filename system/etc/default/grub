@@ -1,7 +1,7 @@
 # GRUB settings. The kernel command line is NOT set here: GRUB chainloads the
 # UKI, which embeds /etc/kernel/cmdline.
 GRUB_DEFAULT=0
-GRUB_TIMEOUT=15
+GRUB_TIMEOUT=60
 GRUB_TIMEOUT_STYLE=menu
 GRUB_DISTRIBUTOR="Arch"
 GRUB_PRELOAD_MODULES="part_gpt part_msdos"
