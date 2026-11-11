@@ -9,7 +9,7 @@ mkdir -p "$dest"
 
 release=$(curl -fsSL "$api")
 tag=$(jq -r .tag_name <<<"$release")
-if [[ -d $dest/$tag ]]; then
+if compgen -G "$dest/$tag*" >/dev/null; then
     echo "$tag is already installed."
     exit 0
 fi
