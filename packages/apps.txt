@@ -3,3 +3,5 @@ vivaldi
 vivaldi-ffmpeg-codecs
 bitwarden
 discord
+# Music: official launcher from [extra], downloads and updates the Spotify client
+spotify-launcher
