@@ -3,3 +3,14 @@ neovim
 tree-sitter-cli   # builds Treesitter parsers for Neovim
 nodejs
 npm
+
+# Language servers (used by Neovim's built-in LSP client)
+lua-language-server
+bash-language-server
+shellcheck            # bash linting, used by bash-language-server
+taplo-cli             # TOML
+yaml-language-server
+
+# Formatters (wired up in the next Neovim step)
+stylua
+shfmt

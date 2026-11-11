@@ -61,5 +61,6 @@ require("which-key").setup({
         { "<leader>e", desc = "File explorer" },
         { "<leader>g", group = "Git" },
         { "<leader>c", group = "Code" },
+        { "gr", group = "LSP" },
     },
 })
