@@ -39,9 +39,9 @@ slurp
 brightnessctl
 playerctl
 
-# Wallpapers: ImageMagick + numpy render the palette wallpapers (make-wallpapers), thumbnails
+# Wallpapers: Pillow renders the palette wallpapers (make-wallpapers), ImageMagick thumbnails
 imagemagick
-python-numpy
+python-pillow
 
 # Fonts
 ttf-jetbrains-mono-nerd

@@ -77,7 +77,8 @@ Files ending in `.tmpl` are generated from these values.
 
 - `SUPER+W` opens the picker: pick an image, or "Shuffle" (new image every 30 min).
 - Your own images: drop them into `~/Pictures/Wallpapers` (subfolders work).
-- `make-wallpapers` re-renders the palette wallpapers (also runs when the palette changes).
+- `make-wallpapers` re-renders the "dev coded" palette wallpapers (code, terminal, hello, rain, gitgraph, loop, wq, brackets; also runs when the palette changes).
+- Every login picks a random desktop image and a different one for the next login screen (`wallpaper-random.service`). A menu choice holds until the next login.
 - Login screen background: SUPER+W, then Shift+Enter (Ctrl+Enter = desktop and login). Stored in `/var/lib/login-wallpaper` (user-owned); `login_wallpaper` in `.chezmoidata/design.toml` only seeds it.
 
 ## Shortcuts and menus

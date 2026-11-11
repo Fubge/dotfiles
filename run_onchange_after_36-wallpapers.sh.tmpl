@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # Regenerate the palette wallpapers whenever the palette changes.
+# units: {{ include "dot_config/systemd/user/wallpaper-random.service" | sha256sum }}
 # palette: {{ .palette | toJson | sha256sum }}
 # generator: {{ include "dot_local/bin/executable_make-wallpapers.tmpl" | sha256sum }}
 set -euo pipefail
 "$HOME/.local/bin/make-wallpapers"
 systemctl --user enable --now wallpaper-shuffle.timer
+systemctl --user enable wallpaper-random.service   # new random images at every login

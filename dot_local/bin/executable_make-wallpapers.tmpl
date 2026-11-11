@@ -1,243 +1,359 @@
 #!/usr/bin/env bash
-# make-wallpapers: render wallpapers in the desktop palette (.chezmoidata/palette.toml)
-# into ~/Pictures/Wallpapers/generated. Re-run automatically by chezmoi when the
-# palette changes. Usage: make-wallpapers [width height]
+# make-wallpapers: render "dev coded" wallpapers in the desktop palette
+# (.chezmoidata/palette.toml) into ~/Pictures/Wallpapers/generated, set in
+# JetBrains Mono: code (vim view of real config), terminal (dev humor), hello
+# (Hello World in many languages), rain (falling glyphs), gitgraph, loop
+# (while (awake) code()), wq, brackets (</>). Re-run automatically by chezmoi
+# when the palette or this script changes. Usage: make-wallpapers [width height]
 set -euo pipefail
 
-W=${1:-3840}
-H=${2:-2400}
+W=${1:-2880}
+H=${2:-1800}
 out="$HOME/Pictures/Wallpapers/generated"
-tmp=$(mktemp -d)
-trap 'rm -rf "$tmp"' EXIT
 mkdir -p "$out"
-
-bg_dark="{{ .palette.bg_dark }}"
-bg="{{ .palette.bg }}"
-bg_alt="{{ .palette.bg_alt }}"
-steel="{{ .palette.steel }}"
-slate="{{ .palette.slate }}"
-accent="{{ .palette.accent }}"
-blue="{{ .palette.blue }}"
-magenta="{{ .palette.magenta }}"
-fg_muted="{{ .palette.fg_muted }}"
-yellow="{{ .palette.yellow }}"
-symbols=$(fc-match "Symbols Nerd Font" -f '%{file}')
-
-# Soft shapes are drawn small, blurred, then scaled up: fast and perfectly smooth.
-sw=$((W / 8)) sh=$((H / 8))
-smooth() { magick "$1" -blur 0x"$2" -resize "${W}x${H}!" "$3"; }
-# Fine film grain against banding; output as 8-bit JPEG (small files)
-grain() { magick "$1" -attenuate 0.2 +noise Gaussian -colorspace sRGB -depth 8 -quality 92 "${1%.*}.jpg" && rm -f "$1"; }
-
+rm -f "$out"/*.jpg "$out"/*.png
 echo "make-wallpapers: ${W}x${H} -> $out"
 
-# 1. slate: diagonal gradient from the darkest background to steel blue
-magick -size "${W}x${H}" xc: -sparse-color Barycentric \
-    "0,0 $bg_dark  %[fx:w],%[fx:h] $steel  0,%[fx:h] $bg" "$tmp/slate.png"
-cp "$tmp/slate.png" "$out/slate.png"
-grain "$out/slate.png"
+{{- range $k, $v := .palette }}
+export {{ $k }}="{{ $v }}"
+{{- end }}
 
-# 2. ember: dark night with an orange glow rising from the bottom right
-magick -size "${sw}x${sh}" xc:"$bg_dark" \
-    -fill "$bg_alt" -draw "circle $((sw / 6)),$((sh / 8)) $((sw / 6)),$((-sh / 6))" \
-    -fill "$accent" -draw "circle $((sw * 4 / 5)),$((sh * 6 / 5)) $((sw * 4 / 5)),$((sh * 3 / 4))" \
-    "$tmp/ember.png"
-smooth "$tmp/ember.png" 80 "$out/ember.png"
-magick "$out/ember.png" -modulate 75,85 "$out/ember.png"
-grain "$out/ember.png"
-
-# 3. aurora: blue and magenta lights over a dark background
-magick -size "${sw}x${sh}" xc:"$bg_dark" \
-    -fill "$blue" -draw "ellipse $((sw / 3)),$((sh / 3)) $((sw / 3)),$((sh / 10)) 0,360" \
-    -fill "$magenta" -draw "ellipse $((sw * 2 / 3)),$((sh / 2)) $((sw / 4)),$((sh / 12)) 0,360" \
-    -fill "$steel" -draw "ellipse $((sw / 2)),$((sh * 9 / 10)) $((sw / 2)),$((sh / 8)) 0,360" \
-    "$tmp/aurora.png"
-smooth "$tmp/aurora.png" 45 "$out/aurora.png"
-magick "$out/aurora.png" -modulate 85,125 "$out/aurora.png"
-grain "$out/aurora.png"
-
-# 5. clouds: soft fractal clouds tinted from dark to steel
-magick -size "${sw}x${sh}" -seed 7 plasma:fractal -colorspace Gray -auto-level \
-    +level-colors "$bg_dark","$steel" "$tmp/clouds.png"
-smooth "$tmp/clouds.png" 6 "$out/clouds.png"
-grain "$out/clouds.png"
-
-# 6. dots: fine dot grid with a vignette
-d=$((W / 64))
-magick -size "${d}x${d}" xc:"$bg" -fill "$steel" \
-    -draw "circle $((d / 2)),$((d / 2)) $((d / 2)),$((d / 2 + d / 10 + 1))" "$tmp/tile.png"
-magick -size "${W}x${H}" tile:"$tmp/tile.png" \
-    \( -size "${W}x${H}" radial-gradient:"rgba(0,0,0,0)"-"$bg_dark" \) -composite \
-    -depth 8 -quality 92 "$out/dots.jpg"
-
-# 7. horizon: thin orange horizon line glowing under a dark sky
-magick -size "${sw}x$((sh * 7 / 10))" gradient:"$bg_dark"-"$steel" \
-    \( -size "${sw}x$((sh - sh * 7 / 10))" gradient:"$bg"-"$bg_dark" \) -append \
-    -fill "$accent" -draw "ellipse $((sw / 2)),$((sh * 7 / 10)) $((sw * 2 / 5)),$((sh / 100 + 1)) 0,360" \
-    "$tmp/horizon.png"
-smooth "$tmp/horizon.png" 3 "$out/horizon.png"
-grain "$out/horizon.png"
-
-# 8-12. scenes drawn with numpy: ridges (layered mountains, sun glow), tides
-# (stacked waves, one orange edge), contours (topographic map, one orange line),
-# synth (striped sun over a perspective grid), night (stars, crescent moon)
-bg_dark=$bg_dark bg=$bg bg_alt=$bg_alt steel=$steel slate=$slate accent=$accent \
-magenta=$magenta fg_muted=$fg_muted yellow=$yellow \
 python3 -I - "$out" "$W" "$H" <<'PY'
 import os
+import random
+import re
 import sys
-import numpy as np
-from PIL import Image
+
+from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
 OUT, W, H = sys.argv[1], int(sys.argv[2]), int(sys.argv[3])
-P = {k: os.environ[k] for k in
-     ("bg_dark", "bg", "bg_alt", "steel", "slate", "accent", "magenta", "fg_muted", "yellow")}
-C = {k: np.array([int(v[i:i + 2], 16) for i in (1, 3, 5)], float) / 255 for k, v in P.items()}
-rng = np.random.default_rng(7)
-yy, xx = np.mgrid[0:H, 0:W]
-X, Y = xx / W, yy / H
+P = {k: os.environ[k] for k in (
+    "bg_dark", "bg", "bg_alt", "steel", "slate", "fg", "fg_muted", "comment",
+    "accent", "yellow", "red", "green", "blue", "magenta", "cyan")}
+FONTS = "/usr/share/fonts/TTF/JetBrainsMonoNerdFont-"
+S = H / 1800  # all sizes are designed for 2880x1800
 
 
-def mix(a, b, t):
-    t = np.asarray(t, float)[..., None] if np.ndim(t) else t
-    return a * (1 - t) + b * t
+def font(size, style="Regular"):
+    return ImageFont.truetype(FONTS + style + ".ttf", max(6, int(size * S)))
 
 
-def noise2(scale, octaves=4, seed=0):
-    r = np.random.default_rng(seed)
-    out = np.zeros((H, W))
-    amp, tot = 1.0, 0.0
-    for o in range(octaves):
-        gw, gh = max(2, int(scale * 2 ** o * W / H)), max(2, int(scale * 2 ** o))
-        g = Image.fromarray(r.random((gh, gw)).astype(np.float32), mode="F")
-        out += amp * np.asarray(g.resize((W, H), Image.BICUBIC), float)
-        tot += amp
-        amp *= 0.5
-    return out / tot
+def rgb(name, alpha=255):
+    h = P.get(name, name).lstrip("#")
+    return tuple(int(h[i:i + 2], 16) for i in (0, 2, 4)) + (alpha,)
 
 
-def noise1(n, scale, octaves=5, seed=0):
-    r = np.random.default_rng(seed)
-    out = np.zeros(n)
-    amp, tot = 1.0, 0.0
-    for o in range(octaves):
-        k = max(2, int(scale * 2 ** o))
-        pts = r.random(k + 1)
-        out += amp * np.interp(np.linspace(0, k, n), np.arange(k + 1), pts)
-        tot += amp
-        amp *= 0.5
-    return out / tot
+def fade(name, alpha, base="bg"):
+    """Text color pre-mixed with the background (Pillow ignores alpha for text)."""
+    t = alpha / 255
+    a, b = rgb(name), rgb(base)
+    return tuple(int(a[i] * t + b[i] * (1 - t)) for i in range(3))
 
 
-def glow(cx, cy, r):
-    d = np.hypot((X - cx) * W / H, Y - cy)
-    return np.exp(-(d / r) ** 2)
+def canvas(top="bg_dark", bottom="bg"):
+    a, b = rgb(top), rgb(bottom)
+    img = Image.new("RGB", (W, H))
+    d = ImageDraw.Draw(img)
+    for y in range(H):
+        t = y / H
+        d.line([(0, y), (W, y)], fill=tuple(int(a[i] * (1 - t) + b[i] * t) for i in range(3)) + (255,))
+    return img
+
+
+def comp(img, layer):
+    return Image.alpha_composite(img.convert("RGBA"), layer).convert("RGB")
+
+
+def glow(img, xy, r, color, alpha=90):
+    layer = Image.new("RGBA", img.size)
+    ImageDraw.Draw(layer).ellipse([xy[0] - r, xy[1] - r, xy[0] + r, xy[1] + r], fill=rgb(color, alpha))
+    return comp(img, layer.filter(ImageFilter.GaussianBlur(r / 2)))
 
 
 def save(img, name):
-    img = np.clip(img + rng.normal(0, 0.006, img.shape), 0, 1)  # grain against banding
-    Image.fromarray((img * 255 + 0.5).astype(np.uint8)).save(f"{OUT}/{name}.jpg", quality=92)
+    img.convert("RGB").save(f"{OUT}/{name}.png")
 
 
-def aa_fill(img, mask_sd, color, alpha=1.0):
-    """mask_sd: signed distance in pixels (>0 inside); 1px antialias."""
-    a = np.clip(mask_sd + 0.5, 0, 1)[..., None] * alpha
-    return img * (1 - a) + color * a
+# --- tiny syntax highlighter (enough for wallpapers) -------------------------
+KEYWORDS = {"local", "function", "end", "if", "then", "else", "elseif", "for", "in", "do",
+            "return", "while", "not", "and", "or", "def", "class", "import", "from", "fn",
+            "let", "mut", "const", "async", "await", "pub", "struct", "impl", "match", "true",
+            "false", "nil", "None", "self", "loop", "break"}
+TOKEN = re.compile(r'(--.*|#.*|//.*)|("[^"]*"|\'[^\']*\')|(\b\d+(?:\.\d+)?\b)|([A-Za-z_]\w*)(?=\s*\()|([A-Za-z_]\w*)|(\s+)|(.)')
 
 
-# 1. ridges: layered mountains in haze, orange sun glow behind
-sky = mix(C["bg_dark"], C["steel"], np.clip(Y / 0.62, 0, 1) ** 1.6)
-img = sky + C["accent"][None, None] * (0.55 * glow(0.68, 0.6, 0.22))[..., None]
-img += C["yellow"][None, None] * (0.35 * glow(0.68, 0.6, 0.05))[..., None]
-layers = 5
-for i in range(layers):
-    t = i / (layers - 1)
-    base = 0.50 + 0.11 * i
-    amp = 0.20 - 0.025 * i
-    ridge = base - amp * (noise1(W, 2 + i, seed=11 + i) - 0.3)
-    col = mix(mix(C["steel"], C["bg_alt"], 0.35), C["bg_dark"], t ** 0.8)
-    img = aa_fill(img, (yy - ridge[None, :] * H), col)
-save(img, "ridges")
+def tokens(line):
+    for m in TOKEN.finditer(line):
+        com, st, num, call, word, ws, other = m.groups()
+        if com:
+            yield com, "comment"
+        elif st:
+            yield st, "green"
+        elif num:
+            yield num, "yellow"
+        elif call:
+            yield call, "blue"
+        elif word:
+            yield word, "magenta" if word in KEYWORDS else "fg_muted"
+        elif ws:
+            yield ws, None
+        else:
+            yield other, "cyan" if other in "{}()[]" else "slate"
 
-# 2. tides: stacked waves, one edge catches orange light
-img = mix(C["bg_dark"], C["bg"], Y)[...]
-n = 9
-for i in range(n):
-    t = i / (n - 1)
-    y0 = 0.22 + 0.085 * i
-    wave = (y0 + 0.035 * np.sin(X[0] * (5 + i * 0.7) + i * 1.3)
-            + 0.02 * np.sin(X[0] * (11 - i * 0.5) + i * 2.1)) * H
-    col = mix(mix(C["steel"], C["bg_alt"], 0.3), C["bg_dark"], t ** 0.7)
-    img = aa_fill(img, yy - wave[None, :], col)
-    if i == 3:
-        edge = np.exp(-((yy - wave[None, :]) / 1.6) ** 2) * (0.5 + 0.5 * np.sin(X * 3.2 - 0.6))
-        img = img * (1 - edge[..., None]) + C["accent"] * edge[..., None]
-save(img, "tides")
 
-# 3. contours: topographic map, one orange contour line
-f = noise2(1.8, 3, seed=3)
-lv = f * 16
-frac = np.abs(lv - np.round(lv))
-gy, gx = np.gradient(lv)
-dist = frac / (np.hypot(gx, gy) + 1e-6)  # distance to the line in px
-img = mix(C["bg_dark"], C["bg"], noise2(1.2, 2, seed=5))
-line = np.clip(1.6 - dist, 0, 1)
-img = mix(img, C["steel"], line * 0.55)
-hl = np.clip(1.8 - np.abs(lv - 10.0) / (np.hypot(gx, gy) + 1e-6), 0, 1)
-img = mix(img, C["accent"], hl)
-save(img, "contours")
+def code(d, x, y, lines, f, alpha=255, lh=1.55, base="bg"):
+    cw = f.getlength("M")
+    for line in lines:
+        cx = x
+        for text, col in tokens(line):
+            if col:
+                d.text((cx, y), text, font=f, fill=fade(col, alpha, base))
+            cx += cw * len(text)
+        y += f.size * lh
+    return y
 
-# 4. synth: striped sun over a perspective grid
-hz = 0.62
-img = mix(C["bg_dark"], mix(C["steel"], C["magenta"], 0.25), np.clip(Y / hz, 0, 1) ** 2.2)
-sd = (0.23 - np.hypot((X - 0.5) * W / H, Y - 0.47)) * H
-sun = mix(C["yellow"], C["accent"], np.clip((Y - 0.27) / 0.25, 0, 1))
-gaps = (Y > 0.5) & (np.sin((Y - 0.5) * 220 * (1 + (Y - 0.5) * 6)) > 0.4)
-sd = np.where(gaps, -1, sd)
-sd = np.where(Y > hz, -1, sd)
-img = img * (1 - np.clip(sd + 0.5, 0, 1)[..., None]) + sun * np.clip(sd + 0.5, 0, 1)[..., None]
-img += C["accent"] * (0.25 * glow(0.5, hz, 0.3))[..., None]
-floor = Y > hz
-d = np.where(floor, Y - hz, 1.0) + 1e-4
-k = 0.08
-wx = (X - 0.5) * k / d * 9           # world x, lines every unit
-wz = k / d * 3                        # world depth
-px_x = (k / d * 9) / W                # world units per pixel
-px_z = (k / d ** 2 * 3) / H
-lx = np.abs(wx - np.round(wx)) / px_x
-lz = np.abs(wz - np.round(wz)) / px_z
-grid = np.clip(1.4 - np.minimum(lx, lz), 0, 1)
-grid *= np.clip((Y - hz) * 8, 0, 1) * np.clip(1.2 - (px_z * 2.5), 0, 1) ** 0  # fade near horizon
-grid = np.where(px_z > 0.6, 0.35 * np.clip(1.4 - lx, 0, 1), grid)  # depth lines merge -> keep verticals
-floor_col = mix(C["bg_dark"], C["bg"], 0.5)
-img = np.where(floor[..., None], floor_col, img)
-img = mix(img, mix(C["magenta"], C["slate"], 0.5), grid * floor * 0.8)
-img += C["accent"] * (np.exp(-((Y - hz) * H / 3) ** 2) * 0.9)[..., None]
-save(img, "synth")
 
-# 5. night: starfield, faint band, crescent moon over a dark ridge
-img = mix(C["bg_dark"], mix(C["bg_dark"], C["steel"], 0.5), np.clip(Y, 0, 1) ** 1.5)
-band = np.exp(-(((Y - 0.9 + X * 0.7) / 0.18) ** 2)) * noise2(3, 4, seed=9)
-img = mix(img, C["slate"], band * 0.25)
-nstars = int(W * H / 2500)
-sx, sy = rng.random(nstars) * W, rng.random(nstars) * H * 0.85
-sz = rng.random(nstars) ** 6 * 1.8 + 0.4
-br = rng.random(nstars) * 0.6 + 0.3
-star = np.zeros((H, W))
-for x, y, s, b in zip(sx, sy, sz, br):
-    x0, x1, y0, y1 = int(max(0, x - 4)), int(min(W, x + 5)), int(max(0, y - 4)), int(min(H, y + 5))
-    star[y0:y1, x0:x1] += b * np.exp(-((xx[y0:y1, x0:x1] - x) ** 2 + (yy[y0:y1, x0:x1] - y) ** 2) / (s * s))
-img = mix(img, C["fg_muted"], np.clip(star, 0, 1))
-mx, my, mr = 0.74, 0.24, 0.065
-moon = (mr - np.hypot((X - mx) * W / H, Y - my)) * H
-cut = (mr * 0.92 - np.hypot((X - mx - 0.022) * W / H, Y - my + 0.02)) * H
-sd = np.minimum(moon, -cut)
-img += C["yellow"] * (0.12 * glow(mx, my, 0.16))[..., None]
-img = aa_fill(img, sd, mix(C["fg_muted"], C["yellow"], 0.25))
-ridge = 0.86 - 0.06 * (noise1(W, 3, seed=21) - 0.3)
-img = aa_fill(img, yy - ridge[None, :] * H, C["bg_dark"])
-save(img, "night")
+LUA = '''-- Dropdown terminal: SUPER+Tab toggles it
+bind(mod .. " + Tab", function()
+    for _, w in ipairs(hl.get_windows()) do
+        if w.class == v.dropdown.class then
+            hl.dispatch(hl.dsp.workspace.toggle_special("dropdown"))
+            return
+        end
+    end
+    hl.dispatch(hl.dsp.exec_cmd(v.launch .. v.terminal))
+end, "Dropdown terminal")
+
+local function brightness(step)
+    local raw = read("/sys/class/backlight/intel_backlight")
+    return math.floor((raw / max) ^ 0.5 * 99 + 1.5)
+end'''.splitlines()
+
+PY = '''def frame_time(watts):
+    # Fast charger -> quick fill, trickle -> slow fill
+    return 0.35 if watts >= 45 else 0.6 if watts >= 15 else 1.0
+
+
+def main():
+    while True:
+        s = state()
+        if s["kind"] == "charging":
+            emit(BOLT[frame], "charging", tip)'''.splitlines()
+
+# 1. code: real config code, current line highlighted, orange block cursor -----
+img = canvas()
+d = ImageDraw.Draw(img, "RGBA")
+f = font(44)
+lh = 1.6
+x0, y0 = 340 * S, (H - 90 * S - len(LUA) * 44 * S * lh) / 2
+cur = 4
+d.rectangle([0, y0 + cur * f.size * lh - 10 * S, W, y0 + (cur + 1) * f.size * lh - 10 * S], fill=rgb("bg_alt"))
+for i in range(len(LUA)):
+    num = str(i + 1).rjust(3)
+    d.text((x0 - 160 * S, y0 + i * f.size * lh), num, font=f,
+           fill=fade("accent" if i == cur else "comment", 255 if i == cur else 140))
+code(d, x0, y0, LUA, f, lh=lh)
+cx = x0 + f.getlength(LUA[cur]) + 6 * S
+d.rectangle([cx, y0 + cur * f.size * lh, cx + f.getlength("M"), y0 + cur * f.size * lh + f.size * 1.2], fill=rgb("accent"))
+# vim-ish statusline
+sy = H - 90 * S
+d.rectangle([0, sy, W, H], fill=rgb("bg_alt"))
+fs = font(28, "Bold")
+d.rounded_rectangle([40 * S, sy + 18 * S, 250 * S, H - 18 * S], radius=26 * S, fill=rgb("accent"))
+d.text((145 * S, sy + 45 * S), "NORMAL", font=fs, fill=rgb("bg_dark"), anchor="mm")
+d.text((290 * S, sy + 45 * S), "binds.lua  \ue725  main", font=font(28), fill=rgb("fg_muted"), anchor="lm")
+d.text((W - 60 * S, sy + 45 * S), "lua   5:52   42%", font=font(28), fill=rgb("comment"), anchor="rm")
+save(img, "code")
+
+# 2. terminal: floating window with the prompt and some dev humor ----------------
+img = canvas("bg_dark", "bg_alt")
+img = glow(img, (W * 0.5, H * 0.5), 700 * S, "steel", 70)
+d = ImageDraw.Draw(img, "RGBA")
+ww, wh = 1700 * S, 1000 * S
+wx, wy = (W - ww) / 2, (H - wh) / 2
+shadow = Image.new("RGBA", img.size)
+ImageDraw.Draw(shadow).rounded_rectangle([wx + 10, wy + 30 * S, wx + ww + 10, wy + wh + 40 * S], radius=24 * S, fill=(0, 0, 0, 150))
+img = comp(img, shadow.filter(ImageFilter.GaussianBlur(40 * S)))
+d = ImageDraw.Draw(img, "RGBA")
+d.rounded_rectangle([wx, wy, wx + ww, wy + wh], radius=24 * S, fill=rgb("bg", 245), outline=rgb("accent"), width=int(4 * S))
+f = font(40)
+fb = font(40, "Bold")
+lines = [
+    ("prompt", "git commit -m \"fix: works on my machine\""),
+    ("out", "[main 5f82253] fix: works on my machine"),
+    ("out", " 1 file changed, 1 insertion(+), 1 deletion(-)"),
+    ("prompt", "make coffee"),
+    ("err", "make: *** No rule to make target 'coffee'.  Stop."),
+    ("prompt", "sudo !!"),
+    ("err", "you are not in the sudoers file."),
+    ("err", "This incident will be reported."),
+    ("prompt", "echo $MOOD"),
+    ("ok", "caffeinated"),
+    ("prompt", ""),
+]
+y = wy + 80 * S
+lx = wx + 70 * S
+for kind, text in lines:
+    if kind == "prompt":
+        d.text((lx, y), "❯", font=fb, fill=rgb("accent"))
+        d.text((lx + 50 * S, y), "17:45", font=f, fill=rgb("yellow"))
+        d.text((lx + 50 * S + f.getlength("17:45 "), y), "//", font=f, fill=rgb("comment"))
+        tx = lx + 50 * S + f.getlength("17:45 // ")
+        d.text((tx, y), text, font=f, fill=rgb("fg"))
+        if text == "":
+            d.rectangle([tx, y + 4 * S, tx + f.getlength("M"), y + f.size * 1.15], fill=rgb("accent"))
+    else:
+        d.text((lx + 50 * S, y), text, font=f, fill=rgb({"out": "fg_muted", "err": "red", "ok": "green"}[kind]))
+    y += f.size * 1.75
+save(img, "terminal")
+
+# 3. hello: Hello, World! in many languages, one lit up -------------------------
+img = canvas()
+d = ImageDraw.Draw(img, "RGBA")
+hellos = ['print("Hello, World!")', 'console.log("Hello, World!");', 'fmt.Println("Hello, World!")',
+          'println!("Hello, World!");', 'puts "Hello, World!"', 'echo "Hello, World!"',
+          'System.out.println("Hello, World!");', 'printf("Hello, World!\\n");', 'IO.puts "Hello, World!"',
+          'std::cout << "Hello, World!";', 'print("Hello, World!")', 'Console.WriteLine("Hello, World!");',
+          'main = putStrLn "Hello, World!"', 'say "Hello, World!"', 'echo("Hello, World!")',
+          'writeln("Hello, World!");', 'io.write("Hello, World!")', 'MsgBox "Hello, World!"']
+f = font(30)
+random.seed(4)
+rows = 22
+for r in range(rows):
+    y = (r + 0.5) * H / rows - f.size / 2
+    x = -random.randint(0, 600) * S
+    while x < W:
+        t = random.choice(hellos)
+        lit = (r == 11 and W * 0.36 < x < W * 0.5)
+        if lit:
+            img = glow(img, (x + f.getlength(t) / 2, y + f.size / 2), 260 * S, "steel", 90)
+            d = ImageDraw.Draw(img, "RGBA")
+            code(d, x, y, [t], font(30, "Bold"))
+            d.rectangle([x + f.getlength(t) + 10 * S, y, x + f.getlength(t) + 10 * S + f.getlength("M"), y + f.size * 1.2], fill=rgb("accent"))
+        else:
+            code(d, x, y, [t], f, alpha=40)
+        x += f.getlength(t) + 90 * S
+save(img, "hello")
+
+# 4. rain: falling glyph columns, a few orange ones ------------------------------
+img = canvas("bg_dark", "bg_dark")
+d = ImageDraw.Draw(img, "RGBA")
+f = font(26)
+cw = f.size * 1.25
+glyphs = "01{}()[]<>=+-*/;:#$&|!?abcdef0123456789λ→"
+random.seed(9)
+cols = int(W / cw)
+for c in range(cols):
+    x = c * cw
+    head = random.uniform(-0.2, 1.3) * H
+    length = random.uniform(0.15, 0.6) * H
+    hot = random.random() < 0.06
+    y = head
+    while y > head - length:
+        t = (head - y) / length
+        if 0 <= y < H:
+            col = "accent" if hot else "slate"
+            a = int(255 * (1 - t) ** 1.5 * (0.95 if hot else 0.8))
+            d.text((x, y), random.choice(glyphs), font=f, fill=fade(col, a, "bg_dark"))
+        y -= f.size * 1.3
+    if 0 <= head < H:
+        d.text((x, head), random.choice(glyphs), font=font(26, "Bold"), fill=rgb("fg", 230))
+save(img, "rain")
+
+# 5. gitgraph: branches and commits like `git log --graph` -----------------------
+img = canvas()
+d = ImageDraw.Draw(img, "RGBA")
+f = font(38)
+fm = font(32)
+commits = [
+    (0, "main", "merge: playful battery module", "accent"),
+    (1, None, "battery: plug slides in and clicks", "magenta"),
+    (1, None, "battery: fill animation while charging", "magenta"),
+    (0, None, "wallpapers: login screen from the menu", "blue"),
+    (2, None, "nvim: native lsp, no plugins needed", "green"),
+    (0, None, "waybar: terminal clock with blinking colon", "blue"),
+    (2, None, "nvim: start from scratch", "green"),
+    (0, None, "grub: slate theme", "blue"),
+    (0, None, "initial commit", "blue"),
+]
+lane = 120 * S
+step = 165 * S
+gx, gy = 620 * S, (H - step * 8) / 2
+lanes_col = {0: "blue", 1: "magenta", 2: "green"}
+pos = [(gx + c[0] * lane, gy + i * step) for i, c in enumerate(commits)]
+# lane lines
+for ln, col in lanes_col.items():
+    ys = [p[1] for p, c in zip(pos, commits) if c[0] == ln]
+    if ys:
+        top = min(ys) - (step if ln else step * 1.2)
+        bot = max(ys) + (step if ln else step * 0.6)
+        d.line([(gx + ln * lane, top), (gx + ln * lane, bot)], fill=rgb(col, 200), width=int(6 * S))
+        if ln:
+            d.line([(gx, top - step * 0.4), (gx + ln * lane, top)], fill=rgb(col, 200), width=int(6 * S))
+            d.line([(gx + ln * lane, bot), (gx, bot + step * 0.4)], fill=rgb(col, 200), width=int(6 * S))
+for (x, y), (ln, ref, msg, col) in zip(pos, commits):
+    r = 20 * S
+    d.ellipse([x - r, y - r, x + r, y + r], fill=rgb("bg"), outline=rgb(col), width=int(6 * S))
+    tx = gx + 3 * lane + 40 * S
+    h = "".join(random.choice("0123456789abcdef") for _ in range(7))
+    d.text((tx, y), h, font=f, fill=rgb("yellow"), anchor="lm")
+    tx += f.getlength(h + "  ")
+    if ref:
+        lab = "HEAD -> main"
+        d.rounded_rectangle([tx - 10 * S, y - 26 * S, tx + fm.getlength(lab) + 10 * S, y + 26 * S], radius=10 * S, fill=rgb("accent"))
+        d.text((tx, y), lab, font=fm, fill=rgb("bg_dark"), anchor="lm")
+        tx += fm.getlength(lab) + 40 * S
+    d.text((tx, y), msg, font=f, fill=rgb("fg_muted"), anchor="lm")
+save(img, "gitgraph")
+
+# 6. loop: one big line of dev philosophy ---------------------------------------
+img = canvas()
+img = glow(img, (W * 0.5, H * 0.52), 520 * S, "steel", 60)
+d = ImageDraw.Draw(img, "RGBA")
+f = font(120, "Bold")
+lines = ["while (awake) {", "    code();", "}"]
+lh = f.size * 1.35
+x = (W - f.getlength(lines[0])) / 2
+y = H / 2 - lh * 1.5
+for line in lines:
+    code(d, x, y, [line], f, lh=1.35)
+    y += lh
+cx = x + f.getlength(lines[1]) + 14 * S
+d.rectangle([cx, y - lh * 2 + 14 * S, cx + f.getlength("M") * 0.55, y - lh * 2 + f.size * 1.15], fill=rgb("accent"))
+d.text((W / 2, H - 160 * S), "// TODO: sleep()", font=font(36), fill=rgb("comment"), anchor="mm")
+save(img, "loop")
+
+# 7. wq: vim's way out, huge -----------------------------------------------------
+img = canvas("bg_dark", "bg_dark")
+d = ImageDraw.Draw(img, "RGBA")
+f = font(520, "Bold")
+d.text((W * 0.5, H * 0.46), ":wq", font=f, fill=rgb("steel"), anchor="mm")
+bb = d.textbbox((W * 0.5, H * 0.46), ":wq", font=f, anchor="mm")
+d.rectangle([bb[2] + 30 * S, bb[1] + 30 * S, bb[2] + 30 * S + 150 * S, bb[3]], fill=rgb("accent"))
+d.text((W * 0.5, H * 0.75), "the only way out", font=font(44), fill=rgb("comment"), anchor="mm")
+save(img, "wq")
+
+# 8. brackets: giant </> over faint code ----------------------------------------
+img = canvas()
+d = ImageDraw.Draw(img, "RGBA")
+f = font(26)
+y = -10 * S
+src = (PY + [""] + LUA) * 4
+while y < H:
+    for line in src:
+        code(d, 80 * S, y, [line], f, alpha=34)
+        code(d, W * 0.52, y, [line[::-1][::-1]], f, alpha=34)
+        y += f.size * 1.6
+        if y > H:
+            break
+big = font(640, "Bold")
+cx, cy = W / 2, H / 2
+layer = Image.new("RGBA", img.size)
+ImageDraw.Draw(layer).text((cx, cy), "</>", font=big, fill=rgb("accent", 160), anchor="mm")
+img = comp(img, layer.filter(ImageFilter.GaussianBlur(60 * S)))
+d = ImageDraw.Draw(img, "RGBA")
+d.text((cx, cy), "</>", font=big, fill=rgb("bg"), anchor="mm", stroke_width=int(8 * S), stroke_fill=rgb("accent"))
+save(img, "brackets")
 PY
 
-rm -f "$out"/*.png "$out/arch.jpg"
 echo "make-wallpapers: $(ls "$out" | wc -l) wallpapers ready"

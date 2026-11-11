@@ -1,0 +1,12 @@
+[Unit]
+Description=Random wallpaper for the desktop and the next login screen
+# Runs before hyprpaper, which then shows the freshly linked image
+Before=hyprpaper.service
+PartOf=graphical-session.target
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/bin/wallpaper random
+
+[Install]
+WantedBy=graphical-session.target

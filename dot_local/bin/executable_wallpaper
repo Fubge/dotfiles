@@ -1,10 +1,12 @@
 #!/usr/bin/env bash
 # wallpaper: choose and switch wallpapers (hyprpaper backend).
 #   wallpaper pick        grid menu with previews (SUPER+W)
-#   wallpaper set FILE    set a specific image (stays until changed)
+#   wallpaper set FILE    set a specific image (until the next login)
 #   wallpaper login FILE  set the login screen (SDDM) background
 #   wallpaper shuffle     switch to shuffle mode: random image now and every 30 min
 #   wallpaper tick        called by the timer; changes image only in shuffle mode
+#   wallpaper random      at every login (wallpaper-random.service, before hyprpaper):
+#                         random desktop image + a different one for the login screen
 # In the menu: Enter = desktop, Shift+Enter = login screen, Ctrl+Enter = both.
 # Images come from ~/Pictures/Wallpapers (incl. subfolders; generated/ = make-wallpapers).
 set -uo pipefail
@@ -36,7 +38,7 @@ set_login() {   # cropped to the panel size as JPEG, so SDDM never chokes on web
     magick "$1[0]" -resize 2880x1800^ -gravity center -extent 2880x1800 -quality 92 "$tmp" &&
         mv -f "$tmp" "$login_dir/background.jpg" &&
         ln -sfn "$1" "$state/login" &&
-        notify-send -t 2000 "Wallpapers" "Login screen: $(basename "${1%.*}")"
+        { [[ ${2:-} == quiet ]] || notify-send -t 2000 "Wallpapers" "Login screen: $(basename "${1%.*}")"; }
 }
 
 random_image() {
@@ -96,6 +98,13 @@ case "${1:-pick}" in
     set) [[ -f ${2:-} ]] && set_fixed "$(realpath "$2")" || { echo "usage: wallpaper set FILE" >&2; exit 1; } ;;
     login) [[ -f ${2:-} ]] && set_login "$(realpath "$2")" || { echo "usage: wallpaper login FILE" >&2; exit 1; } ;;
     shuffle) shuffle ;;
+    random)
+        desk=$(random_image)
+        [[ -n $desk ]] || exit 0
+        ln -sfn "$desk" "$state/current"   # hyprpaper starts after this and reads the link
+        login=$(list_images | grep -vxF "$desk" | grep -vxF "$(readlink "$state/login" 2>/dev/null)" | shuf -n 1)
+        [[ -n $login ]] && set_login "$login" quiet
+        ;;
     tick) [[ $(cat "$state/mode" 2>/dev/null) == shuffle ]] && apply "$(random_image)" ;;
-    *) sed -n '2,9p' "$0"; exit 1 ;;
+    *) sed -n '2,11p' "$0"; exit 1 ;;
 esac
