@@ -1,0 +1,22 @@
+# Central color palette for the whole desktop.
+# Templates read it as {{ .palette.<name> }}; change a color here,
+# run `chezmoi apply`, and every app that uses it follows.
+[palette]
+# Backgrounds (dark -> lighter)
+bg_dark   = "#161a21"
+bg        = "#1c2029"
+bg_alt    = "#262b36"
+steel     = "#626f8c"   # secondary surfaces (bar pills, selections)
+slate     = "#808aa2"   # primary surfaces / muted text
+# Text
+fg        = "#f8f8f2"
+fg_muted  = "#c0c4ce"
+comment   = "#7a8299"
+# Accent and semantic colors
+accent    = "#ff7f00"   # orange: focus, active, cursor
+yellow    = "#ffcc66"   # warning
+red       = "#ff5555"   # error / critical
+green     = "#a6e3a1"   # success / charging
+blue      = "#7aa2f7"
+magenta   = "#c49bff"
+cyan      = "#7dcfff"
