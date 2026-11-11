@@ -44,14 +44,15 @@ bind(mod .. " + M", hl.dsp.exec_cmd("uwsm stop"), "Log out") -- uwsm stops all a
 group("Windows")
 bind(mod .. " + X", function()
     local win = hl.get_active_window()
-    if win and v.keepAlive[string.lower(win.class or "")] then
-        -- Spotify: only hide its workspace (keeps playing); back with SUPER+O,
-        -- the music icon in the bar or its right click menu
-        hl.dispatch(hl.dsp.exec_cmd("~/.local/bin/music hide"))
+    local keep = win and v.keepAlive[string.lower(win.class or "")]
+    if keep then
+        -- Spotify / Discord keep their window (vars.lua): Spotify hides (back with
+        -- SUPER+O or the music icon), Discord goes back to the previous workspace
+        hl.dispatch(keep)
     else
         hl.dispatch(hl.dsp.window.close())
     end
-end, "Close window (Spotify: hide, keeps playing)")
+end, "Close window (Spotify / Discord: keep running)")
 bind(mod .. " + SHIFT + X", hl.dsp.window.close(), "Really close (Spotify too)")
 bind(mod .. " + F", hl.dsp.window.float({ action = "toggle" }), "Float / tile window")
 bind(mod .. " + SHIFT + F", hl.dsp.window.fullscreen({ mode = "fullscreen" }), "Fullscreen")

@@ -1,13 +1,20 @@
 #!/usr/bin/env bash
 # focus-or-run CLASS CMD...: jump to the app's window if it has one (instant,
-# switches to its workspace), otherwise start CMD. Starting an app that already
-# runs (e.g. Discord in the tray) only hands over to the running instance, which
-# is slow and does not switch workspaces.
+# switches to its workspace), otherwise start CMD and jump to the window as soon
+# as it appears. Starting an app that already runs (e.g. Discord in the tray)
+# only hands over to the running instance, which does not switch workspaces.
 class=$1; shift
-addr=$(hyprctl clients -j | jq -r --arg c "$class" \
-    '[.[] | select(.class == $c and (.workspace.name | startswith("special:") | not))][0].address // empty')
-if [[ -n $addr ]]; then
-    hyprctl dispatch "hl.dsp.focus({window = \"address:$addr\"})" >/dev/null
-else
-    exec uwsm app -- "$@"
-fi
+find_window() {
+    hyprctl clients -j | jq -r --arg c "$class" \
+        '[.[] | select(.class == $c and (.workspace.name | startswith("special:") | not))][0].address // empty'
+}
+focus() { hyprctl dispatch "hl.dsp.focus({window = \"address:$1\"})" >/dev/null; }
+
+addr=$(find_window)
+[[ -n $addr ]] && { focus "$addr"; exit; }
+uwsm app -- "$@" >/dev/null 2>&1 &
+for _ in {1..300}; do   # up to 30 s (a cold start after login can take a while)
+    sleep 0.1
+    addr=$(find_window)
+    [[ -n $addr ]] && { focus "$addr"; exit; }
+done

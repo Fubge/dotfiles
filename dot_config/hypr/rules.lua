@@ -84,13 +84,13 @@ for class, size in pairs(v.floating) do
     })
 end
 
--- Discord has its own workspace 5 (chat) and opens there, tiled full size.
--- Title must end in "Discord": the updater splash at login ("Discord Updater")
--- should not pull you over to workspace 5.
+-- Discord has its own workspace 5 (chat) and opens there, tiled full size,
+-- without switching (it starts at login). SUPER+D jumps there (focus-or-run).
+-- Title must end in "Discord": the updater splash stays where it pops up.
 hl.window_rule({
     name = "discord",
     match = { class = "^discord$", title = ".*Discord$" },
-    workspace = "5",
+    workspace = "5 silent",
 })
 
 -- Ignore maximize requests from apps
