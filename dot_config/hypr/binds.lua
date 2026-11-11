@@ -20,7 +20,17 @@ group("Apps")
 bind(mod .. " + Q", run(v.terminal), "Terminal")
 bind(mod .. " + B", run(v.browser), "Browser")
 bind(mod .. " + E", run(v.fileManager), "File manager")
-bind(mod .. " + D", run(v.bin .. "focus-or-run discord discord"), "Discord")
+-- Discord: jump straight to its window (looked up here, no process to start);
+-- without one, focus-or-run starts it and switches once the window is there
+bind(mod .. " + D", function()
+    for _, w in ipairs(hl.get_windows()) do
+        if w.class == "discord" and not w.workspace.special then
+            hl.dispatch(hl.dsp.focus({ window = w }))
+            return
+        end
+    end
+    hl.dispatch(run(v.bin .. "focus-or-run discord discord"))
+end, "Discord")
 bind(mod .. " + space", run(v.menu), "App launcher / web")
 bind(mod .. " + V", run(v.bin .. "rofi-clipboard"), "Clipboard history")
 bind(mod .. " + Return", run(v.bin .. "rofi-websearch"), "Web search")
