@@ -15,6 +15,8 @@ A `bootstrap.sh` for services and system files will follow.
 
 ## Daily use
 
+See [docs/cheatsheet.md](docs/cheatsheet.md) for the full workflow; `dots-check` shows anything untracked.
+
 | Command | Purpose |
 |---|---|
 | `chezmoi edit ~/.config/…` | Edit a file in the source repo |
@@ -29,5 +31,6 @@ A `bootstrap.sh` for services and system files will follow.
 | `packages/` | Package lists per topic (not copied to `~`) |
 | `run_onchange_before_10-install-packages.sh.tmpl` | Installs missing packages |
 | `dot_config/` | Ends up in `~/.config/` |
+| `docs/` | Cheatsheet, manual system changes, rollback guide |
 
 Machine-specific values (monitors, sizes, …) live in variables/templates instead of being hardcoded.

@@ -1,0 +1,56 @@
+#!/usr/bin/env bash
+# dots-check: is everything on this system tracked in the dotfiles repo?
+#   1. explicitly installed packages missing from packages/*.txt (and vice versa)
+#   2. config files changed on the system but not in the repo
+#   3. repo changes that are not committed or not pushed
+set -uo pipefail
+
+src=$(chezmoi source-path)
+bold=$'\e[1m' orange=$'\e[38;5;208m' green=$'\e[32m' reset=$'\e[0m'
+issues=0
+section() { printf '\n%s%s%s\n' "$bold$orange" "$1" "$reset"; }
+ok()      { printf '  %s✓%s %s\n' "$green" "$reset" "$1"; }
+
+# --- 1. Packages ---------------------------------------------------------------
+section "Packages"
+listed=$(sed 's/#.*//; s/[[:space:]]//g; /^$/d' "$src"/packages/*.txt | sort -u)
+installed=$(pacman -Qqe | sort -u)
+
+untracked=$(comm -23 <(echo "$installed") <(echo "$listed"))
+missing=$(comm -13 <(echo "$installed") <(echo "$listed") | while read -r p; do pacman -Qq "$p" &>/dev/null || echo "$p"; done)
+
+if [[ -n $untracked ]]; then
+    echo "  Installed but in no list (add to packages/*.txt or remove):"
+    sed 's/^/    + /' <<<"$untracked"; ((issues++))
+fi
+if [[ -n $missing ]]; then
+    echo "  Listed but not installed (run chezmoi apply):"
+    sed 's/^/    - /' <<<"$missing"; ((issues++))
+fi
+[[ -z $untracked && -z $missing ]] && ok "all packages tracked"
+
+# --- 2. Config files -----------------------------------------------------------
+section "Config files"
+status=$(chezmoi status 2>/dev/null | grep -v '^ R' || true)   # ignore scripts that would run
+if [[ -n $status ]]; then
+    echo "  Differs between repo and system (chezmoi diff shows details):"
+    sed 's/^/    /' <<<"$status"
+    echo "  -> changed in ~/.config?  chezmoi re-add    changed in repo?  chezmoi apply"
+    ((issues++))
+else
+    ok "system matches the repo"
+fi
+
+# --- 3. Git --------------------------------------------------------------------
+section "Git"
+git -C "$src" fetch -q 2>/dev/null
+dirty=$(git -C "$src" status --porcelain)
+ahead=$(git -C "$src" rev-list --count '@{u}..HEAD' 2>/dev/null || echo 0)
+behind=$(git -C "$src" rev-list --count 'HEAD..@{u}' 2>/dev/null || echo 0)
+[[ -n $dirty ]]  && { echo "  Uncommitted changes:"; sed 's/^/    /' <<<"$dirty"; ((issues++)); }
+((ahead > 0))    && { echo "  $ahead commit(s) not pushed (dots, then git push)"; ((issues++)); }
+((behind > 0))   && { echo "  $behind new commit(s) on GitHub (chezmoi update)"; ((issues++)); }
+[[ -z $dirty ]] && ((ahead == 0 && behind == 0)) && ok "committed and in sync with GitHub"
+
+echo
+((issues == 0)) && echo "${green}Everything is tracked.${reset}" || echo "${orange}$issues thing(s) to look at.${reset}"
