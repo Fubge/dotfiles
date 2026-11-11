@@ -1,0 +1,10 @@
+#!/bin/sh
+# Pick the power profile from the power source:
+#   charger connected -> performance, on battery -> power-saver
+# Called by udev (plug/unplug), at boot (power-profile-auto.service) and by GameMode.
+online=0
+for ps in /sys/class/power_supply/*; do
+    [ "$(cat "$ps/type" 2>/dev/null)" = "Mains" ] && [ "$(cat "$ps/online" 2>/dev/null)" = "1" ] && online=1
+done
+if [ "$online" = 1 ]; then profile=performance; else profile=power-saver; fi
+exec powerprofilesctl set "$profile"

@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+# Install files from system/ into / (root-owned, not symlinked).
+# Re-runs when any of them changes:
+{{ range (glob (joinPath .chezmoi.sourceDir "system/**/*")) -}}
+{{ if not (stat .).isDir -}}
+# {{ . | trimPrefix $.chezmoi.sourceDir }}: {{ include . | sha256sum }}
+{{ end -}}
+{{ end -}}
+set -euo pipefail
+src="{{ .chezmoi.sourceDir }}/system"
+
+cd "$src"
+find . -type f | while read -r f; do
+    dest="/${f#./}"
+    mode=0644
+    [[ $dest == */bin/* ]] && mode=0755
+    sudo install -D -m "$mode" -o root -g root "$f" "$dest"
+    echo "system: installed $dest"
+done
+
+sudo udevadm control --reload
+sudo systemctl daemon-reload
+sudo systemctl enable --now power-profile-auto.service

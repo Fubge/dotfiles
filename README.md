@@ -29,6 +29,7 @@ See [docs/cheatsheet.md](docs/cheatsheet.md) for the full workflow; `dots-check`
 | Path | Content |
 |---|---|
 | `packages/` | Package lists per topic (not copied to `~`) |
+| `system/` | Root-owned files installed to `/` by a run_onchange script |
 | `run_onchange_before_10-install-packages.sh.tmpl` | Installs missing packages |
 | `dot_config/` | Ends up in `~/.config/` |
 | `docs/` | Cheatsheet, manual system changes, rollback guide |

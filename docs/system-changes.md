@@ -1,6 +1,14 @@
 # System changes outside of $HOME
 
-Changes made by hand (not managed by chezmoi yet). `bootstrap.sh` will automate these later.
+Files under `system/` in this repo are installed to `/` automatically by
+`run_onchange_after_40-system-files.sh.tmpl` (needs sudo). Everything in the
+table below was changed by hand; `bootstrap.sh` will automate these later.
+
+| Managed file (from `system/`) | Purpose |
+|---|---|
+| `/usr/local/bin/power-profile-auto` | performance on AC, power-saver on battery |
+| `/etc/udev/rules.d/99-power-profile.rules` | runs it when the charger is plugged in/out |
+| `/etc/systemd/system/power-profile-auto.service` | runs it at boot |
 
 | File / unit | Change | Why |
 |---|---|---|
