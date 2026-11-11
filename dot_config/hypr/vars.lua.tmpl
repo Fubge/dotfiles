@@ -14,14 +14,15 @@ M.bin         = os.getenv("HOME") .. "/.local/bin/"
 -- Apps whose window SUPER+X keeps (lowercase window classes) and what it does
 -- instead; SUPER+SHIFT+X really closes them. Spotify: hide its workspace (keeps
 -- playing). Discord: back to the previous workspace, the window stays ready on
--- workspace 5 (a closed Discord window takes long to come back).
+-- workspace 4 (a closed Discord window takes long to come back).
 M.keepAlive   = {
     spotify = hl.dsp.exec_cmd(M.bin .. "music hide"),
     discord = hl.dsp.focus({ workspace = "previous" }),
 }
 
--- Workspaces: 1 desktop (stays empty), 2 browser, 3 Neovim, 4 games
--- (rules.lua), 5 chat (Discord, rules.lua), 6 free. Icons: waybar config
+-- Workspaces: 1 desktop (stays empty), 2 browser, 3 Neovim, 4 chat
+-- (Discord, rules.lua), 5 games (rules.lua), 6 free,
+-- 7 YouTube. Icons: waybar config
 M.startup = {
     { workspace = 2, cmd = M.browser,  class = "vivaldi" },
     { workspace = 3, cmd = M.terminal .. " nvim", class = "kitty" },
@@ -32,7 +33,7 @@ M.hidden = {
     { cmd = "spotify-launcher", class = "spotify", hide = M.bin .. "music hide" },
 }
 M.background = {
-    "discord",                           -- opens on workspace 5 without switching (rules.lua)
+    "discord",                           -- opens on workspace 4 without switching (rules.lua)
     "wl-paste --watch cliphist store",   -- clipboard history
     M.bin .. "game-watch",                -- GameMode + normal Alt key for every game
 }
