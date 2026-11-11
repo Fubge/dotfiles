@@ -105,6 +105,6 @@ case "${1:-pick}" in
         login=$(list_images | grep -vxF "$desk" | grep -vxF "$(readlink "$state/login" 2>/dev/null)" | shuf -n 1)
         [[ -n $login ]] && set_login "$login" quiet
         ;;
-    tick) [[ $(cat "$state/mode" 2>/dev/null) == shuffle ]] && apply "$(random_image)" ;;
+    tick) if [[ $(cat "$state/mode" 2>/dev/null) == shuffle ]]; then apply "$(random_image)"; fi ;;
     *) sed -n '2,11p' "$0"; exit 1 ;;
 esac

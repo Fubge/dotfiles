@@ -84,7 +84,7 @@ tooltip {
 }
 #custom-colon {
     color: @accent;
-    animation: soft-blink 1s ease-in-out infinite alternate;
+    animation: soft-blink 1s steps(6) infinite alternate;
 }
 #clock.date {
     padding: 0 1px 0 12px;
@@ -93,8 +93,10 @@ tooltip {
 #custom-caret {
     color: @accent;
     padding: 0 6px 0 3px;
-    animation: soft-blink 0.9s ease-in-out infinite alternate;
+    animation: soft-blink 0.9s steps(6) infinite alternate;
 }
+/* steps(6), not ease: a smooth infinite animation makes GTK redraw (and
+   Hyprland composite) every frame, ~20% CPU idle; steps redraw 12x a second */
 @keyframes soft-blink {
     from { opacity: 1; }
     to   { opacity: 0.15; }
@@ -124,7 +126,9 @@ tooltip {
     background-size: 3px 4px, 100% 4px;
     background-position: 50% 8px, 50% 8px;
     background-repeat: no-repeat;
-    transition: background-size 45ms linear, background-position 45ms linear;
+    /* no transition: it animates at display rate (120 Hz) on top of the 60 fps
+       updates and costs waybar + Hyprland ~5% each; 60 fps alone looks smooth */
+    transition: none;
 }
 #music label.bar.paused {
     background-image: radial-gradient(circle closest-side, {{ .palette.comment }} 80%, alpha({{ .palette.comment }}, 0));

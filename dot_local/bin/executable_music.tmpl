@@ -8,7 +8,7 @@
   music hide     Spotify's own "Minimize to Tray" (keeps playing; SUPER+X)
   music menu     right click menu: play/pause, next, show, quit (tray stand-in)
 
-Look: a real audio visualizer (cava, at the display's refresh rate). Every bar is its own tiny waybar
+Look: a real audio visualizer (cava, 60 fps). Every bar is its own tiny waybar
 module drawn by CSS (rounded pill, gradient, eased height changes); the script
 only sets a height class l0..l16, so the bars grow from the middle like in the
 Quickshell rices. On pause they shrink to dim dots and the title dims. A new song
@@ -32,17 +32,9 @@ BARS = 6                      # visualizer bars (= custom/music-barN modules)
 LEVELS = 16                   # bar heights l0..l16 (CSS classes in style.css, 1 px steps)
 
 
-def refresh_rate():
-    """Animate as fast as the fastest display refreshes (60 if hyprctl fails)."""
-    try:
-        mons = json.loads(subprocess.run(["hyprctl", "monitors", "-j"], capture_output=True,
-                                         text=True, timeout=2).stdout)
-        return max(30, min(240, round(max(m["refreshRate"] for m in mons))))
-    except Exception:
-        return 60
-
-
-FPS = refresh_rate()          # visualizer frames per second = display refresh rate
+# visualizer frames per second; 120 (display refresh) cost waybar + Hyprland
+# ~15% of a core each, 60 halves that and still looks smooth
+FPS = 60
 # typing speed shared with the other typewriter texts
 sys.path.insert(0, os.path.expanduser("~/.local/lib/flair"))
 from typewriter import TYPE_SPEED  # noqa: E402
