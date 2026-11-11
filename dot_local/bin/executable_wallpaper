@@ -8,7 +8,7 @@
 #   wallpaper random      at every login (wallpaper-random.service, before hyprpaper):
 #                         random desktop image + a different one for the login screen
 # In the menu: Enter = desktop, Shift+Enter = login screen, Ctrl+Enter = both.
-# Images come from ~/Pictures/Wallpapers (incl. subfolders; generated/ = make-wallpapers).
+# Images come from ~/Pictures/Wallpapers (incl. subfolders, e.g. anime/).
 set -uo pipefail
 
 dirs=("$HOME/Pictures/Wallpapers")

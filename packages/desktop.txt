@@ -39,9 +39,8 @@ slurp
 brightnessctl
 playerctl
 
-# Wallpapers: Pillow renders the palette wallpapers (make-wallpapers), ImageMagick thumbnails
+# Wallpapers: ImageMagick makes the menu thumbnails and login screen copies
 imagemagick
-python-pillow
 
 # Fonts
 ttf-jetbrains-mono-nerd
