@@ -84,7 +84,7 @@ Files ending in `.tmpl` are generated from these values.
 
 - **SUPER is the left Alt key** (next to the space bar): left Alt and the Windows key
   are swapped (`altwin:swap_lalt_lwin` in `hypr/vars.lua`), so apps get Alt from the
-  Windows key. While a game runs with `gamemoderun %command%` the swap is undone.
+  Windows key. While a game has focus the swap is undone (see Gaming).
 - **`SUPER+H`** lists every shortcut (built live from the descriptions in `hypr/binds.lua`).
 - The small menus (Wi-Fi `SUPER+N`, Bluetooth `SUPER+SHIFT+B`, audio `SUPER+A`, power
   profile `SUPER+P`, power `SUPER+Escape`) open in the middle of the screen; clicking the
@@ -92,3 +92,17 @@ Files ending in `.tmpl` are generated from these values.
   and share the style in `rofi/menu.rasi`; the search field only appears for long lists.
 - Clicking the brightness icon opens a slider. The slider and the shortcut overview are
   small GTK4 scripts (`brightness-popup`, `keybinds`) styled by `popups/style.css`.
+
+## Gaming
+
+- **Nothing to set up per game.** `game-watch` (started with Hyprland) spots games by
+  how they run, not by name: started by a launcher (Steam, Modrinth App, Lutris,
+  `umu-run`, gamescope, ...), running under Wine/Proton, or Minecraft. It turns on
+  GameMode for them: performance power profile, ends when the game exits
+  (`gamemode-hook`). While a game window has focus, left Alt is a normal Alt key.
+- **`SUPER+G`** marks / unmarks the focused window as a game, for anything not caught.
+- Steam launch option: just `mangohud %command%` (no `gamemoderun`).
+- Minecraft: **Modrinth App** (instances: Vanilla or Fabric + Sodium for more FPS).
+- Other stores (GOG, Epic, Battle.net): **Lutris**; a single `.exe`: `umu-run game.exe`
+  (uses GE-Proton). A new launcher only needs its process name in `LAUNCHERS` in
+  `~/.local/bin/game-watch`.

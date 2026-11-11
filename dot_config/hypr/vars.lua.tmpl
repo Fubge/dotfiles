@@ -23,6 +23,7 @@ M.startup = {
 M.background = {
     "discord --start-minimized",
     "wl-paste --watch cliphist store",   -- clipboard history
+    M.bin .. "game-watch",                -- GameMode + normal Alt key for every game
 }
 
 -- Look -----------------------------------------------------------------------
@@ -73,7 +74,7 @@ M.overlay = {
 -- caps:swapescape       Caps Lock <-> Escape (great for Neovim)
 -- altwin:swap_lalt_lwin  left Alt <-> left Super: the key next to the space bar is
 --                        the Hyprland modifier, apps get Alt from the Windows key.
---                        gamemode-hook drops this swap while a game runs.
+--                        game-watch drops this swap while a game has focus.
 M.keyboard = { layout = "de", options = "caps:swapescape,altwin:swap_lalt_lwin" }
 M.touchpad = "gxtp5400:00-27c6:0f96-touchpad"
 

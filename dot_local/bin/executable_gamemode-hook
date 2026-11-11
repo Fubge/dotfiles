@@ -1,23 +1,14 @@
 #!/usr/bin/env bash
-# Called by GameMode (games started with `gamemoderun %command%`):
-#   - performance power profile while gaming, afterwards the one that fits the power source
-#   - undo the left Alt <-> Super swap (vars.lua) so games get a normal Alt key
-state="${XDG_RUNTIME_DIR:-/tmp}/gamemode-kb-options"
+# Called by GameMode when the first game starts / the last one ends.
+# Games are registered automatically by game-watch (no `gamemoderun` needed);
+# game-watch also gives games a normal Alt key while they have focus.
 case "$1" in
     start)
         powerprofilesctl set performance
-        opts=$(hyprctl getoption input:kb_options -j | jq -r .str)
-        printf '%s' "$opts" > "$state"
-        game_opts=$(tr ',' '\n' <<<"$opts" | grep -vx 'altwin:swap_lalt_lwin' | paste -sd,)
-        hyprctl eval "hl.config({ input = { kb_options = \"$game_opts\" } })" >/dev/null
-        notify-send -a GameMode -i applications-games "GameMode on" "Power profile: performance\nAlt key: normal"
+        notify-send -a GameMode -i applications-games "GameMode on" "Power profile: performance\nAlt key: normal while the game has focus"
         ;;
     end)
         /usr/local/bin/power-profile-auto
-        if [[ -f $state ]]; then
-            hyprctl eval "hl.config({ input = { kb_options = \"$(cat "$state")\" } })" >/dev/null
-            rm -f "$state"
-        fi
         notify-send -a GameMode -i applications-games "GameMode off" "Power profile: $(powerprofilesctl get)"
         ;;
 esac

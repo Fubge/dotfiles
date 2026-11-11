@@ -1,0 +1,225 @@
+#!/usr/bin/env python3
+"""Turns on GameMode for every game window, whatever started it.
+
+    game-watch          daemon (started with Hyprland, see vars.lua M.background)
+    game-watch toggle   mark / unmark the focused window as a game (SUPER+G)
+
+A window is a game when HOW it runs says so, never by its name, so new games
+need no setup:
+  - one of its parent processes is a game launcher (LAUNCHERS)
+  - it runs under Wine / Proton
+  - it is Minecraft (any launcher)
+
+For each game process the daemon asks GameMode to start (`gamemoded -r PID`);
+GameMode ends by itself when that process exits (gamemode-hook switches the
+power profile). While a game window has focus, the left Alt <-> Super swap from
+vars.lua is dropped so the game gets a normal Alt key.
+"""
+import json
+import os
+import socket
+import subprocess
+import sys
+import threading
+
+# Programs that start games. Matched against the name of every parent process
+# (also the script name for Python launchers such as lutris / umu-run).
+LAUNCHERS = {
+    "steam", "reaper", "modrinth-app", "lutris", "umu-run", "gamescope",
+    "heroic", "itch", "prismlauncher", "bottles",
+}
+# Windows of the launchers themselves are never games
+NOT_GAMES = {"steam", "steamwebhelper", "modrinth-app", "lutris", "net.lutris.lutris"}
+INTERPRETERS = {"python", "python3", "env", "sh", "bash"}
+SWAP = "altwin:swap_lalt_lwin"
+
+RUNTIME = os.environ.get("XDG_RUNTIME_DIR", "/tmp")
+FIFO = os.path.join(RUNTIME, "game-watch.fifo")
+
+
+def hyprctl(*args):
+    return subprocess.run(["hyprctl", *args], capture_output=True, text=True).stdout
+
+
+def hypr_json(*args):
+    try:
+        return json.loads(hyprctl(*args, "-j"))
+    except json.JSONDecodeError:
+        return None
+
+
+# Processes -------------------------------------------------------------------
+def proc_names(pid):
+    """Short names a process goes by: comm, argv[0], the script of an interpreter."""
+    names = set()
+    try:
+        with open(f"/proc/{pid}/comm") as f:
+            names.add(f.read().strip().lower())
+        with open(f"/proc/{pid}/cmdline", "rb") as f:
+            argv = [a.decode(errors="replace") for a in f.read().split(b"\0") if a]
+    except OSError:
+        return names, []
+    for i, arg in enumerate(argv[:3]):
+        base = os.path.basename(arg).lower()
+        names.add(base)
+        if base.rstrip("0123456789.") not in INTERPRETERS:
+            break  # only look past interpreters (python3 /usr/bin/lutris)
+    return names, argv
+
+
+def parent(pid):
+    try:
+        with open(f"/proc/{pid}/stat") as f:
+            return int(f.read().rsplit(")", 1)[1].split()[1])
+    except (OSError, IndexError, ValueError):
+        return 0
+
+
+def is_game(pid, wclass):
+    if not pid or pid <= 1 or wclass.lower() in NOT_GAMES:
+        return False
+    if wclass.startswith("steam_app_"):
+        return True
+    names, argv = proc_names(pid)
+    if names & NOT_GAMES:
+        return False
+    try:
+        exe = os.path.basename(os.readlink(f"/proc/{pid}/exe")).lower()
+    except OSError:
+        exe = ""
+    if exe.startswith("wine") or any(n.endswith(".exe") for n in names):
+        return True
+    if "minecraft" in " ".join(argv).lower():
+        return True
+    p = parent(pid)
+    while p > 1:
+        if proc_names(p)[0] & LAUNCHERS:
+            return True
+        p = parent(p)
+    return False
+
+
+# GameMode --------------------------------------------------------------------
+def gamemode_registered(pid):
+    out = subprocess.run(["gamemoded", f"-s{pid}"], capture_output=True, text=True).stdout
+    return "registered" in out
+
+
+def gamemode_toggle(pid):
+    subprocess.run(["gamemoded", f"-r{pid}"], capture_output=True)
+
+
+class Watcher:
+    def __init__(self):
+        self.lock = threading.Lock()
+        self.games = {}    # window address -> pid
+        self.ours = set()  # pids we registered (others came via gamemoderun / Lutris)
+        self.active = ""
+        self.base_opts = ""
+        self.read_base_opts()
+
+    # Keyboard: normal Alt while a game has focus
+    def read_base_opts(self):
+        opt = hypr_json("getoption", "input:kb_options") or {}
+        self.base_opts = opt.get("str", "")
+        self.game_opts = ",".join(o for o in self.base_opts.split(",") if o and o != SWAP)
+
+    def apply_keys(self):
+        want = self.game_opts if self.active in self.games else self.base_opts
+        cur = (hypr_json("getoption", "input:kb_options") or {}).get("str", "")
+        if cur != want:
+            hyprctl("eval", f'hl.config({{ input = {{ kb_options = "{want}" }} }})')
+
+    # Windows
+    def add(self, addr, pid):
+        self.games[addr] = pid
+        if pid not in self.ours and not gamemode_registered(pid):
+            gamemode_toggle(pid)
+            self.ours.add(pid)
+
+    def remove(self, addr):
+        pid = self.games.pop(addr, None)
+        if pid in self.ours and pid not in self.games.values():
+            self.ours.discard(pid)
+            if os.path.exists(f"/proc/{pid}") and gamemode_registered(pid):
+                gamemode_toggle(pid)  # manual "off" while the game keeps running
+
+    def scan(self):
+        for c in hypr_json("clients") or []:
+            if is_game(c.get("pid", 0), c.get("class", "")):
+                self.add(c["address"], c["pid"])
+        act = hypr_json("activewindow") or {}
+        self.active = act.get("address", "")
+        self.apply_keys()
+
+    def on_event(self, name, data):
+        with self.lock:
+            if name == "openwindow":
+                addr = "0x" + data.split(",", 1)[0]
+                for c in hypr_json("clients") or []:
+                    if c["address"] == addr and is_game(c.get("pid", 0), c.get("class", "")):
+                        self.add(addr, c["pid"])
+                self.apply_keys()
+            elif name == "closewindow":
+                self.remove("0x" + data)
+                self.apply_keys()
+            elif name == "activewindowv2":
+                self.active = "0x" + data if data else ""
+                self.apply_keys()
+            elif name == "configreloaded":
+                self.read_base_opts()  # the reload brought the swap back
+                self.apply_keys()
+
+    def toggle(self, addr):
+        with self.lock:
+            if addr in self.games:
+                self.remove(addr)
+                note = "Not a game any more"
+            else:
+                c = next((c for c in hypr_json("clients") or [] if c["address"] == addr), None)
+                if not c:
+                    return
+                self.add(addr, c["pid"])
+                note = f"Game mode for {c.get('class') or 'this window'}"
+            self.apply_keys()
+        subprocess.run(["notify-send", "-a", "GameMode", "-i", "applications-games", note])
+
+    # Loops
+    def listen_fifo(self):
+        if not os.path.exists(FIFO):
+            os.mkfifo(FIFO)
+        while True:
+            with open(FIFO) as f:
+                for line in f:
+                    cmd, _, arg = line.strip().partition(" ")
+                    if cmd == "toggle" and arg:
+                        self.toggle(arg)
+
+    def run(self):
+        threading.Thread(target=self.listen_fifo, daemon=True).start()
+        self.scan()
+        sock_path = os.path.join(RUNTIME, "hypr", os.environ["HYPRLAND_INSTANCE_SIGNATURE"], ".socket2.sock")
+        s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        s.connect(sock_path)
+        buf = b""
+        while chunk := s.recv(4096):
+            buf += chunk
+            *lines, buf = buf.split(b"\n")
+            for line in lines:
+                name, _, data = line.decode(errors="replace").partition(">>")
+                if name in ("openwindow", "closewindow", "activewindowv2", "configreloaded"):
+                    self.on_event(name, data)
+
+
+def main():
+    if sys.argv[1:] == ["toggle"]:
+        act = hypr_json("activewindow") or {}
+        if act.get("address") and os.path.exists(FIFO):
+            with open(FIFO, "w") as f:
+                f.write(f"toggle {act['address']}\n")
+        return
+    Watcher().run()
+
+
+if __name__ == "__main__":
+    main()

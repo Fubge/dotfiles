@@ -35,6 +35,7 @@ bind(mod .. " + N", run(v.bin .. "rofi-wifi"), "Wi-Fi")
 bind(mod .. " + SHIFT + B", run(v.bin .. "rofi-bluetooth"), "Bluetooth")
 bind(mod .. " + A", run(v.bin .. "rofi-volume"), "Audio output / mute")
 bind(mod .. " + O", run(v.bin .. "music show"), "Spotify (show / hide)")
+bind(mod .. " + G", hl.dsp.exec_cmd(v.bin .. "game-watch toggle"), "Game mode for this window")
 group("Session")
 bind(mod .. " + L", hl.dsp.exec_cmd("loginctl lock-session"), "Lock screen")
 bind(mod .. " + M", hl.dsp.exec_cmd("uwsm stop"), "Log out") -- uwsm stops all apps cleanly
