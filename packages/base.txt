@@ -3,6 +3,7 @@ base
 base-devel
 linux
 linux-firmware
+terminus-font
 intel-ucode
 sof-firmware
 mkinitcpio

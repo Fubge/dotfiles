@@ -11,6 +11,7 @@ table below was changed by hand; `bootstrap.sh` will automate these later.
 | `/etc/systemd/system/power-profile-auto.service` | runs it at boot |
 | `/usr/share/sddm/themes/slate/` | login screen theme (`theme.conf` + `background.jpg` generated from the palette) |
 | `/etc/sddm.conf.d/10-theme.conf` | selects the theme, cursor, 2x HiDPI for the greeter |
+| `/etc/vconsole.conf` | keymap + Terminus 32px console font (LUKS prompt, TTYs); changing it rebuilds the UKI |
 
 If the login screen ever breaks: switch to a text console with Ctrl+Alt+F3,
 log in, run `sudo rm /etc/sddm.conf.d/10-theme.conf` and reboot.

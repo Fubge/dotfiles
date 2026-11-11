@@ -1,0 +1,5 @@
+# Hides /usr/share/applications/qv4l2.desktop from the app launcher (tool, not an app)
+[Desktop Entry]
+Type=Application
+Name=qv4l2
+NoDisplay=true

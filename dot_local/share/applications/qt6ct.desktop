@@ -1,0 +1,5 @@
+# Hides /usr/share/applications/qt6ct.desktop from the app launcher (tool, not an app)
+[Desktop Entry]
+Type=Application
+Name=qt6ct
+NoDisplay=true

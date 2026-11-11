@@ -10,6 +10,9 @@ set -euo pipefail
 src="{{ .chezmoi.sourceDir }}/system"
 
 cd "$src"
+# The console font is baked into the UKI, so rebuild it when vconsole.conf changes
+cmp -s etc/vconsole.conf /etc/vconsole.conf && rebuild_uki=false || rebuild_uki=true
+
 find . -type f | while read -r f; do
     dest="/${f#./}"
     mode=0644
@@ -17,6 +20,11 @@ find . -type f | while read -r f; do
     sudo install -D -m "$mode" -o root -g root "$f" "$dest"
     echo "system: installed $dest"
 done
+
+if $rebuild_uki; then
+    echo "system: vconsole.conf changed, rebuilding UKI"
+    sudo mkinitcpio -P
+fi
 
 sudo udevadm control --reload
 sudo systemctl daemon-reload

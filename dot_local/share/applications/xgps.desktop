@@ -1,0 +1,5 @@
+# Hides /usr/share/applications/xgps.desktop from the app launcher (tool, not an app)
+[Desktop Entry]
+Type=Application
+Name=xgps
+NoDisplay=true

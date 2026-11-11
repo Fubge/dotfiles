@@ -78,7 +78,9 @@ Rectangle {
                     selectionColor: config.accent
                     selectedTextColor: config.bg
                     font { family: root.font; pixelSize: 16 }
+                    horizontalAlignment: TextInput.AlignHCenter
                     leftPadding: 16
+                    rightPadding: 16
                     background: Rectangle {
                         radius: root.rounding - 4
                         color: config.bg_alt

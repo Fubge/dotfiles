@@ -79,3 +79,12 @@ hl.window_rule({
     match = { class = "^steam$", title = "^(Friends List|Steam Settings|Steam - News.*)$" },
     float = true,
 })
+
+-- rofi menus: blur the translucent panel and dim the desktop behind it
+hl.layer_rule({
+    name = "rofi",
+    match = { namespace = "^rofi$" },
+    blur = true,
+    ignore_alpha = 0.1,
+    dim_around = true,
+})

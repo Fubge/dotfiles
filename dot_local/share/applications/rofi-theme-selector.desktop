@@ -1,0 +1,5 @@
+# Hides /usr/share/applications/rofi-theme-selector.desktop from the app launcher (tool, not an app)
+[Desktop Entry]
+Type=Application
+Name=rofi-theme-selector
+NoDisplay=true
