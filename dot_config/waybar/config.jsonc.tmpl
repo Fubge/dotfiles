@@ -95,7 +95,7 @@
         "exec": "~/.local/bin/music part icon",
         "return-type": "json",
         "on-click": "~/.local/bin/music show",
-        "on-click-right": "~/.local/bin/music menu",
+        "on-click-right-release": "~/.local/bin/music menu",
         "on-scroll-up": "playerctl -p spotify,%any next",
         "on-scroll-down": "playerctl -p spotify,%any previous"
     },
@@ -104,7 +104,7 @@
         "exec": "~/.local/bin/music part bar{{ $i }}",
         "return-type": "json",
         "on-click": "playerctl -p spotify,%any play-pause",
-        "on-click-right": "~/.local/bin/music menu",
+        "on-click-right-release": "~/.local/bin/music menu",
         "on-scroll-up": "playerctl -p spotify,%any next",
         "on-scroll-down": "playerctl -p spotify,%any previous"
     },
@@ -113,7 +113,7 @@
         "exec": "~/.local/bin/music",
         "return-type": "json",
         "on-click": "playerctl -p spotify,%any play-pause",
-        "on-click-right": "~/.local/bin/music menu",
+        "on-click-right-release": "~/.local/bin/music menu",
         "on-scroll-up": "playerctl -p spotify,%any next",
         "on-scroll-down": "playerctl -p spotify,%any previous"
     },

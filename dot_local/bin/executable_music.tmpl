@@ -53,6 +53,10 @@ COLORS = {
     "caret": "{{ .palette.accent }}",
 }
 ICONS = {"spotify": "\U000F04C7", "default": "\U000F075A"}  # nf-md-spotify / music-note
+# The bar's center block (clock + music) is centered and music is its right end,
+# so the music widget's middle is always half the clock's width right of the
+# screen's middle, however long the title is. Clock = 200 px (measured).
+MENU_AT = 100
 SEP = "   ·   "
 FIELDS = ["status", "player", "artist", "title", "album"]
 FMT = "\x1f".join("{" * 2 + f + "}" * 2  # playerctl format fields
@@ -84,6 +88,20 @@ lock = threading.Lock()
 changed = threading.Event()
 
 
+def store(line):
+    parts = line.rstrip("\n").split("\x1f")
+    with lock:
+        state.update(dict(zip(FIELDS, parts)) if len(parts) == 5 else {f: "" for f in FIELDS})
+    changed.set()
+
+
+def requery():
+    r = subprocess.run(["playerctl", "-p", PLAYERS, "metadata", "--format", FMT],
+                       capture_output=True, text=True)
+    if r.returncode == 0:
+        store(r.stdout)
+
+
 def follow():
     """Keep `state` in sync with playerctl (one line per change)."""
     while True:
@@ -91,11 +109,12 @@ def follow():
             ["playerctl", "-p", PLAYERS, "--follow", "metadata", "--format", FMT],
             stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
         for line in proc.stdout:
-            parts = line.rstrip("\n").split("\x1f")
-            with lock:
-                state.update(dict(zip(FIELDS, parts)) if len(parts) == 5
-                             else {f: "" for f in FIELDS})
-            changed.set()
+            store(line)
+            f = line.rstrip("\n").split("\x1f")
+            if len(f) == 5 and f[0] in ("Playing", "Paused") and not f[3]:
+                # Spotify sometimes announces a new song before its title and
+                # --follow never repeats the line -> ask again a moment later
+                threading.Timer(1.5, requery).start()
         proc.wait()
         time.sleep(2)
 
@@ -161,13 +180,11 @@ class Parts:
 
 
 def part(name):
-    """`exec` of a waybar part module: pass the FIFO through (cat without cat)."""
+    """`exec` of a waybar part module: pass the FIFO through. Hands over to cat:
+    no Python left running per part (an unbuffered Python line loop read byte
+    by byte, one syscall per character at the visualizer's frame rate)."""
     path = fifo(name)
-    while True:
-        with open(path, "rb", buffering=0) as f:
-            for line in f:
-                sys.stdout.buffer.write(line)
-                sys.stdout.flush()
+    os.execvp("sh", ["sh", "-c", 'while :; do cat "$1"; sleep 1; done', "sh", path])
 
 
 def emit(text="", tooltip="", cls=""):
@@ -220,6 +237,14 @@ def marquee(text, pos):
     return gap((1 - frac) * CHAR_W) + body + gap(frac * CHAR_W)
 
 
+def send_bars(parts, tip):
+    """One line per bar whose height class changed (the text is just a
+    placeholder: empty text hides a module, CSS draws the bar)."""
+    lv = levels[:]
+    for i in range(BARS):
+        parts.send(f"bar{i}", NBSP, tip, "bar l" + str(max(0, min(LEVELS, lv[i]))))
+
+
 def watch():
     threading.Thread(target=follow, daemon=True).start()
     cava = Cava()
@@ -230,9 +255,22 @@ def watch():
         for p in PARTS:
             parts.send(p)
 
+    last_s, tip, cls, playing, title = None, "", "", False, ""
     while True:
         with lock:
             s = dict(state)
+        if s == last_s and playing:
+            # only a new cava frame (or the title timer): bars and title, nothing else
+            send_bars(parts, tip)
+            shown, moving = title_text(title, since, True)
+            out = (shown, tip, cls)
+            if out != last_out:
+                emit(*out)
+                last_out = out
+            if changed.wait(1 / FPS):
+                changed.clear()
+            continue
+        last_s = s
         active = s["status"] in ("Playing", "Paused")
         spotify_idle = not active and s["player"] == "spotify" and s["status"]
         if not active:
@@ -242,7 +280,7 @@ def watch():
                 parts.send("icon", span(COLORS["dim"], ICONS["spotify"]),
                            "Spotify\n\n<small>Click show · Right click menu</small>", "idle")
             emit()
-            last_title, last_out = None, None
+            last_title, last_out, playing = None, None, False
             changed.wait()
             changed.clear()
             continue
@@ -261,11 +299,11 @@ def watch():
         cls = "playing" if playing else "paused"
         parts.send("icon", span(COLORS["icon"] if playing else COLORS["dim"],
                                 ICONS.get(s["player"], ICONS["default"])), tip, cls)
-        lv = levels[:]
-        for i in range(BARS):
-            # the text is just a placeholder (empty text hides a module), CSS draws the bar
-            parts.send(f"bar{i}", NBSP, tip,
-                       "bar " + (f"l{max(0, min(LEVELS, lv[i]))}" if playing else "paused"))
+        if playing:
+            send_bars(parts, tip)
+        else:
+            for i in range(BARS):
+                parts.send(f"bar{i}", NBSP, tip, "bar paused")
 
         shown, moving = title_text(title, since, playing)
         if not playing:
@@ -386,10 +424,10 @@ def menu():
             ("\U000F05AF  Show / hide Spotify", show)]
     if subprocess.run(["pgrep", "-x", "spotify"], stdout=subprocess.DEVNULL).returncode == 0:
         rows.append(("\U000F0156  Quit Spotify", quit_spotify))
-    # opened by a right click: rofi closes on a click outside its window, and the
-    # release of that very right click (over the bar) counted as one -> let go first
-    time.sleep(0.25)
-    pick = subprocess.run([os.path.expanduser("~/.local/bin/rofi-menu"), "--bar", "Music", ""],
+    # bound to on-click-right-release: rofi closes on a click outside its window,
+    # so it must only open after the right click (touchpad: two-finger press) is let go
+    pick = subprocess.run([os.path.expanduser("~/.local/bin/rofi-menu"), "--bar",
+                           "--at", str(MENU_AT), "Music", ""],
                           input="\n".join(r[0] for r in rows), capture_output=True, text=True)
     if pick.stdout.strip().isdigit():
         rows[int(pick.stdout.strip())][1]()

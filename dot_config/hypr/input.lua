@@ -11,7 +11,7 @@ hl.config({
             natural_scroll = true,
             scroll_factor = 0.8, -- 1.0 felt a bit too fast
             disable_while_typing = true,
-            clickfinger_behavior = true, -- 2-finger click = right, 3-finger = middle
+            clickfinger_behavior = false, -- click zones like Windows: bottom right = right click (2-finger tap = right still)
         },
     },
 })

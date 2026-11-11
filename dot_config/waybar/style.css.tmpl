@@ -100,30 +100,34 @@ tooltip {
 }
 /* Each bar is a 9 px wide label: a crisp 3 px core (gradient) over a soft
    radial glow. Two background layers instead of box-shadow: the blurred shadow
-   tripled waybar's CPU use, gradients are cheap. */
+   tripled waybar's CPU use, gradients are cheap. The label always has the full
+   20 px; a height class only resizes and moves the background layers, which
+   just repaints (changing margins made GTK lay out the bar on every frame). */
 #music label.bar {
     font-size: 1px;
     color: transparent;
     padding: 0;
-    min-width: 11px;
-    margin: 13px 0;
+    min-width: 9px;
+    margin: 5px 0;
     border-radius: 2px;
     background-image: linear-gradient(to top, @accent 35%, {{ .palette.yellow }}),
-                      radial-gradient(closest-side, alpha(@accent, 0.95), alpha(@accent, 0.45) 55%, alpha(@accent, 0));
-    background-size: 3px 100%, 100% 100%;
-    background-position: center, center;
+                      radial-gradient(closest-side, alpha(@accent, 0.6), alpha(@accent, 0));
+    background-size: 3px 4px, 100% 4px;
+    background-position: 50% 8px, 50% 8px;
     background-repeat: no-repeat;
-    transition: margin 45ms linear;
+    transition: background-size 45ms linear, background-position 45ms linear;
 }
 #music label.bar.paused {
     background-image: radial-gradient(circle closest-side, {{ .palette.comment }} 80%, alpha({{ .palette.comment }}, 0));
-    background-size: 4px 100%;
+    background-size: 4px 4px;
+    background-position: 50% 8px;
 }
-{{- /* heights 4..20 px in the 30 px bar, 1 px steps (GTK margins are whole px,
-       odd remainders go to the top so the bar stays centered within half a px) */}}
+{{- /* heights 4..20 px, 1 px steps; odd remainders go to the top so the bar
+       stays centered within half a px (y = offset inside the 20 px label) */}}
 {{- range $l := until 17 }}
-{{- $m := sub 26 $l }}
-#music label.bar.l{{ $l }} { margin-top: {{ sub $m (div $m 2) }}px; margin-bottom: {{ div $m 2 }}px; }
+{{- $h := add 4 $l }}
+{{- $y := sub (sub (sub 26 $l) (div (sub 26 $l) 2)) 5 }}
+#music label.bar.l{{ $l }} { background-size: 3px {{ $h }}px, 100% {{ $h }}px; background-position: 50% {{ $y }}px, 50% {{ $y }}px; }
 {{- end }}
 
 /* ---------------------------------------------------------------- right */

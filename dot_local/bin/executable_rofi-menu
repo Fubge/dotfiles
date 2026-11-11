@@ -8,11 +8,13 @@
 #     --width PX   menu width (default: fits the longest line, 260-420)
 #     --same-place with --bar: reopen where the last --bar menu was (not under the
 #                  mouse), e.g. when a menu reopens itself after "Scan again"
+#     --at DX      with --bar: center the menu DX logical px right of the screen's
+#                  middle instead of under the mouse (a fixed spot, e.g. the music widget)
 #
 # Prints the index of the chosen line (empty / exit 1 when cancelled).
 set -uo pipefail
 
-bar=false compact=false same=false width=
+bar=false compact=false same=false width= at=
 pos_file=${XDG_RUNTIME_DIR:-/tmp}/rofi-menu-x
 while [[ ${1-} == --* ]]; do
     case $1 in
@@ -20,6 +22,7 @@ while [[ ${1-} == --* ]]; do
         --compact) compact=true ;;
         --width)   width=$2; shift ;;
         --same-place) same=true ;;
+        --at)      at=$2; shift ;;
     esac
     shift
 done
@@ -67,9 +70,13 @@ if $bar; then
     if $same && [[ -s $pos_file ]]; then
         x=$(<"$pos_file")
     else
-        read -r cx _ < <(hyprctl cursorpos | tr -d ,)
         read -r mx mw < <(hyprctl monitors -j |
             jq -r '.[] | select(.focused) | "\(.x) \((.width / .scale) | floor)"')
+        if [[ -n $at ]]; then
+            cx=$((mx + mw / 2 + at))
+        else
+            read -r cx _ < <(hyprctl cursorpos | tr -d ,)
+        fi
         margin=16
         x=$((cx - mx - width / 2))
         ((x < margin))              && x=$margin
