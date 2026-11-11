@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+# focus-or-run CLASS CMD...: jump to the app's window if it has one (instant,
+# switches to its workspace), otherwise start CMD. Starting an app that already
+# runs (e.g. Discord in the tray) only hands over to the running instance, which
+# is slow and does not switch workspaces.
+class=$1; shift
+addr=$(hyprctl clients -j | jq -r --arg c "$class" \
+    '[.[] | select(.class == $c and (.workspace.name | startswith("special:") | not))][0].address // empty')
+if [[ -n $addr ]]; then
+    hyprctl dispatch "hl.dsp.focus({window = \"address:$addr\"})" >/dev/null
+else
+    exec uwsm app -- "$@"
+fi
