@@ -1,52 +1,77 @@
 local v = require("vars")
-local mod = "SUPER"
+local mod = "SUPER" -- the physical left Alt key (Alt and Super are swapped, see vars.lua)
 local run = function(cmd)
     return hl.dsp.exec_cmd(v.launch .. cmd)
 end
+-- bind(keys, action, description[, extra options]): binds with a description show
+-- up in the shortcut overview (SUPER+H, built from `hyprctl binds`), grouped into
+-- cards by the last group() call above them
+local group_name = "Other"
+local function group(name)
+    group_name = name
+end
+local function bind(keys, action, desc, opts)
+    opts = opts or {}
+    opts.description = desc and (group_name .. ": " .. desc) or nil
+    hl.bind(keys, action, opts)
+end
 
--- Apps
-hl.bind(mod .. " + Q", run(v.terminal))
-hl.bind(mod .. " + B", run(v.browser))
-hl.bind(mod .. " + E", run(v.fileManager))
-hl.bind(mod .. " + D", run("discord"))
-hl.bind(mod .. " + space", run(v.menu))
-hl.bind(mod .. " + V", run(v.bin .. "rofi-clipboard"))
-hl.bind(mod .. " + Return", run(v.bin .. "rofi-websearch"))
-hl.bind(mod .. " + Escape", run(v.bin .. "rofi-power"))
-hl.bind(mod .. " + L", hl.dsp.exec_cmd("loginctl lock-session"))
-hl.bind(mod .. " + W", run(v.bin .. "wallpaper pick"))
+group("Apps")
+bind(mod .. " + Q", run(v.terminal), "Terminal")
+bind(mod .. " + B", run(v.browser), "Browser")
+bind(mod .. " + E", run(v.fileManager), "File manager")
+bind(mod .. " + D", run("discord"), "Discord")
+bind(mod .. " + space", run(v.menu), "App launcher / web")
+bind(mod .. " + V", run(v.bin .. "rofi-clipboard"), "Clipboard history")
+bind(mod .. " + Return", run(v.bin .. "rofi-websearch"), "Web search")
+bind(mod .. " + W", run(v.bin .. "wallpaper pick"), "Wallpaper picker")
+bind(mod .. " + H", run(v.bin .. "keybinds"), "This overview")
+
+-- Menus (the same menus open under the mouse when clicked in the bar)
+group("Menus")
+bind(mod .. " + Escape", run(v.bin .. "rofi-power"), "Power menu")
+bind(mod .. " + P", run(v.bin .. "power-profile menu"), "Power profile")
+bind(mod .. " + N", run(v.bin .. "rofi-wifi"), "Wi-Fi")
+bind(mod .. " + SHIFT + B", run(v.bin .. "rofi-bluetooth"), "Bluetooth")
+bind(mod .. " + A", run(v.bin .. "rofi-volume"), "Audio output / mute")
+group("Session")
+bind(mod .. " + L", hl.dsp.exec_cmd("loginctl lock-session"), "Lock screen")
+bind(mod .. " + M", hl.dsp.exec_cmd("uwsm stop"), "Log out") -- uwsm stops all apps cleanly
 
 -- Windows
-hl.bind(mod .. " + X", hl.dsp.window.close())
-hl.bind(mod .. " + F", hl.dsp.window.float({ action = "toggle" }))
-hl.bind(mod .. " + Tab", hl.dsp.window.fullscreen({ mode = "fullscreen" }))
-hl.bind(mod .. " + CTRL + Return", hl.dsp.layout("swapwithmaster master"))
+group("Windows")
+bind(mod .. " + X", hl.dsp.window.close(), "Close window")
+bind(mod .. " + F", hl.dsp.window.float({ action = "toggle" }), "Float / tile window")
+bind(mod .. " + SHIFT + F", hl.dsp.window.fullscreen({ mode = "fullscreen" }), "Fullscreen")
+bind(mod .. " + CTRL + Return", hl.dsp.layout("swapwithmaster master"), "Main window")
 
--- Session (uwsm takes care of stopping all apps cleanly)
-hl.bind(mod .. " + M", hl.dsp.exec_cmd("uwsm stop"))
-
--- Focus and move with arrow keys
-for _, dir in ipairs({ "left", "right", "up", "down" }) do
-    hl.bind(mod .. " + " .. dir, hl.dsp.focus({ direction = dir }))
-    hl.bind(mod .. " + SHIFT + " .. dir, hl.dsp.window.move({ direction = dir }))
+-- Focus and move with arrow keys (only the first gets a description: one
+-- line per group in the overview instead of four)
+for n, dir in ipairs({ "left", "right", "up", "down" }) do
+    local first = n == 1
+    bind(mod .. " + " .. dir, hl.dsp.focus({ direction = dir }), first and "Focus window" or nil)
+    bind(mod .. " + SHIFT + " .. dir, hl.dsp.window.move({ direction = dir }), first and "Move window" or nil)
 end
 
 -- Workspaces 1-10
+group("Workspaces")
 for i = 1, 10 do
     local key = i % 10
-    hl.bind(mod .. " + " .. key, hl.dsp.focus({ workspace = i }))
-    hl.bind(mod .. " + SHIFT + " .. key, hl.dsp.window.move({ workspace = i }))
+    local first = i == 1
+    bind(mod .. " + " .. key, hl.dsp.focus({ workspace = i }), first and "Go to workspace" or nil)
+    bind(mod .. " + SHIFT + " .. key, hl.dsp.window.move({ workspace = i }), first and "Send window" or nil)
 end
-hl.bind(mod .. " + mouse_down", hl.dsp.focus({ workspace = "e+1" }))
-hl.bind(mod .. " + mouse_up", hl.dsp.focus({ workspace = "e-1" }))
+bind(mod .. " + mouse_down", hl.dsp.focus({ workspace = "e+1" }), "Next workspace")
+bind(mod .. " + mouse_up", hl.dsp.focus({ workspace = "e-1" }), "Previous workspace")
 
 -- Mouse: drag to move, right-drag to resize
-hl.bind(mod .. " + mouse:272", hl.dsp.window.drag(), { mouse = true })
-hl.bind(mod .. " + mouse:273", hl.dsp.window.resize(), { mouse = true })
+group("Windows")
+bind(mod .. " + mouse:272", hl.dsp.window.drag(), "Move window", { mouse = true })
+bind(mod .. " + mouse:273", hl.dsp.window.resize(), "Resize window", { mouse = true })
 
 -- "Minimize": SUPER+S sends the window away, or brings it back if it is
 -- already minimized. SUPER+SHIFT+S shows/hides all minimized windows.
-hl.bind(mod .. " + S", function()
+bind(mod .. " + S", function()
     local win = hl.get_active_window()
     if win and win.workspace and win.workspace.special then
         local ws = hl.get_active_workspace()
@@ -55,11 +80,12 @@ hl.bind(mod .. " + S", function()
     elseif win then
         hl.dispatch(hl.dsp.window.move({ workspace = "special:minimized", follow = false }))
     end
-end)
-hl.bind(mod .. " + SHIFT + S", hl.dsp.workspace.toggle_special("minimized"))
+end, "Minimize / restore window")
+bind(mod .. " + SHIFT + S", hl.dsp.workspace.toggle_special("minimized"), "Minimized windows")
 
--- Dropdown terminal: Alt+Tab toggles it, (re)starting it if needed
-hl.bind("ALT + Tab", function()
+group("Apps")
+-- Dropdown terminal: SUPER+Tab (physically Alt+Tab) toggles it, (re)starting it if needed
+bind(mod .. " + Tab", function()
     for _, w in ipairs(hl.get_windows()) do
         if w.class == v.dropdown.class then
             hl.dispatch(hl.dsp.workspace.toggle_special("dropdown"))
@@ -68,13 +94,15 @@ hl.bind("ALT + Tab", function()
     end
     hl.dispatch(hl.dsp.exec_cmd(v.launch .. v.terminal .. " --class " .. v.dropdown.class))
     hl.dispatch(hl.dsp.workspace.toggle_special("dropdown"))
-end)
+end, "Dropdown terminal")
 
+group("Screenshots")
 -- Screenshots: Home = select area -> clipboard, SHIFT+Home = whole screen -> file
-hl.bind("Home", hl.dsp.exec_cmd([[grim -g "$(slurp -d)" - | wl-copy]]))
-hl.bind(
+bind("Home", hl.dsp.exec_cmd([[grim -g "$(slurp -d)" - | wl-copy]]), "Area to clipboard")
+bind(
     "SHIFT + Home",
-    hl.dsp.exec_cmd("mkdir -p " .. v.screenshotDir .. " && grim " .. v.screenshotDir .. "/$(date +%F_%H-%M-%S).png")
+    hl.dsp.exec_cmd("mkdir -p " .. v.screenshotDir .. " && grim " .. v.screenshotDir .. "/$(date +%F_%H-%M-%S).png"),
+    "Screen to file"
 )
 
 -- Media and brightness keys (work on the lock screen too)
@@ -83,8 +111,8 @@ hl.bind("XF86AudioRaiseVolume", hl.dsp.exec_cmd("wpctl set-volume -l 1 @DEFAULT_
 hl.bind("XF86AudioLowerVolume", hl.dsp.exec_cmd("wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%-"), held)
 hl.bind("XF86AudioMute", hl.dsp.exec_cmd("wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle"), { locked = true })
 hl.bind("XF86AudioMicMute", hl.dsp.exec_cmd("wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle"), { locked = true })
-hl.bind("XF86MonBrightnessUp", hl.dsp.exec_cmd("brightnessctl -e4 -n2 set 5%+"), held)
-hl.bind("XF86MonBrightnessDown", hl.dsp.exec_cmd("brightnessctl -e4 -n2 set 5%-"), held)
+hl.bind("XF86MonBrightnessUp", hl.dsp.exec_cmd("brightnessctl -e2 -n1 set 5%+"), held)
+hl.bind("XF86MonBrightnessDown", hl.dsp.exec_cmd("brightnessctl -e2 -n1 set 5%-"), held)
 hl.bind("XF86AudioPlay", hl.dsp.exec_cmd("playerctl play-pause"), { locked = true })
 hl.bind("XF86AudioPause", hl.dsp.exec_cmd("playerctl play-pause"), { locked = true })
 hl.bind("XF86AudioNext", hl.dsp.exec_cmd("playerctl next"), { locked = true })

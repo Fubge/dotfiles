@@ -8,6 +8,9 @@ configuration {
     display-run:        "Run";
     display-window:     "Windows";
     font:               "{{ .design.font }} 12";
+    /* one click picks a row (default: click selects, double click accepts) */
+    me-select-entry:    "";
+    me-accept-entry:    "MousePrimary";
 }
 
 * {
@@ -54,7 +57,7 @@ entry {
     border-radius:     8px;
     horizontal-align:  0.5;
     cursor:            text;
-    placeholder:       "App or web search...";
+    placeholder:       "Filter...";
     placeholder-color: {{ .palette.fg_muted }};
 }
 

@@ -11,20 +11,39 @@ hl.window_rule({
     stay_focused = true,
 })
 
--- Bar popups (volume mixer, Wi-Fi/Bluetooth terminals)
-for _, class in ipairs(v.popup.classes) do
+-- Bar popups (volume mixer, brightness slider, terminals): centered under the click
+local function escape(class)
+    return "^" .. (class:gsub("%.", "\\.")) .. "$"
+end
+for class, size in pairs(v.popup.classes) do
     hl.window_rule({
         name = "popup-" .. class,
-        match = { class = "^" .. (class:gsub("%.", "\\.")) .. "$" },
+        match = { class = escape(class) },
         float = true,
         pin = true,
-        size = v.popup.size,
-        move = v.popup.move,
+        size = size,
+        move = { "cursor_x-" .. size[1] // 2, tostring(v.popup.top) },
+    })
+end
+
+-- Overlays: same size and spot as the rofi overlays (horizontally centered)
+for _, class in ipairs(v.overlays) do
+    hl.window_rule({
+        name = "overlay-" .. class,
+        match = { class = escape(class) },
+        float = true,
+        pin = true,
+        size = v.overlay.size,
+        move = { "monitor_w*0.5-" .. v.overlay.size[1] // 2, tostring(v.overlay.top) },
+        rounding = v.overlay.rounding,
     })
 end
 
 local function is_popup(win)
-    for _, class in ipairs(v.popup.classes) do
+    if v.popup.classes[win.class] then
+        return true
+    end
+    for _, class in ipairs(v.overlays) do
         if win.class == class then
             return true
         end

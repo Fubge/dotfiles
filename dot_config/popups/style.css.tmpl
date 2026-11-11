@@ -1,0 +1,124 @@
+/* Shared look of the small GTK popups (brightness slider, shortcut overview).
+   Colors and fonts come from .chezmoidata/{palette,design}.toml. Hyprland draws
+   the rounded corners, the orange border and the blur behind the window. */
+
+window.popup {
+    background-color: alpha({{ .palette.bg }}, 0.94);
+    color: {{ .palette.fg }};
+    font-family: "{{ .design.font_ui }}";
+    font-size: 11pt;
+}
+
+.title {
+    color: {{ .palette.accent }};
+    font-weight: 700;
+    font-size: 12pt;
+}
+.muted { color: {{ .palette.comment }}; }
+
+/* ---------------------------------------------------------------- menu look */
+/* Popups that sit next to the rofi menus (brightness) copy rofi/menu.rasi:
+   same font, padding, centered accent title, row height */
+window.popup.menu {
+    background-color: alpha({{ .palette.bg }}, 0.9);
+    font-family: "{{ .design.font }}";
+    font-size: 12pt;
+}
+.menu-box { padding: 12px; }
+.menu-title {
+    color: {{ .palette.accent }};
+    margin-top: 2px;
+}
+
+/* ---------------------------------------------------------------- slider */
+.slider-row { padding: 9px 14px; }
+.slider-icon {
+    color: {{ .palette.accent }};
+    min-width: 20px;
+}
+.slider-value { min-width: 40px; }
+scale { padding: 0; }
+scale trough {
+    min-height: 4px;
+    border-radius: 99px;
+    background-color: alpha({{ .palette.steel }}, 0.45);
+}
+scale highlight {
+    border-radius: 99px;
+    background-color: {{ .palette.accent }};
+}
+scale slider {
+    min-width: 14px;
+    min-height: 14px;
+    margin: -5px;
+    border-radius: 99px;
+    background-color: {{ .palette.fg }};
+    box-shadow: none;
+}
+
+/* ---------------------------------------------------------------- shortcuts */
+/* Frame of the big overlays, copied from rofi/overlay.rasi */
+window.popup.overlay { background-color: alpha({{ .palette.bg }}, 0.9); }
+.overview { padding: 28px 24px 18px 24px; }
+.search-pill {
+    min-width: 420px;
+    padding: 12px 18px;
+    border-radius: 999px;
+    border: 1px solid alpha({{ .palette.steel }}, 0.6);
+    background-color: {{ .palette.bg_alt }};
+}
+.lens {
+    font-family: "{{ .design.font }}";
+    font-size: 14pt;
+    color: {{ .palette.comment }};
+}
+.lens.mirror { color: transparent; }
+entry.search {
+    min-height: 0;
+    padding: 0;
+    border: none;
+    box-shadow: none;
+    outline: none;
+    background: none;
+    color: {{ .palette.fg }};
+    font-size: 13pt;
+}
+entry.search placeholder,
+entry.search text placeholder { color: {{ .palette.comment }}; }
+.hint {
+    color: {{ .palette.comment }};
+    font-size: 9pt;
+}
+
+.card {
+    padding: 14px 16px;
+    border-radius: 12px;
+    background-color: alpha({{ .palette.bg_alt }}, 0.75);
+}
+.card-title {
+    color: {{ .palette.accent }};
+    font-weight: 700;
+    font-size: 9pt;
+    letter-spacing: 1px;
+    margin-bottom: 6px;
+}
+.row { padding: 3px 0; }
+.overview .card { font-size: 10pt; }
+.desc { color: {{ .palette.fg_muted }}; }
+
+/* Keycaps */
+.key {
+    font-family: "{{ .design.font }}";
+    font-size: 9pt;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 6px;
+    background-color: alpha({{ .palette.steel }}, 0.55);
+    color: {{ .palette.fg }};
+    box-shadow: inset 0 -2px alpha(black, 0.25);
+}
+.key.mod {
+    background-color: alpha({{ .palette.accent }}, 0.18);
+    color: {{ .palette.accent }};
+}
+.plus { color: {{ .palette.comment }}; font-size: 9pt; }

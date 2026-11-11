@@ -53,13 +53,13 @@ pick() {
             name=$(basename "${img%.*}")
             printf '%s\0icon\x1f%s\n' "$name" "$(thumbnail "$img")"
         done
-    } | rofi -dmenu -i -show-icons -format i -p "Wallpaper" -theme-str '
-        window   { width: 78%; }
-        listview { columns: 4; lines: 3; flow: horizontal; spacing: 10px; }
-        element  { orientation: vertical; padding: 8px; spacing: 6px; }
-        element-icon { size: 170px; }
-        entry    { placeholder: "Filter by name..."; }
-        element-text { horizontal-align: 0.5; }
+    } | rofi -dmenu -i -show-icons -format i -p "Wallpaper" -theme overlay -theme-str '
+        entry    { placeholder: "Filter wallpapers..."; }
+        listview { columns: 4; lines: 3; flow: horizontal; fixed-columns: true; spacing: 6px; }
+        element  { orientation: vertical; padding: 10px 8px 8px 8px; spacing: 6px; }
+        element-icon { size: 140px; horizontal-align: 0.5; }
+        element-text { font: @font-ui; horizontal-align: 0.5; }
+        textbox-hint { str: "Enter  set wallpaper      ·      Esc  close"; }
     ' | {
         read -r idx || exit 0
         if [[ $idx == 0 ]]; then

@@ -1,0 +1,147 @@
+#!/usr/bin/env python3
+"""Shortcut overview (SUPER+H).
+
+Built live from `hyprctl binds -j`: every bind with a description in
+hypr/binds.lua shows up, grouped by the "Group: text" prefix of its description,
+so this never goes stale. Typing filters; Escape closes.
+Look: ~/.config/popups/style.css (shared with the other popups).
+"""
+import json
+import subprocess
+import sys
+from pathlib import Path
+
+import gi
+
+gi.require_version("Gtk", "4.0")
+gi.require_version("Gdk", "4.0")
+from gi.repository import Gdk, Gtk, Pango  # noqa: E402
+
+CSS = Path.home() / ".config/popups/style.css"
+# Hyprland modmask bits, in the order they are shown
+MODS = [(64, "SUPER"), (4, "CTRL"), (8, "ALT"), (1, "SHIFT")]
+KEY_NAMES = {
+    "mouse:272": "Drag", "mouse:273": "Right drag",
+    "mouse_down": "Wheel ↓", "mouse_up": "Wheel ↑",
+    "space": "Space", "Return": "Enter", "Escape": "Esc",
+    # arrows and workspaces: only the first bind of each set has a description
+    "left": "← ↑ → ↓", "1": "1 … 0",
+}
+
+
+def load_binds():
+    """-> {group: [(keys, text), ...]} in the order of binds.lua"""
+    out = subprocess.run(["hyprctl", "binds", "-j"], capture_output=True, text=True).stdout
+    groups = {}
+    for b in json.loads(out or "[]"):
+        if not b.get("has_description"):
+            continue
+        group, _, text = b["description"].partition(": ")
+        if not text:
+            group, text = "Other", group
+        keys = [name for bit, name in MODS if b["modmask"] & bit]
+        keys.append(KEY_NAMES.get(b["key"], b["key"].upper() if len(b["key"]) == 1 else b["key"]))
+        groups.setdefault(group, []).append((keys, text))
+    return groups
+
+
+def keycaps(keys):
+    box = Gtk.Box(spacing=4, valign=Gtk.Align.CENTER)
+    for i, key in enumerate(keys):
+        if i:
+            box.append(Gtk.Label(label="+", css_classes=["plus"]))
+        classes = ["key", "mod"] if key in ("SUPER", "CTRL", "ALT", "SHIFT") else ["key"]
+        box.append(Gtk.Label(label=key, css_classes=classes))
+    return box
+
+
+class Overview(Gtk.ApplicationWindow):
+    def __init__(self, app):
+        super().__init__(application=app, title="Shortcuts")
+        self.add_css_class("popup")
+        self.add_css_class("overlay")
+        self.set_decorated(False)
+
+        # Same frame as the rofi overlays (rofi/overlay.rasi): centered search
+        # pill on top, content, key hints at the bottom. Size: Hyprland rule.
+        root = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=22, css_classes=["overview"])
+
+        # lens + entry + invisible lens, so the text is truly centered
+        pill = Gtk.Box(spacing=10, halign=Gtk.Align.CENTER, css_classes=["search-pill"])
+        pill.append(Gtk.Label(label="\U000F0349", css_classes=["lens"]))
+        self.search = Gtk.Entry(placeholder_text="Filter shortcuts...", hexpand=True,
+                                xalign=0.5, css_classes=["search"])
+        self.search.connect("changed", self.on_filter)
+        pill.append(self.search)
+        pill.append(Gtk.Label(label="\U000F0349", css_classes=["lens", "mirror"]))
+        root.append(pill)
+
+        # Cards in three columns
+        # (equal columns that share the fixed overlay width; long texts get "...")
+        self.flow = Gtk.FlowBox(selection_mode=Gtk.SelectionMode.NONE, homogeneous=True,
+                                column_spacing=14, row_spacing=14, max_children_per_line=3,
+                                min_children_per_line=3, valign=Gtk.Align.START)
+        self.rows = []    # (row widget, card child, search text)
+        self.cards = []
+        for group, binds in load_binds().items():
+            card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2, css_classes=["card"])
+            card.append(Gtk.Label(label=group.upper(), css_classes=["card-title"], xalign=0))
+            child = Gtk.FlowBoxChild(child=card, valign=Gtk.Align.START)
+            for keys, text in binds:
+                row = Gtk.Box(spacing=14, css_classes=["row"])
+                row.append(Gtk.Label(label=text, css_classes=["desc"], xalign=0, hexpand=True,
+                                     ellipsize=Pango.EllipsizeMode.END, tooltip_text=text))
+                row.append(keycaps(keys))
+                card.append(row)
+                self.rows.append((row, child, f"{group} {text} {' '.join(keys)}".lower()))
+            self.flow.append(child)
+            self.cards.append(child)
+
+        scroll = Gtk.ScrolledWindow(child=self.flow, vexpand=True,
+                                    hscrollbar_policy=Gtk.PolicyType.NEVER)
+        root.append(scroll)
+        root.append(Gtk.Label(label="SUPER = Alt key next to the space bar      ·      Esc  close",
+                              css_classes=["hint"]))
+        self.set_child(root)
+
+        keys = Gtk.EventControllerKey(propagation_phase=Gtk.PropagationPhase.CAPTURE)
+        keys.connect("key-pressed", self.on_key)
+        self.add_controller(keys)
+
+    def on_filter(self, entry):
+        query = entry.get_text().lower().split()
+        visible = set()
+        for row, child, text in self.rows:
+            show = all(word in text for word in query)
+            row.set_visible(show)
+            if show:
+                visible.add(child)
+        for child in self.cards:
+            child.set_visible(child in visible)
+
+    def on_key(self, _ctrl, keyval, _code, _state):
+        if keyval == Gdk.KEY_Escape:
+            self.close()
+            return True
+        return False
+
+
+def main():
+    app = Gtk.Application(application_id="popup.keybinds")
+
+    def activate(app):
+        provider = Gtk.CssProvider()
+        provider.load_from_path(str(CSS))
+        Gtk.StyleContext.add_provider_for_display(
+            Gdk.Display.get_default(), provider, Gtk.STYLE_PROVIDER_PRIORITY_USER
+        )
+        win = Overview(app)
+        win.present()
+        win.search.grab_focus()
+
+    app.connect("activate", activate)
+    return app.run([])
+
+
+if __name__ == "__main__":
+    sys.exit(main())

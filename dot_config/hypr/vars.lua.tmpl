@@ -39,15 +39,31 @@ M.dropdown = {
     move  = { "monitor_w*0.2", "monitor_h*0.05" },
 }
 
--- Popups opened from the bar: float under the mouse, close when focus leaves
+-- Popups opened from the bar: float under the mouse, just below the bar, and
+-- close when focus leaves. Size per window class.
 M.popup = {
-    classes = { "org.pulseaudio.pavucontrol", "popup-term" },
-    size    = { 460, 520 },
-    move    = { "cursor_x-230", "48" },   -- centered under the click, below the bar
+    classes = {
+        ["org.pulseaudio.pavucontrol"] = { 460, 520 },
+        ["popup-term"]                 = { 460, 520 },
+        ["popup.brightness"]           = { 260, 90 },   -- = narrowest rofi menu
+    },
+    top = 38,   -- bar margin (8) + bar height (22) + gap (8), same as the rofi menus
+}
+-- Centered overlays that also close when focus leaves (shortcut overview).
+-- Same frame as the rofi overlays (launcher, wallpapers, clipboard): design.toml
+M.overlays = { "popup.keybinds" }
+M.overlay = {
+    size     = { {{ .design.overlay_width }}, {{ .design.overlay_height }} },
+    top      = {{ .design.overlay_top }},
+    rounding = {{ mul .design.rounding 2 }},
 }
 
 -- Input ----------------------------------------------------------------------
-M.keyboard = { layout = "de", options = "caps:swapescape" }
+-- caps:swapescape       Caps Lock <-> Escape (great for Neovim)
+-- altwin:swap_lalt_lwin  left Alt <-> left Super: the key next to the space bar is
+--                        the Hyprland modifier, apps get Alt from the Windows key.
+--                        gamemode-hook drops this swap while a game runs.
+M.keyboard = { layout = "de", options = "caps:swapescape,altwin:swap_lalt_lwin" }
 M.touchpad = "gxtp5400:00-27c6:0f96-touchpad"
 
 -- Screenshots ----------------------------------------------------------------

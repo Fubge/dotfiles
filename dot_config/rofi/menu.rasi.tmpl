@@ -1,0 +1,62 @@
+/* Small list menus (Wi-Fi, Bluetooth, audio, power, power profile).
+   Used through ~/.local/bin/rofi-menu, which also positions them: centered when
+   opened by a shortcut, under the mouse when clicked in the bar.
+   Everything is centered: title, search field, rows.
+   Builds on config.rasi (colors, base look). */
+@import "config.rasi"
+
+* {
+    hint: {{ .palette.comment }};
+}
+
+window {
+    width:   340px;
+    padding: 12px;
+}
+
+mainbox {
+    spacing: 8px;
+}
+
+/* Header: small accent title, search field below it (rofi-menu hides the field
+   for short lists) */
+inputbar {
+    orientation: vertical;
+    children:    [ prompt-row, entry ];
+    spacing:     8px;
+}
+prompt {
+    text-color: @accent;
+    padding:    2px 0 0 0;
+}
+entry {
+    horizontal-align:  0.5;
+    padding:           9px 14px;
+    border-radius:     8px;
+    background-color:  {{ .palette.steel }}73;
+    placeholder-color: @hint;
+}
+
+listview {
+    lines:        10;           /* at most; shorter lists shrink the menu */
+    fixed-height: false;
+    spacing:      2px;
+    margin:       0;
+}
+
+element {
+    padding:  9px 14px;
+    children: [ element-text ];   /* no icon slot: it would push the text off-center */
+}
+element-text {
+    horizontal-align: 0.5;
+}
+
+/* Rows marked with -a (connected network/device, current profile, default output) */
+element normal.active, element alternate.active {
+    text-color: @accent;
+}
+element selected.active {
+    background-color: @bg-alt;
+    text-color:       @accent;
+}

@@ -1,0 +1,98 @@
+/* Shared frame of the big centered overlays: app launcher (launcher.rasi),
+   wallpaper picker, clipboard, web search. The shortcut overview (GTK, keybinds)
+   copies it in popups/style.css. Size and position: .chezmoidata/design.toml.
+   Builds on config.rasi (colors, base look). */
+@import "config.rasi"
+
+* {
+    surface:  {{ .palette.steel }}59;  /* selected item: steel, ~35% */
+    hint:     {{ .palette.comment }};
+    font-ui:  "{{ .design.font_ui }} 11";
+}
+
+window {
+    location:         north;
+    anchor:           north;
+    /* rofi counts y from below the bar (8 px margin + 22 px bar) */
+    y-offset:         {{ sub .design.overlay_top 30 }}px;
+    width:            {{ .design.overlay_width }}px;
+    height:           {{ .design.overlay_height }}px;
+    padding:          28px 24px 18px 24px;
+    border-radius:    {{ mul .design.rounding 2 }}px;
+}
+
+mainbox {
+    children: [ inputbar, listview, textbox-hint ];
+    spacing:  22px;
+}
+
+/* ---------------------------------------------------------------- search */
+/* The pill is centered between two spacers; the lens icon on the left is
+   mirrored by an invisible one on the right so the text stays truly centered */
+inputbar {
+    orientation: horizontal;
+    children:    [ dummy, box-search, dummy ];
+}
+
+box-search {
+    orientation:      horizontal;
+    expand:           false;
+    width:            420px;
+    padding:          12px 18px;
+    spacing:          10px;
+    background-color: {{ .palette.bg_alt }};
+    border:           1px;
+    border-color:     {{ .palette.steel }}99;
+    border-radius:    999px;
+    children:         [ textbox-lens, entry, textbox-lens-mirror ];
+}
+
+textbox-lens, textbox-lens-mirror {
+    expand:     false;
+    str:        "󰍉";  /* nf-md-magnify */
+    font:       "{{ .design.font }} 14";
+    text-color: @hint;
+    vertical-align: 0.5;
+}
+textbox-lens-mirror { text-color: transparent; }
+
+entry {
+    font:              "{{ .design.font_ui }} 13";
+    padding:           0;
+    background-color:  transparent;
+    border-radius:     0;
+    horizontal-align:  0.5;
+    vertical-align:    0.5;
+    placeholder:       "Filter...";
+    placeholder-color: @hint;
+}
+
+/* ---------------------------------------------------------------- list */
+listview {
+    lines:     10;
+    spacing:   4px;
+    margin:    0;
+    scrollbar: false;
+}
+
+element {
+    padding:       10px 14px;
+    spacing:       12px;
+    border-radius: {{ .design.rounding }}px;
+}
+
+element selected.normal, element selected.active, element selected.urgent {
+    background-color: @surface;
+    text-color:       @accent;
+}
+
+element-text { vertical-align: 0.5; }
+
+/* ---------------------------------------------------------------- footer */
+textbox-hint {
+    expand:           false;
+    str:              "Enter  select      ·      Esc  close";
+    font:             "{{ .design.font_ui }} 9";
+    text-color:       @hint;
+    horizontal-align: 0.5;
+}

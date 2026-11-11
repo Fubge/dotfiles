@@ -1,16 +1,19 @@
 #!/usr/bin/env bash
-# Power menu: lock, logout, suspend, reboot, shutdown
-choice=$(printf '%s\n' "󰌾  Lock" "󰍃  Logout" "󰤄  Suspend" "󰜉  Reboot" "󰐥  Shutdown" \
-    | rofi -dmenu -i -no-custom -p "Power" -theme-str '
-        window   { width: 220px; padding: 8px; }
-        mainbox  { children: [ listview ]; }
-        listview { lines: 5; margin: 0; }
-        element  { padding: 10px 14px; }
-    ')
-case "$choice" in
-    *Lock)     loginctl lock-session ;;
-    *Logout)   uwsm stop ;;
-    *Suspend)  systemctl suspend ;;
-    *Reboot)   systemctl reboot ;;
-    *Shutdown) systemctl poweroff ;;
+# Power menu (SUPER+Escape, or bar click with --bar): lock, logout, suspend, reboot, shutdown
+set -uo pipefail
+menu() { "$HOME/.local/bin/rofi-menu" "$@"; }
+
+bar=(); [[ ${1-} == --bar ]] && bar=(--bar)
+
+actions=(lock logout suspend reboot shutdown)
+labels=($'\U000F033E  Lock' $'\U000F0343  Logout' $'\U000F0904  Suspend' $'\U000F0709  Reboot' $'\U000F0425  Shutdown')
+
+idx=$(printf '%s\n' "${labels[@]}" | menu "${bar[@]}" --compact "Power" "") || exit 0
+[[ -z $idx ]] && exit 0
+case ${actions[idx]-} in
+    lock)     loginctl lock-session ;;
+    logout)   uwsm stop ;;
+    suspend)  systemctl suspend ;;
+    reboot)   systemctl reboot ;;
+    shutdown) systemctl poweroff ;;
 esac

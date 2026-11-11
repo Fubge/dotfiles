@@ -1,0 +1,85 @@
+#!/usr/bin/env bash
+# rofi-menu: shared rofi list for all small menus (style: ~/.config/rofi/menu.rasi).
+#
+#   rofi-menu [options] TITLE PLACEHOLDER [extra rofi args...] < lines
+#     --bar        open under the mouse, just below the bar (used by bar clicks);
+#                  without it the menu opens in the middle of the screen
+#     --compact    never show the search field (it only appears for lists > 7 rows anyway)
+#     --width PX   menu width (default: fits the longest line, 260-420)
+#     --same-place with --bar: reopen where the last --bar menu was (not under the
+#                  mouse), e.g. when a menu reopens itself after "Scan again"
+#
+# Prints the index of the chosen line (empty / exit 1 when cancelled).
+set -uo pipefail
+
+bar=false compact=false same=false width=
+pos_file=${XDG_RUNTIME_DIR:-/tmp}/rofi-menu-x
+while [[ ${1-} == --* ]]; do
+    case $1 in
+        --bar)     bar=true ;;
+        --compact) compact=true ;;
+        --width)   width=$2; shift ;;
+        --same-place) same=true ;;
+    esac
+    shift
+done
+title=$1 hint=$2
+shift 2
+
+lines=$(cat)
+
+# Only one menu at a time (rofi refuses to start a second one). A click on another
+# bar icon closes the open menu and opens this one; on the same icon it just closes.
+state=${XDG_RUNTIME_DIR:-/tmp}/rofi-menu-open
+if pgrep -x rofi >/dev/null; then
+    prev=$(cat "$state" 2>/dev/null)
+    pkill -x rofi
+    for _ in {1..50}; do pgrep -x rofi >/dev/null || break; sleep 0.02; done
+    [[ $prev == "$title" ]] && exit 1
+fi
+"$HOME/.local/bin/popup" --close popup.brightness   # GTK slider popup
+echo "$title" >"$state"
+(($(wc -l <<<"$lines") <= 7)) && compact=true
+
+# Rows are centered; padding them to the same length (monospace font) turns them
+# into one centered block with the icons in a straight column
+longest=0
+while IFS= read -r line; do ((${#line} > longest)) && longest=${#line}; done <<<"$lines"
+# (no-break spaces: plain trailing spaces are dropped when the text is centered)
+nbsp=$'\u00a0'
+lines=$(while IFS= read -r line; do
+    pad=$((longest - ${#line}))
+    printf '%s' "$line"; for ((k = 0; k < pad; k++)); do printf '%s' "$nbsp"; done; echo
+done <<<"$lines")
+# ~10 px per character + window/row padding + room for the wide icon glyph
+[[ -z $width ]] && width=$((longest * 10 + 90))
+((width < 260)) && width=260
+((width > 420)) && width=420
+
+theme="window { width: ${width}px; } entry { placeholder: \"$hint\"; }"
+# Without the search field typing still filters, the title stays as the header
+$compact && theme+=" inputbar { children: [ prompt-row ]; }"
+
+if $bar; then
+    # rofi places itself below the bar already (layer-shell exclusive zone) and
+    # ignores "anchor": x-offset is the left edge, centered under the cursor and
+    # kept on screen. All values are logical pixels.
+    if $same && [[ -s $pos_file ]]; then
+        x=$(<"$pos_file")
+    else
+        read -r cx _ < <(hyprctl cursorpos | tr -d ,)
+        read -r mx mw < <(hyprctl monitors -j |
+            jq -r '.[] | select(.focused) | "\(.x) \((.width / .scale) | floor)"')
+        margin=16
+        x=$((cx - mx - width / 2))
+        ((x < margin))              && x=$margin
+        ((x > mw - width - margin)) && x=$((mw - width - margin))
+        echo "$x" >"$pos_file"
+    fi
+    theme+=" window { location: north west; x-offset: ${x}px; y-offset: 8px; }"
+fi
+
+rofi -dmenu -i -no-custom -format i -p "$title" -theme menu -theme-str "$theme" "$@" <<<"$lines"
+rc=$?
+[[ $(cat "$state" 2>/dev/null) == "$title" ]] && rm -f "$state"
+exit $rc

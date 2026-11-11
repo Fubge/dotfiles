@@ -1,51 +1,76 @@
 #!/usr/bin/env bash
-# Wi-Fi menu: pick a network to connect, or toggle Wi-Fi on/off.
+# Wi-Fi menu (SUPER+N, or bar click with --bar): opens instantly with the
+# networks NetworkManager already knows and triggers a fresh scan in the
+# background for next time. Pick a network to connect, the connected one to disconnect.
+# "Scan again" keeps a "Scanning..." menu in the same spot until the fresh list is in.
+#   rofi-wifi [--bar] [--same-place] [--rescan]
 set -uo pipefail
+menu() { "$HOME/.local/bin/rofi-menu" "$@"; }
 
-# rofi_menu PROMPT -> prints the index of the chosen line
-rofi_menu() {
-    rofi -dmenu -i -no-custom -format i -p "$1" -theme-str 'window { width: 420px; } listview { lines: 10; }'
-}
+bar=() rescan=no
+for arg; do
+    case $arg in
+        --bar)        bar+=(--bar) ;;
+        --same-place) bar+=(--same-place) ;;
+        --rescan) rescan=yes ;;
+    esac
+done
+
+# Nerd Font icons (written as escapes: editors tend to drop these glyphs)
+i_on=$'\U000F05A9' i_off=$'\U000F05AA' i_scan=$'\U000F0450'
+# signal strength 1-4, plain (open network) and with a lock (secured): one icon
+# per row keeps the rows aligned
+i_sig=($'\U000F091F' $'\U000F0922' $'\U000F0925' $'\U000F0928')
+i_sig_lock=($'\U000F0921' $'\U000F0924' $'\U000F0927' $'\U000F092A')
 
 if [[ $(nmcli -t -f WIFI general) == "disabled" ]]; then
-    idx=$(printf '%s\n' "󰖩  Turn Wi-Fi on" | rofi_menu "Wi-Fi") || exit 0
-    nmcli radio wifi on && notify-send "Wi-Fi" "Turned on"
+    menu "${bar[@]}" --compact "Wi-Fi" "" <<<"$i_on  Turn Wi-Fi on" >/dev/null || exit 0
+    nmcli radio wifi on && notify-send -t 2000 "Wi-Fi" "Turned on"
     exit 0
 fi
 
-notify-send -t 1500 "Wi-Fi" "Scanning..."
-ssids=() secured=() labels=()
+# Fresh scan only on request or if NetworkManager has no list yet (Wi-Fi just turned on)
+[[ -z $(nmcli -t -f SSID device wifi list --rescan no) ]] && rescan=yes
+[[ $rescan == no ]] && { nmcli device wifi rescan >/dev/null 2>&1 & }
+
+ssids=() secured=() labels=() active=""
 # IN-USE:SIGNAL:SECURITY:SSID, strongest first, each SSID once
 while IFS=: read -r inuse signal security ssid; do
     [[ -z $ssid ]] && continue
     [[ " ${ssids[*]-} " == *" $ssid "* ]] && continue
-    if   ((signal >= 75)); then icon="󰤨"
-    elif ((signal >= 50)); then icon="󰤥"
-    elif ((signal >= 25)); then icon="󰤢"
-    else                        icon="󰤟"; fi
-    lock="   "; [[ -n $security && $security != "--" ]] && lock="󰌾  "
-    mark="";    [[ $inuse == "*" ]] && mark="  (connected)"
-    ssids+=("$ssid"); secured+=("${lock// /}")
-    labels+=("$icon  $lock$ssid$mark")
-done < <(nmcli -t -f IN-USE,SIGNAL,SECURITY,SSID device wifi list --rescan yes)
+    lock=""; [[ -n $security && $security != "--" ]] && lock=yes
+    [[ $inuse == "*" ]] && active=${#ssids[@]}
+    ssids+=("$ssid"); secured+=("$lock")
+    if [[ -n $lock ]]; then icon=${i_sig_lock[signal / 26]}; else icon=${i_sig[signal / 26]}; fi
+    labels+=("$icon  $ssid")
+done < <(nmcli -t -f IN-USE,SIGNAL,SECURITY,SSID device wifi list --rescan "$rescan")
 
-labels+=("󰖪  Turn Wi-Fi off")
-idx=$(printf '%s\n' "${labels[@]}" | rofi_menu "Wi-Fi") || exit 0
+n=${#ssids[@]}
+labels+=("$i_scan  Scan again" "$i_off  Turn Wi-Fi off")
+idx=$(printf '%s\n' "${labels[@]}" | menu "${bar[@]}" "Wi-Fi" "Filter networks..." ${active:+-a "$active"}) || exit 0
 [[ -z $idx ]] && exit 0
 
-if ((idx == ${#ssids[@]})); then
-    nmcli radio wifi off && notify-send "Wi-Fi" "Turned off"
-    exit 0
+if ((idx == n)); then
+    menu "${bar[@]}" --same-place --compact "Wi-Fi" "" <<<"$i_scan  Scanning..." >/dev/null &
+    placeholder=$!
+    nmcli -t device wifi list --rescan yes >/dev/null 2>&1
+    pkill -x rofi; wait "$placeholder"
+    exec "$0" "${bar[@]}" --same-place
+elif ((idx == n + 1)); then
+    nmcli radio wifi off && notify-send -t 2000 "Wi-Fi" "Turned off"; exit 0
 fi
 
 ssid=${ssids[idx]}
-if nmcli -t -f NAME connection show | grep -Fxq "$ssid"; then
-    nmcli connection up id "$ssid" && notify-send "Wi-Fi" "Connected to $ssid"
+if [[ $idx == "$active" ]]; then
+    nmcli connection down id "$ssid" >/dev/null && notify-send -t 2000 "Wi-Fi" "Disconnected from $ssid"
+elif nmcli -t -f NAME connection show | grep -Fxq "$ssid"; then
+    nmcli connection up id "$ssid" >/dev/null && notify-send -t 2000 "Wi-Fi" "Connected to $ssid"
 elif [[ -n ${secured[idx]} ]]; then
-    pass=$(rofi -dmenu -password -p "Password" -theme-str 'window { width: 420px; } listview { lines: 0; }') || exit 0
-    nmcli device wifi connect "$ssid" password "$pass" \
-        && notify-send "Wi-Fi" "Connected to $ssid" \
+    pass=$(rofi -dmenu -password -p "Password" -theme menu -theme-str "
+        listview { lines: 0; } entry { placeholder: \"Password for $ssid\"; }") || exit 0
+    nmcli device wifi connect "$ssid" password "$pass" >/dev/null \
+        && notify-send -t 2000 "Wi-Fi" "Connected to $ssid" \
         || notify-send -u critical "Wi-Fi" "Could not connect to $ssid"
 else
-    nmcli device wifi connect "$ssid" && notify-send "Wi-Fi" "Connected to $ssid"
+    nmcli device wifi connect "$ssid" >/dev/null && notify-send -t 2000 "Wi-Fi" "Connected to $ssid"
 fi
