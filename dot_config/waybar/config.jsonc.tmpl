@@ -10,7 +10,7 @@
     "spacing": 0,
 
     "modules-left":   ["hyprland/workspaces", "hyprland/window"],
-    "modules-center": ["custom/clockface", "clock", "mpris"],
+    "modules-center": ["custom/clockface", "clock", "custom/caret", "mpris"],
     "modules-right":  ["group/hardware", "group/system", "group/connect", "custom/power"],
 
     // ---------------------------------------------------------------- groups
@@ -68,8 +68,10 @@
         "interval": 30
     },
     "clock": {
-        // Bold time, quieter date next to it; click hides the date
-        "format": "<b>{0:%H:%M}</b>  <span alpha='60%'>{0:%a %d. %b}</span>",
+        // Terminal look: bold time, the date as a code comment, then a
+        // blinking caret (custom/caret). Click hides the date
+        "locale": "{{ .locale.clock }}",
+        "format": "<b>{0:%H:%M}</b>  <span color='{{ .palette.comment }}'>// {0:L%a %d. %b}</span>",
         "format-alt": "<b>{0:%H:%M}</b>",
         "tooltip-format": "<tt><small>{calendar}</small></tt>",
         "calendar": {
@@ -82,6 +84,11 @@
                 "today":    "<span color='{{ .palette.accent }}'><b><u>{}</u></b></span>"
             }
         }
+    },
+    // Blinking block caret after the clock (blink lives in style.css)
+    "custom/caret": {
+        "format": "\u258d",
+        "tooltip": false
     },
     // Current song (hidden when nothing plays). Click = play/pause, scroll = skip
     "mpris": {

@@ -69,7 +69,17 @@ window#waybar.empty #window { padding: 0; }
 #custom-clockface.evening { color: @accent; }
 #custom-clockface.night   { color: {{ .palette.cyan_bright }}; }
 #clock {
-    padding: 0 18px 0 8px;
+    padding: 0 2px 0 8px;
+}
+/* Soft blinking caret, like a terminal waiting for input */
+@keyframes caret-blink {
+    from { opacity: 1; }
+    to   { opacity: 0.1; }
+}
+#custom-caret {
+    color: @accent;
+    padding: 0 16px 0 2px;
+    animation: caret-blink 0.9s ease-in-out infinite alternate;
 }
 #mpris {
     padding: 0 16px 0 10px;

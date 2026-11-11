@@ -67,6 +67,7 @@ All apps read the same two files:
 
 - `.chezmoidata/palette.toml` - every color (accent, backgrounds, text, ...)
 - `.chezmoidata/design.toml` - rounding, border width, gaps, fonts
+- `.chezmoidata/locale.toml` - language of the dates in the bar (default German)
 
 Edit them (`dots`, then `nvim .chezmoidata/palette.toml`), run `chezmoi apply`,
 then reload: `hyprctl reload`, `systemctl --user restart waybar`, restart kitty/apps.
