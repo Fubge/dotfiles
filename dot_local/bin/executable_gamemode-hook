@@ -5,7 +5,7 @@
 case "$1" in
     start)
         powerprofilesctl set performance
-        notify-send -a GameMode -i applications-games "GameMode on" "Power profile: performance\nAlt key: normal while the game has focus"
+        notify-send -a GameMode -i applications-games "GameMode on" "Power profile: performance"
         ;;
     end)
         /usr/local/bin/power-profile-auto
