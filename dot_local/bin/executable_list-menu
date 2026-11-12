@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
-# list-menu: shared list for all small menus (Wi-Fi, Bluetooth, power, power
-# profile, Claude, music). Shown by a resident GTK window
+# list-menu: shared list for the small right click menus (Claude, music). Shown by a resident GTK window
 # (~/.local/bin/list-menu-popup, style: ~/.config/popups/style.css) that waits
 # hidden in the background, so it opens at once (rofi took ~0.2 s).
 #
@@ -9,6 +8,7 @@
 #                  without it the menu opens in the middle of the screen
 #     --compact    never show the search field (it only appears for lists > 7 rows anyway)
 #     --width PX   menu width (default: fits the longest line, 260-420)
+#     --info TEXT  a muted line under the title (the song playing, ...)
 #     --same-place with --bar: reopen where the last --bar menu was (not under the
 #                  mouse), e.g. when a menu reopens itself after "Scan again"
 #     --at DX      with --bar: center the menu DX logical px right of the screen's
@@ -16,6 +16,9 @@
 #     -a N         highlight row N (connected network, current profile...)
 #     -selected-row N   start with row N selected
 #   list-menu --close   close the open menu
+#
+# A line "ICON  text" (Nerd Font glyph, two spaces) shows its icon in an
+# accent column, like the rows of the Bluetooth / Wi-Fi popups.
 #
 # Prints the index of the chosen line (empty / exit 1 when cancelled). A click on
 # another bar icon replaces the open menu, on the same icon it just closes it.
@@ -32,7 +35,7 @@ if [[ ${1-} == --close ]]; then
     exit 0
 fi
 
-bar=0 compact=0 same=0 width= at= active= selected=
+bar=0 compact=0 same=0 width= at= active= selected= info=
 while [[ ${1-} == --* ]]; do
     case $1 in
         --bar)        bar=1 ;;
@@ -40,6 +43,7 @@ while [[ ${1-} == --* ]]; do
         --width)      width=$2; shift ;;
         --same-place) same=1 ;;
         --at)         at=$2; shift ;;
+        --info)       info=${2//[$'\t\n']/ }; shift ;;
     esac
     shift
 done
@@ -63,6 +67,7 @@ req=$run/list-menu.$$
 trap 'rm -f "$req.req" "$req.reply"' EXIT
 mkfifo "$req.reply"
 {
+    [[ -n $info ]] && title+=$'\t'$info
     printf '%s\n%s\n' "$title" "$hint"
     echo "compact=$compact width=$width bar=$bar same=$same at=$at active=$active selected=$selected"
     cat

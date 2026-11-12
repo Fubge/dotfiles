@@ -43,7 +43,7 @@
             "1": "\uf303",
             "2": "\uf269",
             "3": "\uf36f",
-            "4": "\uf166",
+            "4": "\uf16a",
             "5": "\udb81\ude6f",
             "6": "\udb80\udea0",
             "7": "\udb82\udfaf",
@@ -164,13 +164,14 @@
         "tooltip-format-activated": "Staying awake",
         "tooltip-format-deactivated": "Idle as usual"
     },
-    // Click opens a small menu with the three profiles (script: ~/.local/bin/power-profile)
+    // Icon from ~/.local/bin/power-profile; click opens the power popup (battery,
+    // the three profiles: ~/.local/bin/power-popup)
     "custom/power-profile": {
         "exec": "~/.local/bin/power-profile status",
         "return-type": "json",
         "interval": 5,
         "signal": 8,
-        "on-click": "~/.local/bin/power-profile menu --bar"
+        "on-click": "~/.local/bin/power-popup toggle"
     },
     // Perceived brightness (same numbers as the slider and the brightness keys);
     // the built-in backlight module would show the raw value. Script: ~/.local/bin/brightness
@@ -189,7 +190,8 @@
     // with a click when plugging in and drifts away when unplugging
     "custom/battery": {
         "exec": "~/.local/bin/battery",
-        "return-type": "json"
+        "return-type": "json",
+        "on-click": "~/.local/bin/power-popup toggle"
     },
 
     // ---------------------------------------------------------------- connect
@@ -212,7 +214,7 @@
         "format-disconnected": "\udb82\udd2e",
         "tooltip-format-wifi": "{essid} ({signalStrength}%)\n{ipaddr}\n\udb80\udc45 {bandwidthDownBytes}   \udb80\udc5d {bandwidthUpBytes}",
         "tooltip-format-ethernet": "{ifname}\n{ipaddr}",
-        "on-click": "~/.local/bin/rofi-wifi --bar",
+        "on-click": "~/.local/bin/wifi-popup toggle",
         "on-click-right": "~/.local/bin/popup popup-term kitty --class popup-term nmtui",
         "interval": 5
     },
@@ -245,6 +247,6 @@
     "custom/power": {
         "format": "\udb81\udc25",
         "tooltip": false,
-        "on-click": "~/.local/bin/rofi-power --bar"
+        "on-click": "~/.local/bin/session-popup toggle --center"
     }
 }

@@ -1,0 +1,240 @@
+#!/usr/bin/env python3
+"""Session popup (power button at the right end of the bar, SUPER+Escape):
+lock, suspend, log out, reboot, shut down, in the middle of the screen.
+
+    session-popup toggle [--center]  show it, or hide it when open
+    session-popup --hidden           login autostart: waits hidden, opens instantly
+    session-popup quit               stop it (it reloads on the next click)
+
+Resident like the other popups (~/.local/lib/popup/resident.py), always
+centered. A little playful: the greeting types itself like the one on the
+lock screen (~/.local/bin/lock-greeting), the five round buttons pop in one
+after the other, wiggle under the mouse and a line below says what the one
+in focus does. Log out, Reboot and Shut down ask first: the button turns red
+and pulses, a second click (or key) within CONFIRM_SECONDS does it.
+
+Keys: L lock, S suspend, E log out, R reboot, P shut down (twice for the
+last three), Left / Right / Tab move, Enter picks, Escape closes.
+"""
+import os
+import subprocess
+import sys
+import time
+
+sys.path.insert(0, os.path.expanduser("~/.local/lib/popup"))
+import resident  # noqa: E402
+
+APP = "popup.session"
+WIDTH = 500
+CSS = os.path.expanduser("~/.config/popups/style.css")
+CONFIRM_SECONDS = 4
+TYPE_MS = 59          # per character, as lock-greeting and the bar flair
+BLINK_MS = 530        # caret
+CARET = "{{ .palette.accent }}"
+
+# key, letter, icon, label, caption, command, asks first
+ACTIONS = [
+    ("lock", "l", "\U000F033E", "Lock", "back in a sec", ["loginctl", "lock-session"], False),
+    ("suspend", "s", "\U000F0904", "Suspend", "nap time", ["systemctl", "suspend"], False),
+    ("logout", "e", "\U000F0343", "Log out", "see you soon", ["uwsm", "stop"], True),
+    ("reboot", "r", "\U000F0709", "Reboot", "fresh start", ["systemctl", "reboot"], True),
+    ("shutdown", "p", "\U000F0425", "Shut down", "lights out", ["systemctl", "poweroff"], True),
+]
+
+
+def greeting():
+    """Same words as the lock screen (~/.local/bin/lock-greeting)."""
+    hour = time.localtime().tm_hour
+    hello = ("gute nacht" if hour < 5 else "guten morgen" if hour < 11 else
+             "guten tag" if hour < 18 else "guten abend" if hour < 22 else "gute nacht")
+    return f"{hello}, {os.environ.get('USER', '')}"
+
+
+def uptime():
+    try:
+        seconds = float(open("/proc/uptime").read().split()[0])
+    except (OSError, ValueError, IndexError):
+        return ""
+    d, rest = divmod(int(seconds) // 60, 24 * 60)
+    h, m = divmod(rest, 60)
+    parts = ([f"{d} d"] if d else []) + ([f"{h} h"] if h or d else []) + [f"{m} min"]
+    return "up " + " ".join(parts)
+
+
+def build():
+    import gi
+
+    gi.require_version("Gtk", "4.0")
+    gi.require_version("Gdk", "4.0")
+    from gi.repository import Gdk, GLib, Gtk
+
+    class Popup(Gtk.Window):
+        popup_width = WIDTH       # resident.place(center=True) on every show
+
+        def __init__(self):
+            super().__init__(title="Session")
+            for c in ("popup", "menu", "session"):
+                self.add_css_class(c)
+            self.set_decorated(False)
+            self.set_default_size(WIDTH, 1)
+            self.confirm = None
+            self.confirm_timer = None
+            self.type_timer = None
+            self.text = ""
+            self.typed = 0
+            self.started = 0
+
+            box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4,
+                          css_classes=["session-box"])
+            self.hello = Gtk.Label(css_classes=["session-hello"], use_markup=True)
+            self.up = Gtk.Label(css_classes=["session-up"])
+            box.append(self.hello)
+            box.append(self.up)
+
+            row = Gtk.Box(spacing=18, halign=Gtk.Align.CENTER, css_classes=["session-row"])
+            self.buttons = {}
+            for key, letter, icon, label, _cap, _cmd, _ask in ACTIONS:
+                b = Gtk.Button(css_classes=["session-button", "flat"])
+                inner = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+                circle = Gtk.Label(label=icon, css_classes=["session-circle"],
+                                   halign=Gtk.Align.CENTER)
+                name = Gtk.Label(label=label, css_classes=["session-label"])
+                cap = Gtk.Label(label=letter.upper(), css_classes=["key", "session-key"],
+                                halign=Gtk.Align.CENTER)
+                for w in (circle, name, cap):
+                    inner.append(w)
+                b.set_child(inner)
+                b.key = key
+                b.name_label = name
+                b.connect("clicked", lambda _b, k=key: self.pick(k))
+                focus = Gtk.EventControllerFocus()
+                focus.connect("enter", lambda _c, k=key: self.caption(k))
+                b.add_controller(focus)
+                hover = Gtk.EventControllerMotion()
+                hover.connect("enter", lambda _c, _x, _y, b=b: b.grab_focus())
+                b.add_controller(hover)
+                self.buttons[key] = b
+                row.append(b)
+            box.append(row)
+            self.caption_label = Gtk.Label(css_classes=["session-caption"])
+            box.append(self.caption_label)
+            self.set_child(box)
+
+            keys = Gtk.EventControllerKey()
+            keys.set_propagation_phase(Gtk.PropagationPhase.CAPTURE)
+            keys.connect("key-pressed", self.on_key)
+            self.add_controller(keys)
+            self.connect("notify::visible", self.on_visible)
+
+        # ------------------------------------------------------------ actions
+        def pick(self, key):
+            _k, _l, _i, _label, _c, cmd, ask = self.action(key)
+            if ask and self.confirm != key:
+                self.set_confirm(key)              # first click only asks
+                return
+            self.set_confirm(None)
+            self.close()
+            # let the window go first (suspend / lock would freeze it on screen)
+            GLib.timeout_add(120, lambda: subprocess.Popen(cmd, start_new_session=True)
+                             and False)
+
+        @staticmethod
+        def action(key):
+            return next(a for a in ACTIONS if a[0] == key)
+
+        def set_confirm(self, key):
+            if self.confirm_timer:
+                GLib.source_remove(self.confirm_timer)
+                self.confirm_timer = None
+            self.confirm = key
+            for k, b in self.buttons.items():
+                label = self.action(k)[3]
+                b.name_label.set_text("Sure?" if k == key else label)
+                (b.add_css_class if k == key else b.remove_css_class)("confirm")
+            if key:
+                self.confirm_timer = GLib.timeout_add_seconds(
+                    CONFIRM_SECONDS, lambda: self.set_confirm(None) or False)
+                self.caption_label.set_text(f"click again to {self.action(key)[3].lower()}")
+            elif (f := self.get_focus()) is not None and getattr(f, "key", None):
+                self.caption(f.key)
+            return False
+
+        def caption(self, key):
+            if self.confirm == key:
+                return
+            self.caption_label.set_text(self.action(key)[4])
+
+        # ------------------------------------------------------------ greeting
+        def tick(self):
+            """Type the greeting, then blink the caret (lock screen look)."""
+            elapsed = (GLib.get_monotonic_time() - self.started) // 1000
+            typed = min(len(self.text), max(0, (elapsed - 150) // TYPE_MS))
+            done = typed == len(self.text)
+            caret = not done or (elapsed // BLINK_MS) % 2 == 0
+            esc = GLib.markup_escape_text
+            self.hello.set_markup(
+                esc(self.text[:typed])
+                + f'<span alpha="{100 if caret else 1}%" foreground="{CARET}">▍</span>'
+                + f'<span alpha="1%">{esc(self.text[typed:])}</span>')   # no shifting
+            return True
+
+        # ------------------------------------------------------------ window
+        def on_visible(self, *_a):
+            if not self.get_visible():
+                self.set_confirm(None)
+                if self.type_timer:
+                    GLib.source_remove(self.type_timer)
+                    self.type_timer = None
+
+        def show_up(self):
+            self.text = greeting()
+            self.up.set_text(uptime())
+            self.started = GLib.get_monotonic_time()
+            self.tick()
+            if self.type_timer is None:
+                self.type_timer = GLib.timeout_add(40, self.tick)
+            # restart the pop-in animation: drop the class, add it once shown
+            for b in self.buttons.values():
+                b.remove_css_class("enter")
+            GLib.timeout_add(30, lambda: [b.add_css_class("enter")
+                                          for b in self.buttons.values()] and False)
+            self.set_default_size(WIDTH, 1)
+            self.present()
+            self.buttons["lock"].grab_focus()
+            self.caption("lock")
+
+        def on_key(self, _ctrl, keyval, _code, state):
+            if keyval == Gdk.KEY_Escape:
+                if self.confirm:
+                    self.set_confirm(None)
+                else:
+                    self.close()
+                return True
+            if keyval in (Gdk.KEY_Left, Gdk.KEY_Right):
+                keys = [a[0] for a in ACTIONS]
+                f = self.get_focus()
+                i = keys.index(f.key) if getattr(f, "key", None) in keys else 0
+                step = 1 if keyval == Gdk.KEY_Right else -1
+                self.buttons[keys[(i + step) % len(keys)]].grab_focus()
+                return True
+            if state & (Gdk.ModifierType.CONTROL_MASK | Gdk.ModifierType.ALT_MASK
+                        | Gdk.ModifierType.SUPER_MASK):
+                return False
+            ch = chr(Gdk.keyval_to_unicode(keyval) or 0).lower()
+            for key, letter, *_rest in ACTIONS:
+                if ch == letter:
+                    self.buttons[key].grab_focus()
+                    self.pick(key)
+                    return True
+            return False
+
+    provider = Gtk.CssProvider()
+    provider.load_from_path(CSS)
+    Gtk.StyleContext.add_provider_for_display(
+        Gdk.Display.get_default(), provider, Gtk.STYLE_PROVIDER_PRIORITY_USER)
+    win = Popup()
+    return win
+
+
+if __name__ == "__main__":
+    resident.main(APP, build, __doc__)

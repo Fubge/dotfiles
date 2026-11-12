@@ -420,8 +420,12 @@ def menu():
         rows.append(("\U000F0156  Quit Spotify", quit_spotify))
     # bound to on-click-right-release: the menu closes when focus leaves it,
     # so it must only open after the right click (touchpad: two-finger press) is let go
+    meta = subprocess.run(["playerctl", "-p", PLAYERS, "metadata", "--format",
+                           "\x1f".join("{" * 2 + f + "}" * 2 for f in ("title", "artist"))],
+                          capture_output=True, text=True).stdout.strip()
+    song = "  ·  ".join(x for x in meta.split("\x1f") if x)     # title · artist
     pick = subprocess.run([os.path.expanduser("~/.local/bin/list-menu"), "--bar",
-                           "--at", str(MENU_AT), "Music", ""],
+                           "--at", str(MENU_AT), "--info", song, "Music", ""],
                           input="\n".join(r[0] for r in rows), capture_output=True, text=True)
     if pick.stdout.strip().isdigit():
         rows[int(pick.stdout.strip())][1]()

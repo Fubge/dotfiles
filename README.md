@@ -71,9 +71,10 @@ greets you with a fresh pair.
 
 ### Menus that are just *there*
 
-Sound with per-app volume, Bluetooth pairing, Wi-Fi, power profiles and the
-power menu. Small GTK4 popups that wait in the background, so they open with
-no delay at all.
+Sound with per-app volume, Bluetooth pairing, Wi-Fi with the password typed
+right in the list, battery + power profile, a playful centered session menu.
+Small GTK4 popups that follow the system live and wait in the background, so
+they open with no delay at all.
 
 </td>
 </tr>
@@ -160,11 +161,11 @@ walks through a full LUKS + btrfs + UKI setup.
 | `SUPER+W` | Wallpapers | `SUPER+Tab` | Dropdown terminal |
 | `SUPER+V` | Clipboard history | `SUPER+B` | Browser |
 | `SUPER+A` | Sound | `SUPER+SHIFT+B` | Bluetooth |
-| `SUPER+N` | Wi-Fi | `SUPER+P` | Power profile |
+| `SUPER+N` | Wi-Fi | `SUPER+P` | Power (profile, battery) |
 | `SUPER+X` | Close (hides Spotify) | `SUPER+S` | Minimize / restore |
 | `SUPER+F` | Float / tile | `SUPER+SHIFT+F` | Fullscreen |
 | `SUPER+1..0` | Workspace | `SUPER+SHIFT+1..0` | Send window |
-| `SUPER+L` | Lock | `SUPER+Escape` | Power menu |
+| `SUPER+L` | Lock | `SUPER+Escape` | Session (lock, reboot, off) |
 | `Home` | Area screenshot to clipboard | `SUPER+G` | Mark window as game |
 
 ## Make it yours

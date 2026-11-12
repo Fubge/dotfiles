@@ -1,19 +1,20 @@
 #!/usr/bin/env python3
-"""List menu server: the GTK window behind ~/.local/bin/list-menu (Wi-Fi,
-Bluetooth, power, power profile, Claude and music menus).
+"""List menu server: the GTK window behind ~/.local/bin/list-menu (the Claude
+and music menus; Wi-Fi, Bluetooth, sound and power have their own popups).
 
     list-menu-popup --hidden   login autostart: waits hidden (hypr/vars.lua)
     list-menu-popup quit       stop it (list-menu starts a new one)
 
 Resident like the brightness slider (~/.local/lib/popup/resident.py): rofi
 needed ~90 ms to start plus ~100 ms of script around it, a hidden GTK window
-shows up at once. Same look as the rofi menus it replaces (popups/style.css).
+shows up at once. Rows look like the ones in the Bluetooth and Wi-Fi popups
+(popups/style.css): a row "ICON  text" gets its icon in an accent column.
 
 Requests come over the FIFO $XDG_RUNTIME_DIR/popup.menu.fifo, one line per
 request: the client's PID. The request itself is the file
 $XDG_RUNTIME_DIR/list-menu.PID.req:
 
-    TITLE
+    TITLE, optionally TAB and an info line shown under it (song, state...)
     PLACEHOLDER (search field hint)
     key=value options: compact width bar same at active selected
     rows...
@@ -61,6 +62,8 @@ def build():
             box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8,
                           css_classes=["menu-box"])
             self.title_label = Gtk.Label(css_classes=["menu-title"])
+            self.info_label = Gtk.Label(css_classes=["menu-info"],
+                                        ellipsize=Pango.EllipsizeMode.END)
             self.entry = Gtk.Entry(css_classes=["menu-search"], xalign=0.5)
             self.entry.connect("changed", lambda e: self.set_query(e.get_text()))
             self.list = Gtk.ListBox(css_classes=["menu-list"])
@@ -69,10 +72,9 @@ def build():
             self.list.connect("row-activated", lambda _l, row: self.answer(row.index))
             self.scroll = Gtk.ScrolledWindow(child=self.list)
             self.scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
-            for w in (self.title_label, self.entry, self.scroll):
+            for w in (self.title_label, self.info_label, self.entry, self.scroll):
                 box.append(w)
             self.set_child(box)
-            self.sizes = Gtk.SizeGroup(mode=Gtk.SizeGroupMode.HORIZONTAL)
 
             hover = Gtk.EventControllerMotion()
             hover.connect("motion", self.on_motion)
@@ -94,12 +96,13 @@ def build():
             opts = dict(o.split("=", 1) for o in opts.split() if "=" in o)
             while rows and rows[-1] == "":
                 rows.pop()
+            title, _, info = title.partition("\t")
             if self.get_visible():
                 same = self.req and self.req["title"] == title
                 self.close()                      # cancels the open menu
                 if same:
                     return self.reply(client, "")
-            self.req = dict(title=title, hint=hint, rows=rows, **opts)
+            self.req = dict(title=title, info=info, hint=hint, rows=rows, **opts)
             self.client = client
             self.bring_up()
 
@@ -139,6 +142,8 @@ def build():
                 resident.place(APP, width, center=True)
 
             self.title_label.set_text(req["title"])
+            self.info_label.set_text(req["info"])
+            self.info_label.set_visible(bool(req["info"]))
             searchable = req.get("compact") != "1" and len(rows) >= SEARCH_FROM
             self.entry.set_visible(searchable)
             self.entry.set_placeholder_text(req["hint"])
@@ -146,14 +151,10 @@ def build():
             self.entry.set_text("")
 
             self.list.remove_all()
-            self.sizes = Gtk.SizeGroup(mode=Gtk.SizeGroupMode.HORIZONTAL)
             active = {int(a) for a in req.get("active", "").split(",") if a.isdigit()}
             for i, text in enumerate(rows):
-                # one width for all labels, centered: the icons line up in a column
-                label = Gtk.Label(label=text, xalign=0, halign=Gtk.Align.CENTER,
-                                  ellipsize=Pango.EllipsizeMode.END)
-                self.sizes.add_widget(label)
-                row = Gtk.ListBoxRow(child=label, css_classes=["active"] if i in active else [])
+                row = Gtk.ListBoxRow(child=self.row_child(text),
+                                     css_classes=["active"] if i in active else [])
                 row.index = i
                 row.text = text.lower()
                 self.list.append(row)
@@ -166,6 +167,7 @@ def build():
             self.scroll.set_min_content_height(height)
             self.scroll.set_max_content_height(height)
             self.scroll.get_vadjustment().set_value(0)
+            self.scroll.set_size_request(width - 24, -1)   # rows ellipsize: hold the width
             self.set_default_size(width, 1)
 
             sel = req.get("selected", "")
@@ -176,6 +178,20 @@ def build():
                 self.entry.grab_focus()
 
         # ------------------------------------------------------------ rows
+        @staticmethod
+        def row_child(text):
+            """"ICON  text" (a Nerd Font glyph first): icon in its own accent column."""
+            icon, sep, rest = text.partition("  ")
+            label = Gtk.Label(xalign=0, hexpand=True, ellipsize=Pango.EllipsizeMode.END)
+            if sep and len(icon) == 1 and ord(icon) >= 0xE000:
+                box = Gtk.Box(spacing=12)
+                box.append(Gtk.Label(label=icon, css_classes=["row-icon"]))
+                label.set_text(rest)
+                box.append(label)
+                return box
+            label.set_text(text)
+            return label
+
         def rows(self):
             out, row = [], self.list.get_first_child()
             while row:

@@ -41,9 +41,9 @@ bind(mod .. " + SHIFT + C", hl.dsp.exec_cmd(v.bin .. "claude-pad ask"), "Quick q
 
 -- Menus (the same menus open under the mouse when clicked in the bar)
 group("Menus")
-bind(mod .. " + Escape", run(v.bin .. "rofi-power"), "Power menu")
-bind(mod .. " + P", run(v.bin .. "power-profile menu"), "Power profile")
-bind(mod .. " + N", run(v.bin .. "rofi-wifi"), "Wi-Fi")
+bind(mod .. " + Escape", run(v.bin .. "session-popup toggle --center"), "Lock, suspend, log out, reboot, shut down")
+bind(mod .. " + P", run(v.bin .. "power-popup toggle --center"), "Power profile, battery")
+bind(mod .. " + N", run(v.bin .. "wifi-popup toggle --center"), "Wi-Fi: networks, password, forget")
 bind(mod .. " + SHIFT + B", run(v.bin .. "bluetooth-popup toggle --center"), "Bluetooth: devices, pairing")
 bind(mod .. " + A", run(v.bin .. "sound-popup toggle --center"), "Sound: volume, outputs, apps")
 bind(mod .. " + O", run(v.bin .. "music show"), "Spotify (show / hide)")

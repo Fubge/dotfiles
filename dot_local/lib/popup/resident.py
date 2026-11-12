@@ -26,6 +26,12 @@ middle of the screen). When its content grows or shrinks while it is open,
 keep_top() keeps it below the bar. Others keep their static rule (hypr/rules.lua).
 The server sets win.bring_up(center=False) for windows that show themselves
 (the list menu shows up on a request, not on a command).
+
+Every show is a little entrance, the same in all popups (style: popups/style.css):
+the title (class menu-title) types itself with an orange caret, like the lock
+screen greeting, and the rows slide in one after the other. animate_in() numbers
+the row-like widgets in order (classes in-0..in-11) and sets class "enter" on
+the window for ENTER_MS; rows built later while it is open do not animate.
 """
 import json
 import os
@@ -40,6 +46,14 @@ HYPR_SOCK = os.path.join(RUN, "hypr", os.environ.get("HYPRLAND_INSTANCE_SIGNATUR
                          ".socket.sock")
 POPUP_TOP = 46      # just below the bar, as hypr/vars.lua M.popup.top
 EDGE = 16           # min distance to the screen edges
+ENTER_MS = 700      # how long the entrance animations may run
+TYPE_MS = 45        # title typing speed per character
+BLINK_MS = 530      # caret blink, as the lock screen
+BLINKS = 3          # caret blinks after typing, then it goes away
+# widgets that slide in on their own (their children move with them)
+ROW_CLASSES = ("sound-row", "slider-row", "item-card", "section", "note", "app-name",
+               "segment", "battery", "more", "pet-card", "sound-sep", "menu-search",
+               "menu-info")
 
 
 def sock_path(app_id):
@@ -106,6 +120,78 @@ def keep_top(app_id):
              % (app_id, *at))
 
 
+def animate_in(win):
+    """Entrance: number the rows (staggered slide-in), type the title."""
+    from gi.repository import GLib, Gtk
+
+    count = 0
+
+    def walk(w):
+        nonlocal count
+        while w is not None:
+            for c in w.get_css_classes():
+                if c.startswith("in-"):
+                    w.remove_css_class(c)
+            if w.get_visible() and (isinstance(w, Gtk.ListBoxRow)
+                                    or any(w.has_css_class(c) for c in ROW_CLASSES)):
+                w.add_css_class(f"in-{min(count, 11)}")
+                count += 1
+            elif w.has_css_class("menu-title") and isinstance(w, Gtk.Label):
+                type_title(w)
+            else:
+                walk(w.get_first_child())
+            w = w.get_next_sibling()
+
+    walk(win.get_child())
+    win.remove_css_class("enter")
+    if getattr(win, "enter_timer", None):
+        GLib.source_remove(win.enter_timer)
+
+    def start():
+        win.add_css_class("enter")
+        win.enter_timer = GLib.timeout_add(ENTER_MS, stop)
+        return False
+
+    def stop():
+        win.remove_css_class("enter")
+        win.enter_timer = None
+        return False
+    GLib.timeout_add(16, start)       # after the first frame: the animation starts fresh
+
+
+def type_title(label):
+    """Type the label's text with a caret in its own color, blink, done."""
+    from gi.repository import GLib
+
+    if getattr(label, "type_timer", None):
+        GLib.source_remove(label.type_timer)
+    text = label.get_text()
+    if "\u258d" in text:         # still our markup (maybe cut short): the stored title
+        text = label.full_text
+    label.full_text = text
+    color = label.get_color()
+    caret_color = "#%02x%02x%02x" % tuple(round(c * 255) for c in
+                                          (color.red, color.green, color.blue))
+    start = GLib.get_monotonic_time()
+    esc = GLib.markup_escape_text
+
+    def tick():
+        ms = (GLib.get_monotonic_time() - start) // 1000
+        typed = min(len(text), ms // TYPE_MS)
+        after = ms - len(text) * TYPE_MS
+        done = after > BLINKS * 2 * BLINK_MS
+        on = not done and (after < 0 or (after // BLINK_MS) % 2 == 0)
+        # the untyped rest is drawn invisibly: the centered title does not move
+        label.set_markup(esc(text[:typed])
+                         + f'<span foreground="{caret_color}" alpha="{100 if on else 1}%">\u258d</span>'
+                         + f'<span alpha="1%">{esc(text[typed:])}</span>')
+        if done:              # the caret stays, invisible: the title does not shift
+            label.type_timer = None
+        return not done
+    tick()
+    label.type_timer = GLib.timeout_add(30, tick)
+
+
 def close_rofi():
     """Close an open rofi (launcher, clipboard...). Its pid file, not pkill:
     pgrep/pkill scan all of /proc (~50 ms)."""
@@ -139,6 +225,7 @@ def serve(app_id, build, show):
         if hasattr(win, "popup_width"):
             place(app_id, win.popup_width, center=center)
         win.show_up()
+        animate_in(win)
         surface = win.get_surface()
         if surface and not getattr(win, "keeps_top", False):
             win.keeps_top = True

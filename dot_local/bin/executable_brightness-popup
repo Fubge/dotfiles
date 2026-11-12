@@ -1,14 +1,16 @@
 #!/usr/bin/env python3
-"""Brightness slider (click on the brightness icon in the bar).
+"""Brightness slider (click on the brightness icon in the bar), and the
+keyboard backlight below it when the laptop has one.
 
     brightness-popup toggle    bar click: show it, or hide it when open
     brightness-popup --hidden  login autostart: waits hidden, opens instantly
     brightness-popup quit      stop it (it reloads on the next click)
 
 A tiny GTK4 window that stays alive in the background and only hides
-(~/.local/lib/popup/resident.py). Hyprland floats it under the mouse and closes
-it when it loses focus (window rule for class "popup.brightness", see
-hypr/rules.lua). Drag, click or scroll the slider; Escape closes. The
+(~/.local/lib/popup/resident.py), placed under the mouse like the other bar
+popups; Hyprland closes it when it loses focus (hypr/rules.lua). Drag, click
+or scroll the slider; Escape closes. A keyboard backlight with a few steps
+(ThinkPad: off / low / high) gets one button per step, a finer one a slider. The
 percentage is perceived brightness (square-root curve, like the brightness
 keys: brightnessctl -e2), spread over the hardware range: 1% = darkest step
 (raw 1; 0 is panel off), 100% = full. ~/.local/bin/brightness shows the same
@@ -27,6 +29,11 @@ DEVICE = next(Path("/sys/class/backlight").iterdir(), Path("/sys/class/backlight
 EXPONENT = 2
 CSS = Path.home() / ".config/popups/style.css"
 ICONS = ["\U000F0594", "\U000F0595", "\U000F05A8"]  # moon / cloud / sun, as in the bar
+I_KEYBOARD = "\U000F030C"
+WIDTH = 300
+# keyboard backlight LED (tpacpi::kbd_backlight, asus::kbd_backlight, ...)
+KBD = next(Path("/sys/class/leds").glob("*kbd_backlight"), None)
+KBD_STEPS = 3        # up to this many levels: buttons, more: a slider
 
 
 def to_percent(raw):
@@ -47,6 +54,17 @@ def write_percent(percent):
     subprocess.run(["brightnessctl", "-q", "set", str(to_raw(percent))], check=False)
 
 
+def kbd_read():
+    try:
+        return int((KBD / "brightness").read_text()), int((KBD / "max_brightness").read_text())
+    except (OSError, ValueError, TypeError):
+        return None, None
+
+
+def kbd_write(level):
+    subprocess.Popen(["brightnessctl", "-q", "-d", KBD.name, "set", str(level)])
+
+
 def build():
     import gi
 
@@ -55,11 +73,14 @@ def build():
     from gi.repository import Gdk, GLib, Gtk
 
     class Popup(Gtk.Window):
+        popup_width = WIDTH       # resident.place() puts it under the mouse
+
         def __init__(self):
             super().__init__(title="Brightness")
-            self.add_css_class("popup")
-            self.add_css_class("menu")  # same look as the rofi menus
+            for c in ("popup", "menu", "brightness"):
+                self.add_css_class(c)
             self.set_decorated(False)
+            self.set_default_size(WIDTH, 1)
             self.pending = None
             self.loading = False
 
@@ -74,6 +95,11 @@ def build():
             for widget in (self.icon, self.scale, self.value):
                 row.append(widget)
             box.append(row)
+            self.kbd_buttons = []
+            self.kbd_scale = None
+            _level, top = kbd_read()
+            if top:
+                box.append(self.keyboard_row(top))
             self.set_child(box)
             self.scale.connect("value-changed", self.on_change)
 
@@ -81,11 +107,47 @@ def build():
             keys.connect("key-pressed", self.on_key)
             self.add_controller(keys)
 
+        def keyboard_row(self, top):
+            row = Gtk.Box(spacing=12, css_classes=["slider-row", "kbd-row"])
+            row.append(Gtk.Label(label=I_KEYBOARD, css_classes=["slider-icon"]))
+            if top <= KBD_STEPS:
+                names = ["Off", "Low", "High"] if top == 2 else \
+                    ["Off"] + [str(i) for i in range(1, top + 1)]
+                seg = Gtk.Box(spacing=6, homogeneous=True, hexpand=True,
+                              css_classes=["segments"])
+                for level, name in enumerate(names):
+                    b = Gtk.Button(label=name, css_classes=["segment", "flat", "small"])
+                    b.connect("clicked", lambda _b, lv=level: (kbd_write(lv),
+                                                               self.show_kbd(lv)))
+                    self.kbd_buttons.append(b)
+                    seg.append(b)
+                row.append(seg)
+            else:
+                self.kbd_scale = Gtk.Scale.new_with_range(Gtk.Orientation.HORIZONTAL, 0, top, 1)
+                self.kbd_scale.set_draw_value(False)
+                self.kbd_scale.set_hexpand(True)
+                self.kbd_scale.connect("value-changed", lambda s: self.loading or
+                                       kbd_write(int(s.get_value())))
+                row.append(self.kbd_scale)
+            return row
+
+        def show_kbd(self, level):
+            for i, b in enumerate(self.kbd_buttons):
+                (b.add_css_class if i == level else b.remove_css_class)("active")
+            if self.kbd_scale:
+                self.loading = True
+                self.kbd_scale.set_value(level)
+                self.loading = False
+
         def show_up(self):
             # the brightness may have changed by keys since the last time
             self.loading = True
             self.scale.set_value(read_percent())
             self.loading = False
+            level, _top = kbd_read()
+            if level is not None:
+                self.show_kbd(level)
+            self.set_default_size(WIDTH, 1)
             self.update_labels()
             self.present()
             self.scale.grab_focus()

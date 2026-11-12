@@ -1,0 +1,266 @@
+#!/usr/bin/env python3
+"""Power popup (click on the power profile or battery icon in the bar,
+SUPER+P): battery and power profile; its last row opens the session popup
+(~/.local/bin/session-popup: lock, reboot, shut down...).
+
+    power-popup toggle [--center]  bar click: show it, or hide it when open
+                                   (--center: middle of the screen)
+    power-popup --hidden           login autostart: waits hidden, opens instantly
+    power-popup quit               stop it (it reloads on the next click)
+
+Resident like the other bar popups (~/.local/lib/popup/resident.py). Battery
+level, time left / until full, power draw, health and charge limit come from
+UPower; the profile from power-profiles-daemon. Both over D-Bus, followed
+live while the popup is open.
+
+The profile buttons switch at once (the charger udev rule switches again on
+the next plug / unplug, see power-profile-auto). Escape closes.
+"""
+import os
+import subprocess
+import sys
+from pathlib import Path
+
+sys.path.insert(0, os.path.expanduser("~/.local/lib/popup"))
+import resident  # noqa: E402
+
+APP = "popup.power"
+WIDTH = 340
+CSS = os.path.expanduser("~/.config/popups/style.css")
+
+UPOWER = "org.freedesktop.UPower"
+DISPLAY_DEVICE = "/org/freedesktop/UPower/devices/DisplayDevice"
+PROFILES = "org.freedesktop.UPower.PowerProfiles"
+PROFILES_PATH = "/org/freedesktop/UPower/PowerProfiles"
+CHARGING, DISCHARGING, EMPTY, FULL, HELD = 1, 2, 3, 4, 5   # UPower states (5: pending charge)
+
+# Nerd Font icons, as in the bar (written as escapes: editors drop these glyphs)
+BATTERY = ["\U000F007A", "\U000F007B", "\U000F007C", "\U000F007D", "\U000F007E",
+           "\U000F007F", "\U000F0080", "\U000F0081", "\U000F0082", "\U000F0079"]
+BATTERY_BOLT = ["\U000F089C", "\U000F0086", "\U000F0087", "\U000F0088", "\U000F089D",
+                "\U000F0089", "\U000F089E", "\U000F008A", "\U000F008B", "\U000F0085"]
+I_PLUG = "\U000F06A5"
+# left to right: most saving to fastest
+PROFILE_ROWS = [("power-saver", "\U000F032A", "Saver"),
+                ("balanced", "\U000F0F85", "Balanced"),
+                ("performance", "\U000F04C5", "Performance")]
+I_SESSION = "\U000F0425"
+
+
+def duration(seconds):
+    h, m = divmod(round(seconds / 60), 60)
+    return f"{h} h {m} min" if h else f"{m} min"
+
+
+def battery_extra():
+    """Health and charge limit straight from sysfs (UPower has no limit)."""
+    out = {}
+    for bat in sorted(Path("/sys/class/power_supply").glob("BAT*")):
+        def read(name):
+            try:
+                return int((bat / name).read_text())
+            except (OSError, ValueError):
+                return None
+        full = read("energy_full") or read("charge_full")
+        design = read("energy_full_design") or read("charge_full_design")
+        if full and design:
+            out["health"] = min(100, round(full * 100 / design))
+        end = read("charge_control_end_threshold")
+        if end and end < 100:
+            out["limit"] = end
+        break
+    return out
+
+
+def build():
+    import gi
+
+    gi.require_version("Gtk", "4.0")
+    gi.require_version("Gdk", "4.0")
+    from gi.repository import Gdk, Gio, GLib, Gtk, Pango
+
+    def proxy(name, path, iface):
+        try:
+            return Gio.DBusProxy.new_for_bus_sync(
+                Gio.BusType.SYSTEM, Gio.DBusProxyFlags.NONE, None, name, path, iface, None)
+        except GLib.Error:
+            return None
+
+    def get(p, name, default=None):
+        value = p.get_cached_property(name) if p else None
+        return value.unpack() if value is not None else default
+
+    class Popup(Gtk.Window):
+        popup_width = WIDTH       # resident.place() puts it under the mouse
+
+        def __init__(self):
+            super().__init__(title="Power")
+            for c in ("popup", "menu", "power"):
+                self.add_css_class(c)
+            self.set_decorated(False)
+            self.set_default_size(WIDTH, 1)
+
+            box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2,
+                          css_classes=["menu-box"])
+            box.append(Gtk.Label(label="Power", css_classes=["menu-title"]))
+
+            # battery: icon, level, state; a bar; draw / health / limit
+            self.battery = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6,
+                                   css_classes=["battery"])
+            top = Gtk.Box(spacing=12)
+            self.bat_icon = Gtk.Label(css_classes=["battery-icon"])
+            self.bat_level = Gtk.Label(css_classes=["battery-level"], valign=Gtk.Align.BASELINE)
+            self.bat_state = Gtk.Label(xalign=0, hexpand=True, css_classes=["row-status"],
+                                       ellipsize=Pango.EllipsizeMode.END,
+                                       valign=Gtk.Align.BASELINE)
+            for w in (self.bat_icon, self.bat_level, self.bat_state):
+                top.append(w)
+            self.bat_bar = Gtk.LevelBar(min_value=0, max_value=100, css_classes=["battery-bar"])
+            for name in ("low", "high", "full"):
+                self.bat_bar.remove_offset_value(name)
+            self.bat_info = Gtk.Label(xalign=0, css_classes=["item-info"],
+                                      ellipsize=Pango.EllipsizeMode.END)
+            for w in (top, self.bat_bar, self.bat_info):
+                self.battery.append(w)
+            box.append(self.battery)
+
+            # power profile: three buttons side by side
+            self.profile_label = Gtk.Label(label="Power profile", xalign=0,
+                                           css_classes=["section"])
+            box.append(self.profile_label)
+            self.profile_box = Gtk.Box(spacing=6, homogeneous=True, css_classes=["segments"])
+            self.profile_buttons = {}
+            for key, icon, label in PROFILE_ROWS:
+                b = Gtk.Button(css_classes=["segment", "flat"])
+                inner = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
+                inner.append(Gtk.Label(label=icon, css_classes=["segment-icon"]))
+                inner.append(Gtk.Label(label=label, css_classes=["segment-label"]))
+                b.set_child(inner)
+                b.connect("clicked", lambda _b, k=key: self.set_profile(k))
+                self.profile_buttons[key] = b
+                self.profile_box.append(b)
+            box.append(self.profile_box)
+
+            box.append(Gtk.Separator(css_classes=["sound-sep"]))
+            more = Gtk.Box(spacing=12)
+            more.append(Gtk.Label(label=I_SESSION, css_classes=["row-icon"]))
+            more.append(Gtk.Label(label="Lock, reboot, shut down...", xalign=0, hexpand=True))
+            self.session_row = Gtk.Button(child=more, css_classes=["sound-row", "flat"])
+            self.session_row.connect("clicked", lambda _b: self.open_session())
+            box.append(self.session_row)
+            self.set_child(box)
+
+            keys = Gtk.EventControllerKey()
+            keys.connect("key-pressed", self.on_key)
+            self.add_controller(keys)
+
+            self.upower = proxy(UPOWER, DISPLAY_DEVICE, UPOWER + ".Device")
+            self.profiles = proxy(PROFILES, PROFILES_PATH, PROFILES)
+            for p in (self.upower, self.profiles):
+                if p:
+                    p.connect("g-properties-changed", lambda *_a: self.render())
+            self.render()
+
+        # ------------------------------------------------------------ actions
+        def set_profile(self, key):
+            if not self.profiles:
+                return
+            self.profiles.call(
+                "org.freedesktop.DBus.Properties.Set",
+                GLib.Variant("(ssv)", (PROFILES, "ActiveProfile", GLib.Variant("s", key))),
+                Gio.DBusCallFlags.NONE, 5000, None,
+                lambda p, res: self.profile_set(p, res))
+
+        @staticmethod
+        def profile_set(p, res):
+            try:
+                p.call_finish(res)
+            except GLib.Error:
+                return
+            subprocess.Popen(["pkill", "-RTMIN+8", "-x", "waybar"])   # bar icon follows at once
+
+        def open_session(self):
+            self.close()
+            subprocess.Popen([os.path.expanduser("~/.local/bin/session-popup"), "show",
+                              "--center"], start_new_session=True)
+
+        # ------------------------------------------------------------ view
+        def render(self):
+            up = self.upower
+            present = bool(get(up, "IsPresent")) and get(up, "Type") == 2   # 2 = battery
+            self.battery.set_visible(present)
+            if present:
+                pct = round(get(up, "Percentage", 0))
+                state = get(up, "State", 0)
+                rate = get(up, "EnergyRate", 0.0)
+                extra = battery_extra()
+                step = min(9, pct // 10)
+                if state == CHARGING:
+                    left = get(up, "TimeToFull", 0)
+                    text = "Charging" + (f", full in {duration(left)}" if left else "")
+                    icon = BATTERY_BOLT[step]
+                elif state in (FULL, HELD) or (state != DISCHARGING and rate < 0.5):
+                    text = ("Plugged in, held at the charge limit"
+                            if extra.get("limit") and pct >= extra["limit"] - 5 and state != FULL
+                            else "Plugged in, full")
+                    icon = I_PLUG
+                else:
+                    left = get(up, "TimeToEmpty", 0)
+                    text = "On battery" + (f", {duration(left)} left" if left else "")
+                    icon = BATTERY[step]
+                self.bat_icon.set_text(icon)
+                self.bat_level.set_text(f"{pct}%")
+                self.bat_state.set_text(text)
+                self.bat_bar.set_value(pct)
+                for c in ("warning", "critical", "charging"):
+                    self.battery.remove_css_class(c)
+                if state == CHARGING:
+                    self.battery.add_css_class("charging")
+                elif state == DISCHARGING and pct <= 10:
+                    self.battery.add_css_class("critical")
+                elif state == DISCHARGING and pct <= 25:
+                    self.battery.add_css_class("warning")
+                info = []
+                if rate >= 0.5:
+                    info.append(f"{rate:.1f} W")
+                if "health" in extra:
+                    info.append(f"health {extra['health']}%")
+                if "limit" in extra:
+                    info.append(f"limit {extra['limit']}%")
+                self.bat_info.set_text("  ·  ".join(info))
+                self.bat_info.set_visible(bool(info))
+
+            active = get(self.profiles, "ActiveProfile")
+            offered = {p.get("Profile") for p in get(self.profiles, "Profiles", [])}
+            self.profile_label.set_visible(active is not None)
+            self.profile_box.set_visible(active is not None)
+            for key, b in self.profile_buttons.items():
+                b.set_visible(key in offered)
+                (b.add_css_class if key == active else b.remove_css_class)("active")
+
+            if self.get_visible():
+                self.set_default_size(WIDTH, 1)
+            return False
+
+        # ------------------------------------------------------------ window
+        def show_up(self):
+            self.render()
+            self.set_default_size(WIDTH, 1)
+            self.present()
+            self.session_row.grab_focus()
+
+        def on_key(self, _ctrl, keyval, _code, _state):
+            if keyval == Gdk.KEY_Escape:
+                self.close()
+                return True
+            return False
+
+    provider = Gtk.CssProvider()
+    provider.load_from_path(CSS)
+    Gtk.StyleContext.add_provider_for_display(
+        Gdk.Display.get_default(), provider, Gtk.STYLE_PROVIDER_PRIORITY_USER)
+    return Popup()
+
+
+if __name__ == "__main__":
+    resident.main(APP, build, __doc__)

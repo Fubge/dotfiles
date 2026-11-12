@@ -2,3 +2,6 @@
 .local/bin/rofi-menu
 .local/bin/rofi-volume
 .local/bin/rofi-bluetooth
+.local/bin/rofi-wifi
+.local/bin/rofi-power
+.config/rofi/menu.rasi

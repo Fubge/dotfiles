@@ -100,10 +100,11 @@ def build():
             self.was_powered = False
             self.shape = None
             self.timer = None
+            self.opening = None
 
             box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2,
                           css_classes=["menu-box"])
-            head = Gtk.CenterBox(css_classes=["bt-head"])
+            head = Gtk.CenterBox(css_classes=["head"])
             head.set_center_widget(Gtk.Label(label="Bluetooth", css_classes=["menu-title"]))
             self.switch = Gtk.Switch(valign=Gtk.Align.CENTER)
             self.switch_handler = self.switch.connect("state-set", self.on_switch)
@@ -309,6 +310,7 @@ def build():
 
         def toggle_open(self, path):
             self.open = None if self.open == path else path
+            self.opening = self.open      # its card unfolds (once, not on every rebuild)
             self.confirm = None
             self.render()
 
@@ -418,7 +420,7 @@ def build():
                     for r in paired:
                         self.body.append(self.device_row(r, paired=True))
                 if self.searching:
-                    self.body.append(self.section("Searching for devices..."))
+                    self.body.append(self.section("Searching for devices...", busy=True))
                     if self.repair:
                         self.body.append(self.note(
                             f"Put {self.repair[1]} in pairing mode, it pairs by itself"))
@@ -433,7 +435,7 @@ def build():
                 self.body.append(Gtk.Separator(css_classes=["sound-sep"]))
                 search = self.text_row(
                     f"{I_SEARCH}  Stop searching" if self.searching else f"{I_ADD}  Add a device",
-                    self.toggle_search)
+                    self.toggle_search, spin=bool(self.searching))
                 search.bt_key = "search"
                 self.body.append(search)
             if self.get_visible():
@@ -464,20 +466,27 @@ def build():
             height = sum(r.measure(Gtk.Orientation.VERTICAL, WIDTH - 24)[1]
                          for r in rows[:FOUND_ROWS]) + 2 * (min(len(rows), FOUND_ROWS) - 1)
             scroll = Gtk.ScrolledWindow(child=lst, hscrollbar_policy=Gtk.PolicyType.NEVER,
-                                        css_classes=["bt-found"])
+                                        css_classes=["found"])
             scroll.set_min_content_height(height)
             scroll.set_max_content_height(height)
             return scroll
 
-        def section(self, text):
-            return Gtk.Label(label=text, xalign=0, css_classes=["section"])
+        def section(self, text, busy=False):
+            return Gtk.Label(label=text, xalign=0,
+                             css_classes=["section"] + (["busy-text"] if busy else []))
 
         def note(self, text):
-            return Gtk.Label(label=text, xalign=0, css_classes=["bt-note"])
+            return Gtk.Label(label=text, xalign=0, css_classes=["note"])
 
-        def text_row(self, text, on_click):
-            label = Gtk.Label(label=text, xalign=0, ellipsize=Pango.EllipsizeMode.END)
-            button = Gtk.Button(child=label, css_classes=["sound-row", "flat"])
+        def text_row(self, text, on_click, spin=False):
+            """A plain row; "ICON  text" puts the icon in its own label
+            (class spin: it turns while something runs)."""
+            icon, _, rest = text.partition("  ")
+            inner = Gtk.Box(spacing=12)
+            inner.append(Gtk.Label(label=icon, css_classes=["text-icon"] + (["spin"] if spin else [])))
+            inner.append(Gtk.Label(label=rest, xalign=0, hexpand=True,
+                                   ellipsize=Pango.EllipsizeMode.END))
+            button = Gtk.Button(child=inner, css_classes=["sound-row", "flat"])
             button.connect("clicked", lambda _b: on_click())
             return button
 
@@ -491,16 +500,16 @@ def build():
             else:
                 status = "Click to pair"
             inner = Gtk.Box(spacing=12)
-            inner.append(Gtk.Label(label=r["icon"], css_classes=["bt-icon"]))
+            inner.append(Gtk.Label(label=r["icon"], css_classes=["row-icon"]))
             texts = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, valign=Gtk.Align.CENTER,
                             hexpand=True)
             texts.append(Gtk.Label(label=r["name"], xalign=0,
                                    ellipsize=Pango.EllipsizeMode.END))
             if status:
-                texts.append(Gtk.Label(label=status, xalign=0, css_classes=["bt-status"],
+                texts.append(Gtk.Label(label=status, xalign=0, css_classes=["row-status"],
                                        ellipsize=Pango.EllipsizeMode.END))
             inner.append(texts)
-            classes = ["sound-row", "flat", "bt-device"]
+            classes = ["sound-row", "flat", "device"]
             if r["connected"] and paired:
                 classes.append("active")
             if r["status"]:
@@ -516,7 +525,7 @@ def build():
             top = Gtk.Box(spacing=2)
             top.append(button)
             more = Gtk.Button(label=I_LESS if self.open == path else I_MORE,
-                              css_classes=["bt-more", "flat"], valign=Gtk.Align.CENTER,
+                              css_classes=["more", "flat"], valign=Gtk.Align.CENTER,
                               tooltip_text="Manage this device")
             more.bt_key = "more" + path
             more.connect("clicked", lambda _b: self.toggle_open(path))
@@ -526,15 +535,18 @@ def build():
 
             # actions of an opened device: (dis)connect, pair again, forget
             card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6,
-                           css_classes=["bt-card"])
+                           css_classes=["item-card"])
+            if self.opening == path:
+                card.add_css_class("opening")
+                self.opening = None
             card.append(top)
             card.append(Gtk.Label(
                 label=r["address"] + ("  ·  trusted" if r["trusted"] else ""),
-                xalign=0, css_classes=["bt-info"]))
-            actions = Gtk.Box(spacing=6, homogeneous=True, css_classes=["bt-actions"])
+                xalign=0, css_classes=["item-info"]))
+            actions = Gtk.Box(spacing=6, homogeneous=True, css_classes=["item-actions"])
 
             def action(text, key, on_click, classes=()):
-                b = Gtk.Button(label=text, css_classes=["bt-action", "flat", *classes])
+                b = Gtk.Button(label=text, css_classes=["item-action", "flat", *classes])
                 b.bt_key = key + path
                 b.connect("clicked", lambda _b: on_click())
                 actions.append(b)

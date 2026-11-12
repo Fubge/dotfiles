@@ -86,11 +86,24 @@ Files ending in `.tmpl` are generated from these values.
   `altwin:swap_lalt_lwin`: then the left Alt key (next to the space bar) is SUPER and
   apps get Alt from the Windows key. While a game has focus the swap is undone (see Gaming).
 - **`SUPER+H`** lists every shortcut (built live from the descriptions in `hypr/binds.lua`).
-- The small menus (Wi-Fi `SUPER+N`, power profile `SUPER+P`,
-  power `SUPER+Escape`) open in the middle of the screen; clicking the same icon in the
-  bar opens them under the mouse. All of them go through `list-menu`: a resident GTK
-  window (`list-menu-popup`) in the old rofi look; the search field only appears for
-  long lists, typing filters anyway.
+- The popups below open in the middle of the screen from their shortcut and under
+  the mouse from their bar icon; a second click on the icon closes them, Escape too.
+  Each one opens with a small entrance (the title types itself like the lock screen
+  greeting, the rows slide in one after the other); running things breathe or spin.
+- **Wi-Fi** (`SUPER+N` or a click on the network icon; right click opens `nmtui`):
+  on/off switch, the network in use (click: signal, band, Disconnect, Auto-join,
+  Forget), saved networks in range, other networks. Opening it scans (again every
+  20 s while open). A new secured network asks for its password right in its row;
+  a wrong one brings the field back. Hidden and enterprise networks: "Network
+  settings" (nm-connection-editor).
+- **Power** (`SUPER+P` or a click on the profile or battery icon): battery level, time
+  left / until full, draw, health and charge limit; the three power profiles.
+- **Session** (`SUPER+Escape` or the power button at the right end of the bar), always in
+  the middle of the screen: the greeting types itself like on the lock screen, round
+  buttons for Lock, Suspend, Log out, Reboot, Shut down (keys L S E R P). The last three
+  turn red and ask for a second click.
+- The right click menus of the Claude pet and the music icon go through `list-menu`,
+  a resident list window (`list-menu-popup`); typing filters.
 - **Bluetooth** (`SUPER+SHIFT+B` or a click on the Bluetooth icon; right click opens
   `bluetoothctl`): on/off switch, paired devices with battery (click connects or
   disconnects; the arrow next to it opens "Pair again" and "Forget"). "Add a device"
@@ -99,9 +112,11 @@ Files ending in `.tmpl` are generated from these values.
 - **Sound** (`SUPER+A` or a click on the speaker; right click mutes): volume and
   microphone sliders, output device, one slider per app that plays sound, "Open mixer"
   for pavucontrol. Click an icon to mute that slider, `m` mutes the output.
-- Clicking the brightness icon opens a slider. All these popups and the shortcut overview
-  are small GTK4 scripts (`list-menu-popup`, `sound-popup`, `bluetooth-popup`, `brightness-popup`,
-  `pet-picker`, `keybinds`) styled by `popups/style.css`. All but the overview stay
+- Clicking the brightness icon opens a slider, with the keyboard backlight levels below
+  it on laptops that have one. All these popups and the shortcut overview are small GTK4
+  scripts (`wifi-popup`, `bluetooth-popup`, `sound-popup`, `power-popup`, `session-popup`,
+  `brightness-popup`, `list-menu-popup`, `pet-picker`, `keybinds`) styled by
+  `popups/style.css`. All but the overview stay
   resident and only hide (`~/.local/lib/popup/resident.py`, autostart `--hidden`,
   restarted by `chezmoi apply` when their code changes): they open instantly.
 

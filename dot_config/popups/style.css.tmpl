@@ -142,9 +142,9 @@ entry.search text placeholder { color: {{ .palette.comment }}; }
 .pet-card.current .pet-name { color: {{ .palette.accent }}; }
 
 /* ---------------------------------------------------------------- list menus */
-/* Wi-Fi, Bluetooth, power... (~/.local/bin/list-menu): the look of the old
-   rofi menus (rofi/menu.rasi): centered rows, steel highlight, accent for
-   the connected / current row */
+/* Claude and music right click menus (~/.local/bin/list-menu): rows like the
+   item rows below (accent icon column, steel highlight), accent for the
+   current row; typing filters */
 .menu-search {
     min-height: 0;
     padding: 9px 14px;
@@ -168,15 +168,17 @@ entry.search text placeholder { color: {{ .palette.comment }}; }
 }
 .menu-list row:first-child { margin-top: 0; }
 .menu-list row.active { color: {{ .palette.accent }}; }
-.menu-list row:selected {
-    background-color: {{ .palette.steel }};
-    color: {{ .palette.accent }};
+.menu-list row:selected { background-color: {{ .palette.steel }}; }
+.menu-info {
+    color: {{ .palette.comment }};
+    font-size: 10pt;
+    margin: -4px 14px 0 14px;
 }
 .list-menu scrollbar { opacity: 0; }
 
 /* ---------------------------------------------------------------- sound */
 /* ~/.local/bin/sound-popup: sliders like the brightness popup, outputs as rows */
-.sound .section, .bluetooth .section {
+.menu-box .section {
     color: {{ .palette.comment }};
     font-size: 10pt;
     margin: 8px 14px 2px 14px;
@@ -216,26 +218,27 @@ button.sound-row.active { color: {{ .palette.accent }}; }
     background-color: alpha({{ .palette.steel }}, 0.6);
 }
 
-/* ---------------------------------------------------------------- bluetooth */
-/* ~/.local/bin/bluetooth-popup: rows like the sound outputs, a status line
-   under each device name, on/off switch next to the title */
-.bt-head { margin: 0 4px 4px 4px; }
-.bt-icon {
+/* ---------------------------------------------------------------- item rows */
+/* Bluetooth, Wi-Fi and power popups: rows like the sound outputs, an accent
+   icon and a status line under the name; the arrow next to a row opens its
+   card (info + action buttons); on/off switch next to the title */
+.head { margin: 0 4px 4px 4px; }
+.row-icon {
     color: {{ .palette.accent }};
     min-width: 20px;
 }
-.bt-status {
+.row-status {
     font-size: 9pt;
     color: {{ .palette.comment }};
 }
-button.bt-device.active .bt-status { color: {{ .palette.fg_muted }}; }
-button.bt-device.busy .bt-status { color: {{ .palette.accent }}; }
-.bt-note {
+button.device.active .row-status { color: {{ .palette.fg_muted }}; }
+button.device.busy .row-status { color: {{ .palette.accent }}; }
+.note {
     color: {{ .palette.comment }};
     font-size: 10pt;
     margin: 6px 14px;
 }
-button.bt-more {
+button.more {
     min-height: 0;
     min-width: 0;
     padding: 4px 10px;
@@ -245,23 +248,23 @@ button.bt-more {
     background: none;
     color: {{ .palette.comment }};
 }
-button.bt-more:hover, button.bt-more:focus-visible {
+button.more:hover, button.more:focus-visible {
     background-color: {{ .palette.steel }};
     color: {{ .palette.fg }};
 }
 /* an opened device: framed, its address and the action buttons below */
-.bt-card {
+.item-card {
     padding-bottom: 8px;
     border-radius: 10px;
     background-color: alpha({{ .palette.steel }}, 0.25);
 }
-.bt-info {
+.item-info {
     font-size: 9pt;
     color: {{ .palette.comment }};
     margin: -4px 14px 0 46px;
 }
-.bt-actions { margin: 0 10px; }
-button.bt-action {
+.item-actions { margin: 0 10px; }
+button.item-action {
     min-height: 0;
     padding: 5px 8px;
     border: none;
@@ -272,21 +275,21 @@ button.bt-action {
     font-size: 10pt;
     font-weight: normal;
 }
-button.bt-action:hover, button.bt-action:focus-visible {
+button.item-action:hover, button.item-action:focus-visible {
     background-color: {{ .palette.steel }};
     color: {{ .palette.accent }};
 }
-button.bt-action.danger { background-color: {{ .palette.red }}; color: {{ .palette.bg }}; }
-.bt-found scrollbar { opacity: 0; }
-.bluetooth switch {
+button.item-action.danger { background-color: {{ .palette.red }}; color: {{ .palette.bg }}; }
+.found scrollbar { opacity: 0; }
+window.popup switch {
     min-height: 18px;
     border: none;
     border-radius: 99px;
     background-color: alpha({{ .palette.steel }}, 0.6);
     box-shadow: none;
 }
-.bluetooth switch:checked { background-color: {{ .palette.accent }}; }
-.bluetooth switch slider {
+window.popup switch:checked { background-color: {{ .palette.accent }}; }
+window.popup switch slider {
     min-width: 18px;
     min-height: 18px;
     margin: 2px;
@@ -295,3 +298,250 @@ button.bt-action.danger { background-color: {{ .palette.red }}; color: {{ .palet
     background-color: {{ .palette.fg }};
     box-shadow: none;
 }
+
+/* a row that only informs (wired connection in the Wi-Fi popup) */
+.sound-row.info { padding: 7px 14px; color: {{ .palette.accent }}; }
+.note.error, .item-info.error { color: {{ .palette.red }}; }
+button.item-action.on { color: {{ .palette.accent }}; }
+button.item-action.off { color: {{ .palette.comment }}; }
+/* Wi-Fi password field inside a network's card */
+.item-actions entry.password { padding: 5px 10px; font-size: 10pt; }
+.item-actions entry.password image { color: {{ .palette.comment }}; }
+
+/* ---------------------------------------------------------------- segments */
+/* A few choices side by side: power profiles, keyboard backlight levels */
+.segments { margin: 2px 4px 4px 4px; }
+button.segment {
+    min-height: 0;
+    padding: 6px 4px;
+    border: 1px solid transparent;
+    border-radius: 10px;
+    box-shadow: none;
+    background-color: alpha({{ .palette.steel }}, 0.25);
+    color: {{ .palette.fg_muted }};
+    font-weight: normal;
+}
+button.segment.small { padding: 3px 4px; font-size: 10pt; }
+button.segment:hover, button.segment:focus-visible {
+    background-color: alpha({{ .palette.steel }}, 0.6);
+    color: {{ .palette.fg }};
+}
+button.segment.active {
+    border-color: alpha({{ .palette.accent }}, 0.8);
+    background-color: alpha({{ .palette.accent }}, 0.15);
+    color: {{ .palette.accent }};
+}
+.segment-icon { font-size: 15pt; }
+.segment-label { font-size: 9pt; }
+.brightness .slider-row { padding: 7px 14px; }
+
+/* ---------------------------------------------------------------- power */
+/* ~/.local/bin/power-popup: battery on top, profiles, session rows */
+.battery { margin: 4px 14px 6px 14px; }
+.battery .item-info { margin: 0; }
+.battery-icon { color: {{ .palette.accent }}; font-size: 16pt; min-width: 20px; }
+.battery-level { font-size: 16pt; font-weight: 700; }
+.battery-bar trough {
+    min-height: 4px;
+    border: none;
+    border-radius: 99px;
+    background-color: alpha({{ .palette.steel }}, 0.45);
+}
+.battery-bar block.filled { border: none; border-radius: 99px; background-color: {{ .palette.accent }}; }
+.battery-bar block.empty { border: none; background: none; }
+.battery.charging .battery-icon { color: {{ .palette.green }}; }
+.battery.charging .battery-bar block.filled { background-color: {{ .palette.green }}; }
+.battery.warning .battery-icon { color: {{ .palette.yellow }}; }
+.battery.warning .battery-bar block.filled { background-color: {{ .palette.yellow }}; }
+.battery.critical .battery-icon, .battery.critical .battery-level { color: {{ .palette.red }}; }
+.battery.critical .battery-bar block.filled { background-color: {{ .palette.red }}; }
+button.sound-row.danger, button.sound-row.danger .row-icon { color: {{ .palette.red }}; }
+
+/* ---------------------------------------------------------------- session */
+/* ~/.local/bin/session-popup: centered, greeting types itself, round buttons
+   pop in one after the other, wiggle under the mouse, pulse red when they ask */
+.session-box { padding: 26px 28px 20px 28px; }
+.session-hello {
+    font-size: 16pt;
+    color: {{ .palette.fg }};
+}
+.session-up {
+    font-size: 9pt;
+    color: {{ .palette.comment }};
+    margin-bottom: 16px;
+}
+button.session-button {
+    min-height: 0;
+    min-width: 0;
+    padding: 0;
+    border: none;
+    box-shadow: none;
+    background: none;
+    outline: none;
+}
+.session-circle {
+    min-width: 72px;
+    min-height: 72px;
+    border-radius: 99px;
+    font-size: 22pt;
+    background-color: alpha({{ .palette.steel }}, 0.3);
+    color: {{ .palette.accent }};
+    transition: background-color 160ms ease, color 160ms ease, transform 200ms ease,
+                box-shadow 200ms ease;
+}
+.session-label {
+    font-size: 10pt;
+    color: {{ .palette.fg_muted }};
+    transition: color 160ms ease;
+}
+.session-key { font-size: 8pt; padding: 0 6px; opacity: 0.7; }
+
+/* pop in, one after the other */
+@keyframes session-pop {
+    0%   { opacity: 0; transform: translateY(14px) scale(0.6); }
+    70%  { opacity: 1; transform: translateY(-3px) scale(1.06); }
+    100% { opacity: 1; transform: none; }
+}
+button.session-button.enter { animation: session-pop 380ms ease-out both; }
+.session-row button.session-button.enter:nth-child(2) { animation-delay: 50ms; }
+.session-row button.session-button.enter:nth-child(3) { animation-delay: 100ms; }
+.session-row button.session-button.enter:nth-child(4) { animation-delay: 150ms; }
+.session-row button.session-button.enter:nth-child(5) { animation-delay: 200ms; }
+
+/* in focus / under the mouse: orange, a bit bigger, a little wiggle */
+@keyframes session-wiggle {
+    0%   { transform: scale(1.1) rotate(0deg); }
+    30%  { transform: scale(1.1) rotate(-9deg); }
+    60%  { transform: scale(1.1) rotate(6deg); }
+    100% { transform: scale(1.1) rotate(0deg); }
+}
+button.session-button:focus .session-circle {
+    background-color: {{ .palette.accent }};
+    color: {{ .palette.bg }};
+    transform: scale(1.1);
+    box-shadow: 0 0 18px alpha({{ .palette.accent }}, 0.45);
+    animation: session-wiggle 420ms ease-in-out 1;
+}
+button.session-button:focus .session-label { color: {{ .palette.fg }}; }
+
+/* asks first: red, pulsing */
+@keyframes session-pulse {
+    0%   { box-shadow: 0 0 0 0 alpha({{ .palette.red }}, 0.6); }
+    100% { box-shadow: 0 0 0 14px alpha({{ .palette.red }}, 0); }
+}
+button.session-button.confirm .session-circle {
+    background-color: {{ .palette.red }};
+    color: {{ .palette.bg }};
+    transform: scale(1.1);
+    animation: session-pulse 900ms ease-out infinite;
+}
+button.session-button.confirm .session-label { color: {{ .palette.red }}; }
+.session-caption {
+    margin-top: 14px;
+    font-size: 10pt;
+    color: {{ .palette.comment }};
+}
+
+/* ---------------------------------------------------------------- motion */
+/* The same small motions in every popup. Entrance (~/.local/lib/popup/resident.py
+   animate_in): the window gets class "enter" for a moment and its rows are
+   numbered in-0..in-11, so they slide in one after the other. */
+@keyframes row-in {
+    0%   { opacity: 0; transform: translateY(8px); }
+    100% { opacity: 1; transform: none; }
+}
+{{- range $i := until 12 }}
+window.enter .in-{{ $i }} { animation: row-in 260ms cubic-bezier(0.2, 0.9, 0.3, 1.15) {{ mul $i 28 }}ms both; }
+{{- end }}
+
+/* row icons wiggle under the mouse / keyboard */
+@keyframes icon-wiggle {
+    0%   { transform: none; }
+    30%  { transform: rotate(-12deg) scale(1.15); }
+    65%  { transform: rotate(8deg) scale(1.15); }
+    100% { transform: none; }
+}
+button.sound-row:hover .row-icon, button.sound-row:focus-visible .row-icon,
+button.sound-row:hover .text-icon, button.sound-row:focus-visible .text-icon,
+.menu-list row:selected .row-icon,
+button.segment:hover .segment-icon {
+    animation: icon-wiggle 380ms ease-in-out 1;
+}
+.text-icon { min-width: 20px; }
+
+/* something is running: the status breathes, search icons turn */
+@keyframes breathe {
+    0%, 100% { opacity: 1; }
+    50%      { opacity: 0.35; }
+}
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to   { transform: rotate(360deg); }
+}
+button.device.busy .row-status, button.device.busy .row-icon, .busy-text {
+    animation: breathe 1.4s ease-in-out infinite;
+}
+.spin { animation: spin 1s linear infinite; }
+
+/* a card unfolds; a wrong password shakes its head */
+@keyframes card-in {
+    0%   { opacity: 0; transform: scale(0.96) translateY(-4px); }
+    100% { opacity: 1; transform: none; }
+}
+@keyframes shake {
+    0%, 100% { transform: none; }
+    20% { transform: translateX(-7px); }
+    40% { transform: translateX(6px); }
+    60% { transform: translateX(-4px); }
+    80% { transform: translateX(2px); }
+}
+.item-card.opening { animation: card-in 220ms ease-out both; }
+.item-card.shake { animation: shake 380ms ease-in-out 1; }
+
+/* "Sure?" pulses red like the session popup */
+button.item-action.danger { animation: session-pulse 900ms ease-out infinite; }
+
+/* buttons ease between states */
+button.sound-row, button.item-action, button.segment, button.more, .menu-list row {
+    transition: background-color 150ms ease, color 150ms ease, border-color 150ms ease;
+}
+button.item-action:active, button.segment:active, button.sound-row:active {
+    transform: scale(0.97);
+}
+@keyframes seg-pop {
+    0%   { transform: scale(0.92); }
+    60%  { transform: scale(1.05); }
+    100% { transform: none; }
+}
+button.segment.active { animation: seg-pop 260ms ease-out 1; }
+
+/* switches slide, slider knobs grow under the finger */
+window.popup switch, window.popup switch slider {
+    transition: background-color 200ms ease, margin 200ms ease;
+}
+scale slider { transition: transform 150ms ease; }
+scale:hover slider, scale:active slider { transform: scale(1.3); }
+
+/* muting shakes the icon */
+@keyframes mute-shake {
+    0%, 100% { transform: none; }
+    25% { transform: rotate(-14deg); }
+    50% { transform: rotate(10deg); }
+    75% { transform: rotate(-5deg); }
+}
+button.slider-icon.muted { animation: mute-shake 320ms ease-in-out 1; }
+
+/* battery: the fill shimmers while charging, the icon pulses when low */
+@keyframes charge-shimmer {
+    0%, 100% { background-color: {{ .palette.green }}; }
+    50%      { background-color: {{ .palette.green_bright }}; }
+}
+.battery.charging .battery-bar block.filled { animation: charge-shimmer 1.6s ease-in-out infinite; }
+.battery.critical .battery-icon { animation: breathe 1.2s ease-in-out infinite; }
+
+/* pet picker: the chosen pet hops */
+@keyframes hop {
+    0%, 100% { transform: none; }
+    40% { transform: translateY(-5px); }
+}
+.pet-card.selected { animation: hop 300ms ease-out 1; }
