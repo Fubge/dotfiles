@@ -1,6 +1,0 @@
-#!/usr/bin/env bash
-# Wallpaper timers and services (images live in ~/Pictures/Wallpapers).
-# units: {{ include "dot_config/systemd/user/wallpaper-random.service" | sha256sum }}
-set -euo pipefail
-systemctl --user enable --now wallpaper-shuffle.timer
-systemctl --user enable wallpaper-random.service   # new random images at every login

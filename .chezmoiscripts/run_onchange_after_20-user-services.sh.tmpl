@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+# Desktop components and wallpaper timers as systemd user services (started with
+# the uwsm session; images live in ~/Pictures/Wallpapers).
+# units: {{ include "dot_config/systemd/user/wallpaper-random.service" | sha256sum }}
+set -euo pipefail
+services=(hyprpaper hypridle hyprpolkitagent waybar)
+systemctl --user enable "${services[@]}"
+systemctl --user enable --now wallpaper-shuffle.timer
+systemctl --user enable wallpaper-random.service   # new random images at every login
+
+# Start them right away if a graphical session is already running
+if systemctl --user is-active --quiet graphical-session.target; then
+    systemctl --user restart "${services[@]}"
+fi

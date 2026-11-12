@@ -1,8 +1,22 @@
 #!/usr/bin/env bash
-# KDE apps (Dolphin) read colors and icons from kdeglobals: Breeze Dark,
-# recolored with the desktop palette. Re-runs when the palette changes:
+# Dark mode, fonts and colors for apps outside Hyprland: GTK (gsettings, read by
+# the settings portal too) and KDE (kdeglobals). Re-runs when the palette changes:
 # palette: {{ .palette | toJson | sha256sum }}
 set -euo pipefail
+
+# --- GTK / libadwaita -------------------------------------------------------
+gs="gsettings set org.gnome.desktop.interface"
+$gs color-scheme      'prefer-dark'
+$gs accent-color      'orange'     # closest named accent for libadwaita apps
+$gs gtk-theme         'adw-gtk3-dark'
+$gs icon-theme        'Papirus-Dark'
+$gs cursor-theme      'breeze_cursors'
+$gs cursor-size       24
+$gs font-name         'Noto Sans 11'
+$gs monospace-font-name 'JetBrainsMono Nerd Font 11'
+
+# --- KDE apps (Dolphin) -----------------------------------------------------
+# They read colors and icons from kdeglobals: Breeze Dark, recolored with the palette.
 src=/usr/share/color-schemes/BreezeDark.colors
 [[ -f $src ]] || exit 0
 

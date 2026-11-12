@@ -1,8 +1,0 @@
-#!/usr/bin/env bash
-# A change in a module that hyprland.lua requires (vars.lua, rules.lua...) did not
-# always reach the running Hyprland (new popup class stayed open): reload after any.
-{{ range (glob (joinPath .chezmoi.sourceDir "dot_config/hypr/*.lua*")) -}}
-# {{ include . | sha256sum }}
-{{ end -}}
-[[ -n ${HYPRLAND_INSTANCE_SIGNATURE-} ]] || exit 0    # not in a session (bootstrap)
-hyprctl reload >/dev/null

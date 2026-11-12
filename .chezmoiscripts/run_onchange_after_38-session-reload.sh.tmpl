@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
-# Resident popups (~/.local/lib/popup/resident.py) keep their old code until
-# restarted: stop them after a change and start them hidden again.
+# Push changes into the running session:
+# - Resident popups (~/.local/lib/popup/resident.py) keep their old code until
+#   restarted: stop them and start them hidden again.
+# - A change in a module that hyprland.lua requires (vars.lua, rules.lua...) did
+#   not always reach the running Hyprland (new popup class stayed open): reload.
 # {{ include "dot_local/lib/popup/resident.py" | sha256sum }}
 # {{ include "dot_local/bin/executable_list-menu-popup" | sha256sum }}
 # {{ include "dot_local/bin/executable_sound-popup" | sha256sum }}
@@ -8,12 +11,19 @@
 # {{ include "dot_local/bin/executable_brightness-popup" | sha256sum }}
 # {{ include "dot_local/bin/executable_pet-picker" | sha256sum }}
 # {{ include "dot_config/popups/style.css.tmpl" | sha256sum }}
+{{ range (glob (joinPath .chezmoi.sourceDir "dot_config/hypr/*.lua*")) -}}
+# {{ include . | sha256sum }}
+{{ end -}}
 set -uo pipefail
 [[ -n ${HYPRLAND_INSTANCE_SIGNATURE-} ]] || exit 0    # not in a session (bootstrap)
-for p in list-menu-popup sound-popup bluetooth-popup brightness-popup pet-picker; do
+
+popups=(list-menu-popup sound-popup bluetooth-popup brightness-popup pet-picker)
+for p in "${popups[@]}"; do
     "$HOME/.local/bin/$p" quit
 done
 sleep 0.3
-for p in list-menu-popup sound-popup bluetooth-popup brightness-popup pet-picker; do
+for p in "${popups[@]}"; do
     setsid -f "$HOME/.local/bin/$p" --hidden >/dev/null 2>&1
 done
+
+hyprctl reload >/dev/null
