@@ -96,6 +96,16 @@ def hypr_json(what):
         return []
 
 
+def window_alive():
+    """True if the pad window exists; also True when hyprctl gives no answer."""
+    out = subprocess.run(["hyprctl", "clients", "-j"], capture_output=True, text=True).stdout
+    try:
+        clients = json.loads(out)
+    except ValueError:
+        return True
+    return any(c.get("class") == CLASS for c in clients)
+
+
 def window():
     return next((c for c in hypr_json("clients") if c["class"] == CLASS), None)
 
@@ -341,7 +351,9 @@ def hook(name):
         set_state("idle")
     elif name == "prompt":
         set_state("busy")
-    elif name == "tool" and state == "waiting":   # permission given, works on
+    elif name == "tool" and state != "busy":
+        # permission given and it works on; also heals a state that went wrong
+        # (e.g. "off" from a missed window check), so the pet never naps mid-work
         set_state("busy")
     elif name == "ask":                           # AskUserQuestion / permission
         set_state("waiting")
@@ -465,13 +477,17 @@ def watch():
         os.mkfifo(FIFO)
     fd = os.open(FIFO, os.O_RDWR | os.O_NONBLOCK)   # RDWR: never sees EOF
     pet = Pet()
-    last, next_alive = None, 0.0
+    last, next_alive, missing = None, 0.0, 0
     while True:
         now = time.monotonic()
         if now >= next_alive:   # session gone without a SessionEnd hook (killed)
             next_alive = now + 3
-            if read_state() != "off" and not window():
+            # three misses in a row: one failed hyprctl call must not put the
+            # pet to sleep while Claude works
+            missing = missing + 1 if read_state() != "off" and not window_alive() else 0
+            if missing >= 3:
                 set_state("off")
+                missing = 0
         state = read_state()
         pet.update(state, read_pet())
         classes = ["pet", pet.kind, state] + ([pet.frame] if pet.frame else [])
