@@ -7,28 +7,27 @@ animations live. Click a card (or Left/Right + Enter) to switch, Escape closes.
     pet-picker show       show the running picker (starts one if there is none)
     pet-picker quit       stop the running picker (after pet.py changed)
 
-It stays alive in the background and only hides its window: starting Python and
-GTK took ~0.5 s per click, showing a hidden window is instant. Commands come in
-over a small socket ($XDG_RUNTIME_DIR/pet-picker.sock); the cards only animate
-while the window is shown.
+It stays alive in the background and only hides its window
+(~/.local/lib/popup/resident.py): starting Python and GTK took ~0.5 s per
+click, showing a hidden window is instant. The cards only animate while the
+window is shown.
 
 Opened from the Claude bar menu (claude-pad menu -> "Choose pet"), which sets
 the window position first (Hyprland rule "pet-picker-at": centered under the
 spot that was right-clicked). Hyprland floats it and closes it when focus
-leaves (class "popup.pets", hypr/vars.lua M.popup); a close only hides it. A
-plain window, not a Gtk.Application (that registers on D-Bus, ~0.6 s). The pets
+leaves (class "popup.pets", hypr/vars.lua M.popup); a close only hides it. The pets
 are drawn straight from ~/.local/lib/pet/pet.py with GTK snapshot rectangles,
 so they stay crisp at any scale; the choice goes through `claude-pad pet NAME`.
 """
-import os
 import random
-import socket
 import subprocess
 import sys
 from pathlib import Path
 
 HOME = Path.home()
-SOCK = os.path.join(os.environ.get("XDG_RUNTIME_DIR", "/tmp"), "pet-picker.sock")
+sys.path.insert(0, str(HOME / ".local/lib/popup"))
+import resident  # noqa: E402
+
 CSS = HOME / ".config/popups/style.css"
 STATE = HOME / ".local/state/claude-pad/pet"
 CLAUDE_PAD = HOME / ".local/bin/claude-pad"
@@ -43,17 +42,7 @@ SHOW = [("rest", 3), ("blink", 3), ("breathe", 2), ("look", 2), ("wave", 2),
         ("thump", 2)]
 
 
-def send(cmd):
-    """Send a command to the running picker; False if none is running."""
-    try:
-        with socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM) as s:
-            s.sendto(cmd.encode(), SOCK)
-        return True
-    except OSError:
-        return False
-
-
-def serve(show):
+def build():
     import gi
 
     gi.require_version("Gtk", "4.0")
@@ -135,7 +124,6 @@ def serve(show):
             self.add_css_class("popup")
             self.add_css_class("menu")  # same look as the rofi menus
             self.set_decorated(False)
-            self.set_hide_on_close(True)
 
             box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10, css_classes=["menu-box"])
             box.append(Gtk.Label(label="Pet", css_classes=["menu-title"]))
@@ -194,51 +182,12 @@ def serve(show):
                 return False
             return True
 
-    GLib.set_prgname("popup.pets")       # Wayland app id = window class for Hyprland
     provider = Gtk.CssProvider()
     provider.load_from_path(str(CSS))
     Gtk.StyleContext.add_provider_for_display(
         Gdk.Display.get_default(), provider, Gtk.STYLE_PROVIDER_PRIORITY_USER)
-
-    loop = GLib.MainLoop()
-    win = Picker()
-    sock = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
-    try:
-        os.unlink(SOCK)
-    except OSError:
-        pass
-    sock.bind(SOCK)
-
-    def on_cmd(*_a):
-        cmd = sock.recv(64).decode().strip()
-        if cmd == "show":
-            win.show_up()
-        elif cmd == "quit":
-            loop.quit()
-        return True
-    GLib.io_add_watch(sock.fileno(), GLib.PRIORITY_DEFAULT, GLib.IOCondition.IN, on_cmd)
-    if show:
-        win.show_up()
-    loop.run()
-    os.unlink(SOCK)
-
-
-def main():
-    args = sys.argv[1:]
-    if args == ["show"]:
-        if not send("show"):
-            serve(show=True)
-    elif args == ["quit"]:
-        send("quit")
-    elif args in ([], ["--hidden"]):
-        if send("ping"):          # already running
-            if not args:
-                send("show")
-            return
-        serve(show=not args)
-    else:
-        sys.exit(__doc__)
+    return Picker()
 
 
 if __name__ == "__main__":
-    main()
+    resident.main("popup.pets", build, __doc__)

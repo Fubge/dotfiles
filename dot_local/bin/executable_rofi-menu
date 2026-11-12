@@ -44,7 +44,7 @@ if pgrep -x rofi >/dev/null; then
     for _ in {1..50}; do pgrep -x rofi >/dev/null || break; sleep 0.02; done
     [[ $prev == "$title" ]] && exit 1
 fi
-"$HOME/.local/bin/popup" --close popup.brightness   # GTK slider popup
+"$HOME/.local/bin/popup" --close popup.brightness   # GTK slider popup (hides, stays resident)
 echo "$title" >"$state"
 (($(wc -l <<<"$lines") <= 7)) && compact=true
 

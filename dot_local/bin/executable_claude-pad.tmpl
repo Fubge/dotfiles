@@ -54,7 +54,7 @@ PET_DIR = os.path.join(HOME, ".config/waybar/pet")      # built by pet.py
 PET_FILE = os.path.join(HOME, ".local/state/claude-pad/pet")
 PETS = ("mochi", "kitty", "bunny")
 POPUP_TOP = 46       # = hypr/vars.lua M.popup.top
-PICKER_SOCK = os.path.join(os.environ.get("XDG_RUNTIME_DIR", "/tmp"), "pet-picker.sock")
+PICKER_SOCK = os.path.join(os.environ.get("XDG_RUNTIME_DIR", "/tmp"), "popup.pets.sock")  # pet-picker
 NIGHT = (22, 6)      # idle turns into dozing between these hours
 
 # What the pet does per state: (animation, weight). Animations exist per pet in

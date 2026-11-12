@@ -91,7 +91,9 @@ Files ending in `.tmpl` are generated from these values.
   same icon in the bar opens them under the mouse. All of them go through `rofi-menu`
   and share the style in `rofi/menu.rasi`; the search field only appears for long lists.
 - Clicking the brightness icon opens a slider. The slider and the shortcut overview are
-  small GTK4 scripts (`brightness-popup`, `keybinds`) styled by `popups/style.css`.
+  small GTK4 scripts (`brightness-popup`, `pet-picker`, `keybinds`) styled by `popups/style.css`;
+  slider and pet picker stay resident and only hide (`~/.local/lib/popup/resident.py`,
+  autostart `--hidden`, `SCRIPT quit` reloads them): they open instantly.
 
 ## Claude scratchpad
 

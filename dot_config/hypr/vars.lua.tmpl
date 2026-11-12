@@ -39,6 +39,7 @@ M.background = {
     M.bin .. "youtube-autostart",         -- YouTube app window on workspace 4 (rules.lua)
     M.bin .. "claude-pad start",          -- Claude session waits hidden on special:claude
     M.bin .. "pet-picker --hidden",       -- pet picker waits hidden, opens instantly
+    M.bin .. "brightness-popup --hidden", -- brightness slider, same
 }
 
 -- Look -----------------------------------------------------------------------
@@ -76,7 +77,7 @@ M.popup = {
     classes = {
         ["org.pulseaudio.pavucontrol"] = { 460, 520 },
         ["popup-term"]                 = { 460, 520 },
-        ["popup.brightness"]           = { 260, 90 },   -- = narrowest rofi menu
+        ["popup.brightness"]           = { 260, 96 },   -- = narrowest rofi menu; GTK needs 96 high
         ["popup.pets"]                 = { 340, 170 },  -- pet picker (claude-pad menu)
     },
     top = 46,   -- bar margin (8) + bar height (30) + gap (8), same as the rofi menus
