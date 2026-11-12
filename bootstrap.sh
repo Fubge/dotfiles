@@ -63,7 +63,7 @@ run sudo pacman -Syu --needed --noconfirm git chezmoi
 
 # ---------------------------------------------------------------- dotfiles
 # Packages (packages/), configs, root files from system/ (+ system-boot/), SDDM + GRUB
-# themes and the user services all come from chezmoi's run_* scripts.
+# themes and the user services all come from chezmoi's scripts in .chezmoiscripts/.
 step "chezmoi: packages, dotfiles, system files, themes"
 run chezmoi init --source "$repo"     # only writes chezmoi's config, keeps the repo
 run chezmoi apply --source "$repo"

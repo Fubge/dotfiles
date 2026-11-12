@@ -139,6 +139,8 @@ Files ending in `.tmpl` are generated from these values.
   (`gamemode-hook`). While a game window has focus, left Alt is a normal Alt key.
 - **`SUPER+G`** marks / unmarks the focused window as a game, for anything not caught.
 - Steam launch option: just `mangohud %command%` (no `gamemoderun`).
+- Newest GE-Proton for Steam: run `update-proton-ge`, restart Steam, then pick it under
+  Properties > Compatibility.
 - Minecraft: **Modrinth App** (instances: Vanilla or Fabric + Sodium for more FPS).
 - A single Windows `.exe` (GOG, ...): `umu-run game.exe`
   (uses GE-Proton). A new launcher only needs its process name in `LAUNCHERS` in

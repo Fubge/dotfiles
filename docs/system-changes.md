@@ -2,7 +2,7 @@
 
 Files under `system/` (every machine) and `system-boot/` (only with
 `machine.boot = true`, see [install.md](install.md)) are installed to `/` by
-`run_onchange_after_40-system-files.sh.tmpl` (needs sudo); `*.tmpl` files are
+`.chezmoiscripts/run_onchange_after_40-system-files.sh.tmpl` (needs sudo); `*.tmpl` files are
 rendered with the values from `chezmoi init` first. The second table
 below is handled by `bootstrap.sh` (pacman.conf, services, ufw, snapper, shell, groups);
 only fstab and the GRUB tweaks come from the base install and the GRUB theme script.
@@ -17,7 +17,7 @@ only fstab and the GRUB tweaks come from the base install and the GRUB theme scr
 | `/etc/kernel/cmdline` | *boot only*: `machine.cmdline`, the kernel command line baked into the UKI: LUKS root, `quiet loglevel=3` (no kernel messages over the LUKS prompt); changing it rebuilds the UKI |
 | `/etc/default/grub` | *boot only*: native gfxmode (`machine.grub_resolution`), theme, hides the firmware's BootNext entries |
 | `/etc/grub.d/40_custom` | *boot only*: the only menu entries: Arch Linux (chainloads the UKI) and optionally Windows |
-| `/boot/grub/themes/slate/` | *boot only*: GRUB theme, generated from the palette by `run_onchange_after_42-grub-theme.sh.tmpl` |
+| `/boot/grub/themes/slate/` | *boot only*: GRUB theme, generated from the palette by `.chezmoiscripts/run_onchange_after_42-grub-theme.sh.tmpl` |
 | `/etc/vconsole.conf` | *boot only*: console keymap + Terminus font (LUKS prompt, TTYs); changing it rebuilds the UKI |
 
 If GRUB ever fails to boot Arch: press F12 at power-on and pick the firmware's

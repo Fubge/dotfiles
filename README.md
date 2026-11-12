@@ -3,7 +3,7 @@
 # slate
 
 **A calm, playful Hyprland desktop for Arch Linux.**<br>
-Slate-blue glass, one orange accent, and small animations with a purpose.
+Slate-blue glass, one orange accent, and a little pixel pet living in your bar.
 
 [![Arch Linux](https://img.shields.io/badge/Arch_Linux-1793D1?style=for-the-badge&logo=archlinux&logoColor=white)](https://archlinux.org)
 [![Hyprland](https://img.shields.io/badge/Hyprland_0.57-596690?style=for-the-badge&logo=hyprland&logoColor=white)](https://hyprland.org)
@@ -12,26 +12,26 @@ Slate-blue glass, one orange accent, and small animations with a purpose.
 
 <img src="assets/desktop.png" alt="Desktop: Neovim, fastfetch and git log in kitty, slate-blue bar on top" width="100%">
 
-[Features](#features) · [Install](#install) · [Shortcuts](#shortcuts) · [Make it yours](#make-it-yours) · [Docs](#docs)
+[Features](#whats-inside) · [Install](#install) · [Shortcuts](#shortcuts) · [Make it yours](#make-it-yours) · [Docs](#docs)
 
 </div>
 
 ---
 
-## Why this one
+Most riced desktops look great in a screenshot and fall apart on day two.
+**slate** is built the other way around: it is the desktop I use every day, for
+code, games and everything in between, and it is tuned until nothing gets in the way.
 
-- **One install script, everything else in the repo.** `bootstrap.sh` + `chezmoi`
-  turn a plain Arch install into this desktop, asking only about your hardware.
-- **One design system.** Every color, radius, gap and font lives in two TOML files;
-  Hyprland, the bar, rofi, GTK/Qt, kitty, Neovim, notifications, the login screen
-  and even GRUB are generated from them.
-- **Official repos only.** No AUR helper, no curl-to-bash. Packages are plain lists.
-- **Fast.** Bar menus are resident GTK windows that open instantly; the animated bar
-  was profiled down to a few % CPU.
-- **Safe to break.** btrfs snapshots before every pacman run, a rollback guide, and a
-  `dots-check` command that shows anything the repo does not know about yet.
+It is opinionated. Every color, gap and font comes from **one design system**, so
+the bar, the launcher, the terminal, Neovim, the lock screen and even the boot menu
+look like they were made by the same hand. It is playful where it does not cost
+you anything: window titles type themselves, the CPU icon turns from snail into
+rocket, and a small pixel pet keeps you company while Claude Code thinks.
 
-## Features
+And it is honest Arch: **official repos only**, plain package lists, one script,
+no curl-to-bash. You can read every line of it in an afternoon.
+
+## What's inside
 
 <table>
 <tr>
@@ -39,18 +39,17 @@ Slate-blue glass, one orange accent, and small animations with a purpose.
 
 ### A bar that feels alive
 
-Music visualizer driven by `cava`, window titles that *type themselves*
-(the system's signature typewriter effect), a blinking terminal-style clock,
-playful state icons (the brightness icon is a day cycle, the CPU goes snail →
-rabbit → rocket) and a pixel pet that reacts to your Claude Code session.
+A `cava` music visualizer, window titles with a typewriter effect, a blinking
+terminal clock, icons with moods (brightness follows the sun) and a pixel pet
+that reacts to your Claude Code session.
 
 </td>
 <td width="50%" valign="top">
 
-### Spotlight-style launcher
+### Spotlight, but on Linux
 
-`SUPER+Space`: apps as an icon grid. No match? Enter searches the web instead.
-Same search pill and frame language as every other overlay.
+`SUPER+Space` opens an icon grid of your apps. Typed something that is not an
+app? Hit Enter and it becomes a web search.
 
 </td>
 </tr>
@@ -61,19 +60,20 @@ Same search pill and frame language as every other overlay.
 <tr>
 <td valign="top">
 
-### Wallpaper picker
+### Wallpapers, with a preview
 
-`SUPER+W`: a preview grid of `~/Pictures/Wallpapers`. Enter sets the desktop,
-Shift+Enter the login screen, or shuffle every 30 minutes. A new random pair
-greets you at every login.
+`SUPER+W` shows a grid of `~/Pictures/Wallpapers`. Enter sets the desktop,
+Shift+Enter the login screen, or let it shuffle every 30 minutes. Every login
+greets you with a fresh pair.
 
 </td>
 <td valign="top">
 
-### Menus that open instantly
+### Menus that are just *there*
 
-Sound (per-app volume), Bluetooth pairing, Wi-Fi, power profile and power menu:
-small GTK4 popups that stay resident and appear under the mouse or centered.
+Sound with per-app volume, Bluetooth pairing, Wi-Fi, power profiles and the
+power menu. Small GTK4 popups that wait in the background, so they open with
+no delay at all.
 
 </td>
 </tr>
@@ -84,17 +84,18 @@ small GTK4 popups that stay resident and appear under the mouse or centered.
 <tr>
 <td valign="top">
 
-### Dropdown terminal
+### A terminal from above
 
-`SUPER+Tab` slides a kitty terminal down over whatever you are doing.
+`SUPER+Tab` drops a kitty terminal over whatever you are doing, and slides it
+away again.
 
 </td>
 <td valign="top">
 
-### Every shortcut, one key away
+### Never forget a shortcut
 
-`SUPER+H` builds this overview live from the bind descriptions in `binds.lua`,
-so it can never go stale.
+`SUPER+H` shows every keybinding, built live from `binds.lua`. If it's bound,
+it's listed. It can't go stale.
 
 </td>
 </tr>
@@ -104,30 +105,30 @@ so it can never go stale.
 </tr>
 </table>
 
-### And under the hood
+### And the parts you don't see
 
 | | |
 |---|---|
-| **Gaming** | `game-watch` detects games by how they run (Steam, Proton/Wine, Modrinth, gamescope, ...) and turns on GameMode, the performance profile and a normal Alt key. Zero per-game setup. |
-| **Power** | performance on AC, power-saver on battery, switched by udev. Battery icon fills with bolts while charging. |
-| **Neovim** | built from scratch on `vim.pack` + `mini.nvim`, native LSP, `conform` formatting, same palette. |
-| **Login & boot** | custom SDDM theme and an optional GRUB theme, both generated from the palette. |
-| **Lock screen** | hyprlock with a typewriter greeting. |
-| **Snapshots** | snapper + snap-pac: pre/post snapshots of `/` on every pacman transaction. |
-| **Claude Code** | optional: `SUPER+C` toggles a long-running Claude session; the bar pet shows whether it is thinking, waiting or done. |
+| 🎮 **Gaming** | `game-watch` spots games by *how* they run (Steam, Proton/Wine, Modrinth, gamescope, ...) and switches on GameMode, the performance profile and a normal Alt key. No per-game setup. |
+| 🔋 **Power** | Performance on AC, power-saver on battery, switched by udev. The battery icon fills with bolts while charging. |
+| ✏️ **Neovim** | Built from scratch on `vim.pack` + `mini.nvim`, native LSP, `conform` formatting, same palette. |
+| 🔐 **Login & boot** | A custom SDDM theme and an optional GRUB theme, both generated from the palette. hyprlock greets you with a typewriter line. |
+| 🛟 **Snapshots** | snapper + snap-pac take a snapshot of `/` before and after every pacman run. Broke something? Roll back. |
+| ⚡ **Fast** | Popups stay resident, the animated bar was profiled down to a few % CPU. |
+| 🐾 **Claude Code** | Optional: `SUPER+C` toggles a long-running Claude session, and the bar pet shows whether it is thinking, waiting or done. |
 
 ## Install
 
-On an existing Arch install (any bootloader, any filesystem):
+On any existing Arch install (any bootloader, any filesystem):
 
 ```sh
 sudo pacman -S --needed git
 git clone https://github.com/Fubge/dotfiles ~/.local/share/chezmoi
-~/.local/share/chezmoi/bootstrap.sh     # add --dry-run to only look
+~/.local/share/chezmoi/bootstrap.sh     # add --dry-run to just look
 reboot
 ```
 
-It asks a few questions first:
+That's it. Before it touches anything, it asks about your machine:
 
 ```text
 CPU vendor (microcode package)                     intel / amd      (detected)
@@ -140,18 +141,18 @@ Manage the boot chain (GRUB, cmdline, console)?    no   <- leave this off unless
                                                            you follow docs/install.md
 ```
 
-Then it enables multilib, installs every package list, applies the dotfiles,
-installs the SDDM theme and enables the services. It is idempotent: run it again
-any time. The full walkthrough, including a from-scratch LUKS + btrfs + UKI setup,
-is in **[docs/install.md](docs/install.md)**.
+Then it enables multilib, installs the package lists, applies the dotfiles, sets
+up the login screen and starts the services. Run it again whenever you like; it
+only changes what is missing. Starting from a blank disk? **[docs/install.md](docs/install.md)**
+walks through a full LUKS + btrfs + UKI setup.
 
 > [!NOTE]
-> Built and used daily on a ThinkPad X9-15p (Intel Arc, 2880x1800 OLED).
+> Daily driver on a ThinkPad X9-15p (Intel Arc, 2880x1800 OLED).
 > AMD graphics should work out of the box; NVIDIA is wired up but untested.
 
 ## Shortcuts
 
-`SUPER+H` shows all of them. The essentials:
+`SUPER+H` shows all of them. The ones you'll use in the first hour:
 
 | Keys | Action | Keys | Action |
 |---|---|---|---|
@@ -168,6 +169,8 @@ is in **[docs/install.md](docs/install.md)**.
 
 ## Make it yours
 
+Change one file, and the whole system follows, down to the boot menu.
+
 | Want to change | Edit |
 |---|---|
 | Colors | [`.chezmoidata/palette.toml`](.chezmoidata/palette.toml) |
@@ -177,35 +180,37 @@ is in **[docs/install.md](docs/install.md)**.
 | Shortcuts | [`dot_config/hypr/binds.lua`](dot_config/hypr/binds.lua) |
 | Packages | [`packages/*.txt`](packages/) |
 
-Then `chezmoi apply`. Every themed file is a template, so one palette change
-re-colors the whole system, down to the boot menu.
+Then run `chezmoi apply`.
 
-## Layout
+<details>
+<summary><b>Where things live</b></summary>
 
 ```text
 .chezmoidata/        palette + design tokens shared by every template
+.chezmoiscripts/     install packages, enable services, build themes, reload
 .chezmoi.toml.tmpl   the install questions (machine settings)
 dot_config/          ~/.config: hypr, waybar, rofi, kitty, nvim, dunst, gtk, qt ...
-dot_local/bin/       ~/.local/bin: the bar modules, popups and helper scripts
+dot_local/bin/       ~/.local/bin: bar modules, popups and helper scripts
 dot_local/lib/       shared Python: typewriter effect, resident popups, bar pet
 packages/            package lists (+ machine/ for CPU and GPU drivers)
 system/              root files for every machine (SDDM theme, power switching)
 system-boot/         root files for the full layout only (GRUB, kernel cmdline)
-run_*                chezmoi scripts: packages, services, themes, reloads
 bootstrap.sh         one-time setup of a new machine
 ```
 
+</details>
+
 ## Docs
 
-- **[Install](docs/install.md)** — existing Arch, or the full encrypted layout from scratch
-- **[Cheatsheet](docs/cheatsheet.md)** — daily workflow, every feature explained
-- **[System changes](docs/system-changes.md)** — everything outside `$HOME`, rollback guide
+- **[Install](docs/install.md)**: existing Arch, or the full encrypted layout from scratch
+- **[Cheatsheet](docs/cheatsheet.md)**: the daily workflow, every feature explained
+- **[System changes](docs/system-changes.md)**: everything outside `$HOME`, and how to undo it
 
 ## Credits
 
-[Hyprland](https://hyprland.org), [chezmoi](https://www.chezmoi.io),
+Standing on the shoulders of [Hyprland](https://hyprland.org), [chezmoi](https://www.chezmoi.io),
 [mini.nvim](https://github.com/echasnovski/mini.nvim), [cava](https://github.com/karlstav/cava),
 [Nerd Fonts](https://www.nerdfonts.com) and [Papirus](https://github.com/PapirusDevelopmentTeam/papirus-icon-theme).
 Wallpapers in the screenshots are not part of this repo.
 
-Licensed under the [MIT License](LICENSE).
+Released under the [MIT License](LICENSE). Take it, break it, make it yours.
