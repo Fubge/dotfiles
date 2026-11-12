@@ -122,3 +122,21 @@ entry.search text placeholder { color: {{ .palette.comment }}; }
     color: {{ .palette.accent }};
 }
 .plus { color: {{ .palette.comment }}; font-size: 9pt; }
+
+/* ---------------------------------------------------------------- pet picker */
+/* One card per bar pet (~/.local/bin/pet-picker); the pet in use is framed
+   in orange, the card under the mouse / keyboard gets the menu's steel tint */
+.pet-card {
+    padding: 8px 10px 6px 10px;
+    border-radius: 12px;
+    border: 1px solid transparent;
+    background-color: alpha({{ .palette.steel }}, 0.18);
+}
+.pet-card.selected { background-color: alpha({{ .palette.steel }}, 0.35); }
+.pet-card.current  { border-color: alpha({{ .palette.accent }}, 0.8); }
+.pet-name {
+    font-size: 10pt;
+    color: {{ .palette.fg_muted }};
+}
+.pet-card.selected .pet-name,
+.pet-card.current .pet-name { color: {{ .palette.accent }}; }

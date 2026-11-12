@@ -102,7 +102,8 @@ Files ending in `.tmpl` are generated from these values.
   is off, potters about when ready (dozes at night), mines / types / thinks while
   working, jumps with a "!" when it needs you, cheers and shows a gem when it finished
   while hidden (plus a notification). Right click = new chat, resume, restart, quit,
-  switch pet (Mochi fluffball or Kitty, `claude-pad pet NAME`). Clicking it also
+  "Choose pet" (popup with live previews: Mochi fluffball, Kitty, Bunny; ←/→ + Enter or
+  click; `claude-pad pet NAME`, `~/.local/bin/pet-picker`). Clicking it also
   makes it hop. Each animation is only as wide as it needs, the title glides. Script:
   `~/.local/bin/claude-pad`; the pets are drawn in `~/.local/lib/pet/pet.py`
   (`pet.py sheet FILE` = contact sheet), frames are rendered into

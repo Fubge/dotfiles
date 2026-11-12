@@ -1,0 +1,171 @@
+#!/usr/bin/env python3
+"""Pet picker: a small popup with one card per bar pet, each playing its idle
+animations live. Click a card (or Left/Right + Enter) to switch, Escape closes.
+
+Opened from the Claude bar menu (claude-pad menu -> "Choose pet"). Hyprland
+floats it under the mouse and closes it when focus leaves (class "popup.pets",
+hypr/vars.lua M.popup). The pets are drawn straight from ~/.local/lib/pet/pet.py
+with GTK snapshot rectangles, so they stay crisp at any scale; the choice goes through
+`claude-pad pet NAME`.
+"""
+import random
+import subprocess
+import sys
+from pathlib import Path
+
+import gi
+
+gi.require_version("Gtk", "4.0")
+gi.require_version("Gdk", "4.0")
+gi.require_version("Graphene", "1.0")
+from gi.repository import Gdk, GLib, Graphene, Gtk  # noqa: E402
+
+HOME = Path.home()
+sys.path.insert(0, str(HOME / ".local/lib/pet"))
+import pet  # noqa: E402
+
+CSS = HOME / ".config/popups/style.css"
+STATE = HOME / ".local/state/claude-pad/pet"
+CLAUDE_PAD = HOME / ".local/bin/claude-pad"
+
+PX = 4                    # logical pixels per art pixel in the cards
+COLS = range(0, 19)       # art columns shown: the pet at CX=9 in the middle
+ROWS = range(1, 19)       # room for long ears, jumps and the shadow
+# what the cards play: calm fidgets plus each pet's own tricks
+SHOW = [("rest", 3), ("blink", 3), ("breathe", 2), ("look", 2), ("wave", 2),
+        ("hop", 2), ("wiggle", 1), ("happy", 1), ("yawn", 1),
+        ("twinkle", 3), ("swish", 3), ("twitch", 2), ("nibble", 3), ("flop", 2),
+        ("thump", 2)]
+
+
+def current():
+    try:
+        name = STATE.read_text().strip()
+    except OSError:
+        name = ""
+    return name if name in pet.PETS else "mochi"
+
+
+def rgba(color):
+    c = Gdk.RGBA()
+    c.parse(color[:7])
+    c.alpha = int(color[7:9], 16) / 255 if len(color) == 9 else 1.0
+    return c
+
+
+class Stage(Gtk.Widget):
+    """One pet, looping random animations from SHOW."""
+
+    def __init__(self, kind):
+        super().__init__()
+        self.kind = kind
+        self.have = [(n, w) for n, w in SHOW if n in pet.anims_for(kind)]
+        self.cache = {}
+        self.queue = [(f, ms) for f, ms in pet.ANIMS["wave"]]
+        self.canvas = None
+        self.last = None
+        self.set_size_request(len(COLS) * PX, len(ROWS) * PX)
+        self.step()
+
+    def render(self, pose):
+        key = repr(pose)
+        if key not in self.cache:     # [(Gdk.RGBA, Graphene.Rect), ...]
+            self.cache[key] = [
+                (rgba(color), Graphene.Rect().init((x - COLS.start) * PX, (y - ROWS.start) * PX, PX, PX))
+                for (x, y), color in pet.render(self.kind, pose).px.items()
+                if x in COLS and y in ROWS]
+        return self.cache[key]
+
+    def step(self):
+        if not self.queue:
+            options = [(n, w) for n, w in self.have if n != self.last] or self.have
+            self.last = random.choices([n for n, _ in options], [w for _, w in options])[0]
+            self.queue = list(pet.ANIMS[self.last])
+            if self.last == "rest":
+                self.queue = [(self.queue[0][0], random.randint(600, 1800))]
+        pose, ms = self.queue.pop(0)
+        self.canvas = self.render(pose)
+        self.queue_draw()
+        GLib.timeout_add(ms, self.step)
+        return False
+
+    def do_snapshot(self, snapshot):
+        for color, rect in self.canvas:
+            snapshot.append_color(color, rect)
+
+
+class Picker(Gtk.ApplicationWindow):
+    def __init__(self, app):
+        super().__init__(application=app, title="Pets")
+        self.add_css_class("popup")
+        self.add_css_class("menu")  # same look as the rofi menus
+        self.set_decorated(False)
+
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10, css_classes=["menu-box"])
+        box.append(Gtk.Label(label="Pet", css_classes=["menu-title"]))
+        row = Gtk.Box(spacing=8, halign=Gtk.Align.CENTER)
+        self.cards = []
+        chosen = current()
+        for kind in pet.PETS:
+            card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4, css_classes=["pet-card"])
+            card.append(Stage(kind))
+            card.append(Gtk.Label(label=pet.NAMES.get(kind, kind.title()), css_classes=["pet-name"]))
+            if kind == chosen:
+                card.add_css_class("current")
+            click = Gtk.GestureClick()
+            click.connect("released", lambda *_a, k=kind: self.choose(k))
+            card.add_controller(click)
+            motion = Gtk.EventControllerMotion()
+            motion.connect("enter", lambda *_a, i=len(self.cards): self.select(i))
+            card.add_controller(motion)
+            row.append(card)
+            self.cards.append((kind, card))
+        box.append(row)
+        self.set_child(box)
+        self.selected = 0
+        self.select(next(i for i, (k, _) in enumerate(self.cards) if k == chosen))
+
+        keys = Gtk.EventControllerKey()
+        keys.connect("key-pressed", self.on_key)
+        self.add_controller(keys)
+
+    def select(self, i):
+        self.cards[self.selected][1].remove_css_class("selected")
+        self.selected = i % len(self.cards)
+        self.cards[self.selected][1].add_css_class("selected")
+
+    def choose(self, kind):
+        subprocess.Popen([str(CLAUDE_PAD), "pet", kind])
+        self.close()
+
+    def on_key(self, _ctrl, keyval, _code, _state):
+        if keyval == Gdk.KEY_Escape:
+            self.close()
+        elif keyval in (Gdk.KEY_Left, Gdk.KEY_h):
+            self.select(self.selected - 1)
+        elif keyval in (Gdk.KEY_Right, Gdk.KEY_l):
+            self.select(self.selected + 1)
+        elif keyval in (Gdk.KEY_Return, Gdk.KEY_KP_Enter, Gdk.KEY_space):
+            self.choose(self.cards[self.selected][0])
+        else:
+            return False
+        return True
+
+
+def main():
+    app = Gtk.Application(application_id="popup.pets")
+
+    def activate(app):
+        provider = Gtk.CssProvider()
+        provider.load_from_path(str(CSS))
+        Gtk.StyleContext.add_provider_for_display(
+            Gdk.Display.get_default(), provider, Gtk.STYLE_PROVIDER_PRIORITY_USER
+        )
+        Picker(app).present()
+
+    app.connect("activate", activate)
+    return app.run([])
+
+
+if __name__ == "__main__":
+    sys.exit(main())

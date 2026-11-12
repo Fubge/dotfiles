@@ -2,9 +2,10 @@
 """The bar pet: a tiny pixel critter that lives in waybar (custom/claude) and
 acts out what Claude is doing.
 
-Two pets, picked in the claude-pad menu:
+Three pets, picked in the pet picker (claude-pad menu -> ~/.local/bin/pet-picker):
   mochi   peach fluffball with a little orange star (the Claude sparkle)
   kitty   round blue-grey kitten loaf
+  bunny   lavender bunny with long ears, nibbles carrots
 
 Everything is drawn here as code (round silhouettes from row spans, an outline
 around them, then face and props on top). The pet is kept small and the props
@@ -51,6 +52,7 @@ PROP_COLORS = {
     "y": "#ffdd66", "Y": "#fff6cc", "s": "#8a92a6",  # bulb, socket
     "b": "#ff7f00",                                  # "!"
     "z": PROP["z"], "t": PROP["think"],
+    "o": "#ff8a3d", "O": "#d9622b", "f": "#7bd88f",  # carrot, shade, leaves
 }
 
 PETS = {
@@ -58,7 +60,10 @@ PETS = {
                   mouth="#7a3b2e", star="#ff7f00", star_hi="#ffdd99", star_off="#c98a63"),
     "kitty": dict(hi="#f3f5fa", mid="#d6dcea", shade="#adb6cd", line="#454b63",
                   mouth="#454b63", ear="#ffb3c2"),
+    "bunny": dict(hi="#faf6ff", mid="#ddd0f4", shade="#b7a2de", line="#5a4880",
+                  mouth="#5a4880", ear="#ffb3c2", nose="#ff8fa8"),
 }
+NAMES = {"mochi": "Mochi", "kitty": "Kitty", "bunny": "Bunny"}
 
 
 # ---------------------------------------------------------------- canvas
@@ -194,7 +199,9 @@ def face(c, kind, cx, ey, p, pal):
     c.put(rx + 3, my, PROP["blush"])
     m = pal["mouth"]
     if p.mouth == "dot":
-        if kind == "kitty":           # little cat mouth
+        if kind == "bunny":
+            c.put(cx, my - 1, pal["nose"])
+        if kind in ("kitty", "bunny"):   # little cat mouth
             c.put(cx - 1, my, m)
             c.put(cx + 1, my, m)
             c.put(cx, my + 1, m)
@@ -239,7 +246,23 @@ def paws(which, box, col):
 BODY = {
     "mochi": [2.5, 4, 4.5, 5, 5.5, 5.5, 5.5, 5.5, 5, 4],
     "kitty": [3.5, 4.5, 5, 5.5, 5.5, 5.5, 5.5, 5.5, 5, 4.5],
+    "bunny": [3, 4, 4.5, 5, 5.5, 5.5, 5.5, 5.5, 5, 4.5],
 }
+
+
+def bunny_ears(cx, top, ear):
+    """Long ears as (x, y, inner) pixels; ear=1: the right one flops over."""
+    px = []
+    for dy in range(1, 5):
+        px += [(cx - 2, top - dy, False), (cx - 1, top - dy, dy < 4)]
+    if ear:
+        px += [(cx + 1, top - 1, True), (cx + 2, top - 1, False), (cx + 2, top - 2, False),
+               (cx + 3, top - 2, True), (cx + 4, top - 2, False), (cx + 3, top - 1, False),
+               (cx + 4, top - 1, False), (cx + 5, top - 1, False)]
+    else:
+        for dy in range(1, 5):
+            px += [(cx + 1, top - dy, dy < 4), (cx + 2, top - dy, False)]
+    return px
 
 
 def draw_pet(kind, p):
@@ -254,6 +277,12 @@ def draw_pet(kind, p):
     if kind == "mochi":
         c.put(l0 - 1, top + 1, pal["mid"])     # soft tufts
         c.put(rows[3][1] + 1, top + 3, pal["mid"])
+    elif kind == "bunny":
+        for x, y, _ in bunny_ears(cx, top, p.ear):
+            c.put(x, y, pal["mid"])
+        ty = bot - 2 - (1 if p.tail else 0)          # puffy tail
+        for dx, dy in ((1, 0), (2, 0), (1, 1), (2, 1)):
+            c.put(rows[-3][1] + dx, ty + dy, pal["hi"])
     else:
         for dx, dy in ((0, -2), (0, -1), (1, -1)):   # ears (ear=1: left one twitches)
             c.put(l0 + dx - (1 if p.ear and dy == -2 else 0), top + dy, pal["mid"])
@@ -276,6 +305,10 @@ def draw_pet(kind, p):
         if p.star == "glow":
             for dx, dy in ((0, -1), (-2, 1), (2, 1)):
                 c.put(sx + dx, sy + dy, pal["star_hi"])
+    elif kind == "bunny":
+        for x, y, inner in bunny_ears(cx, top, p.ear):
+            if inner:
+                c.put(x, y, pal["ear"])
     else:
         c.put(l0, top - 1, pal["ear"])
         c.put(r0, top - 1, pal["ear"])
@@ -418,6 +451,22 @@ def fade(color, alpha):
     return color + "%02x" % int(255 * alpha)
 
 
+def carrot(c, x0, y, length):
+    """Carrot lying sideways, tip at x0 (the mouth), leaves on the right end."""
+    core = Canvas()
+    for i in range(length):
+        x = x0 + i
+        core.put(x, y, PROP_COLORS["o"])
+        if i >= 2:
+            core.put(x, y - 1, PROP_COLORS["o"])
+            core.put(x, y + 1, PROP_COLORS["O"])
+    e = x0 + length
+    for dx, dy in ((0, 0), (1, -1), (1, 0), (1, 1), (2, -2), (2, 0), (2, 2)):
+        core.put(e + dx, y + dy, PROP_COLORS["f"])
+    outline(core, PROP_COLORS["k"])
+    c.merge(core)
+
+
 def props(c, items, box):
     l, r, top, bot = box
     for item in items:
@@ -451,6 +500,8 @@ def props(c, items, box):
         elif name == "poof":          # (poof, step, dx, dy): little cloud where a prop appears
             k, dx, dy = args
             c.grid(POOF[k], r + dx, GROUND + dy, {"t": fade(PROP["think"], (1, 0.85, 0.55)[k])})
+        elif name == "carrot":        # (carrot, length): gets shorter bite by bite
+            carrot(c, (l + r) // 2 + 2, top + 6, args[0])
         elif name == "bang":
             c.grid(BANG, r + 4, top - 1 + (args[0] if args else 0))
         elif name == "Z":             # (Z, step 0..7): rises and fades out
@@ -553,6 +604,14 @@ ANIMS = {
     # kitty only
     "swish":   rep([F(140, tail=1), F(200, tail=2), F(140, tail=1), F(200, tail=0)], 3),
     "twitch":  [F(120, ear=1), F(160), F(120, ear=1), F(900)],
+    # bunny only
+    "nibble":  appear(("poof", 2, -9), [("carrot", 6)], dict(eyes="right")) +
+               [F(150, eyes="happy" if i % 2 else "open", mouth="o" if i % 2 else "dot",
+                  props=[("carrot", 6 - i // 3)]) for i in range(12)] +
+               [F(200, mouth="o"), F(1000, **SMILE)],
+    "flop":    [F(700, ear=1, eyes="up"), F(200, ear=1, eyes="blink"), F(500, ear=1),
+                F(150, squash=1), F(600, **SMILE)],
+    "thump":   rep([F(120, tail=1, squash=1), F(160)], 3) + [F(500)],
     # ---- night / off
     "sleep":   [F(260, eyes="sleep", star="off", squash=1 if i % 4 < 2 else 0, props=[("Z", i)])
                 for i in range(8)] + [F(600, eyes="sleep", star="off")],
@@ -588,7 +647,12 @@ ANIMS = {
     "poke":    [F(90, eyes="wide", mouth="o")] + jump(60, 2, eyes="happy", mouth="open") +
                [F(700, **SMILE)],
 }
-ONLY = {"twinkle": "mochi", "swish": "kitty", "twitch": "kitty"}
+ONLY = {"twinkle": ("mochi",), "swish": ("kitty",), "twitch": ("kitty",),
+        "nibble": ("bunny",), "flop": ("bunny",), "thump": ("bunny",)}
+
+
+def anims_for(kind):
+    return [n for n in ANIMS if kind in ONLY.get(n, (kind,))]
 
 
 # ---------------------------------------------------------------- build
@@ -608,9 +672,8 @@ def build(out):
     ids, anims, css, widths = {}, {}, [], set()
     for kind in PETS:
         anims[kind] = {}
-        for name, seq in ANIMS.items():
-            if ONLY.get(name, kind) != kind:
-                continue
+        for name in anims_for(kind):
+            seq = ANIMS[name]
             steps, right = [], 0
             for pose, ms in seq:
                 canvas = render(kind, pose)
@@ -636,7 +699,7 @@ def build(out):
             f.write(f"#custom-claude.w{cols} {{ min-width: {cols * SCALE // 2}px; }}\n")
         f.write("\n".join(css) + "\n")
     with open(os.path.join(out, "anims.json"), "w") as f:
-        json.dump({"anims": anims}, f)
+        json.dump({"anims": anims, "names": NAMES}, f)
     print(f"{len(ids)} frames -> {out}")
 
 
@@ -644,10 +707,8 @@ def sheet(path, bg="#7583a8", scale=4):
     from PIL import Image
     tiles = []
     for kind in PETS:
-        for name, seq in ANIMS.items():
-            if ONLY.get(name, kind) != kind:
-                continue
-            for pose, _ in seq[:3]:
+        for name in anims_for(kind):
+            for pose, _ in ANIMS[name][:3]:
                 tiles.append(image(render(kind, pose), scale))
     cols, pad = 5, 6
     tw, th = W * scale, H * scale
