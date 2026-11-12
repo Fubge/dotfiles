@@ -26,7 +26,7 @@ import sys
 
 W, H = 40, 20            # canvas in art pixels (60 x 30 logical = bar height)
 SCALE = 3                # device pixels per art pixel in the @2 image
-GROUND = 15              # feet row: the body sits centered in the bar, room above
+GROUND = 16              # feet row: star to shadow sits centered in the bar, room above
                          # and below for jumps, raised tools and rising Zs
 CX = 9                   # where the pet stands (center column)
 COMPACT = 20             # columns shown while idle (no props): the window title
@@ -429,7 +429,7 @@ def props(c, items, box):
             k = args[0]
             for dx, dy, col in ((1, -1, "spark"), (2, -2, "chip"), (-1, -2, "spark"),
                                 (3, 0, "spark"), (0, -3, "chip")):
-                x, y = r + 9 + dx * (k + 1), GROUND - 5 + dy * (k + 1) // 1 - k
+                x, y = r + 9 + dx * (k + 1), GROUND - 5 + dy * (k + 1) * 2 // 3 - k // 2
                 c.put(x, y, fade(PROP[col], 1 - k * 0.3))
         elif name == "computer":      # monitor with code lines + keyboard
             c.grid(MONITOR, r + 9, GROUND - 10)
@@ -437,11 +437,11 @@ def props(c, items, box):
             c.grid(KEYBOARD, r, GROUND - 2)
         elif name == "dots":
             for i in range(args[0]):
-                c.grid(DOT, r + 2 + i * 3, top - 3 - i)
+                c.grid(DOT, r + 2 + i * 3, top - 1 - i)
         elif name == "bulb":
-            c.grid(BULB, r + 2, top - 7)
+            c.grid(BULB, r + 3, top - 4)
         elif name == "gem":           # (gem, bob, sparkle)
-            gy = top - 5 + args[0]
+            gy = top - 3 + args[0]
             c.grid(GEM, r - 1, gy)
             if len(args) > 1 and args[1]:
                 sx, sy = r + 5, gy - 1
@@ -451,12 +451,12 @@ def props(c, items, box):
             k, dx, dy = args
             c.grid(POOF[k], r + dx, GROUND + dy, {"t": fade(PROP["think"], (1, 0.85, 0.55)[k])})
         elif name == "bang":
-            c.grid(BANG, r + 4, top - 3 + (args[0] if args else 0))
+            c.grid(BANG, r + 4, top - 1 + (args[0] if args else 0))
         elif name == "Z":             # (Z, step 0..7): rises and fades out
             k = args[0]
             alpha = 1 if k < 5 else 1 - (k - 4) * 0.25
             shape = z if k < 3 else Z
-            c.grid(shape, r + k // 3, GROUND - 7 - k, {"z": fade(PROP["z"], alpha)})
+            c.grid(shape, r - 1 + k // 3, GROUND - 7 - k, {"z": fade(PROP["z"], alpha)})
         elif name == "confetti":      # (confetti, step): pieces drift down
             k = args[0]
             pts = [(l - 5, 0), (l - 3, 5), (r + 4, -1), (r + 7, 4), (l + 2, -3), (r + 1, 2),
