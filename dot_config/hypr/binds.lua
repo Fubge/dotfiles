@@ -142,3 +142,13 @@ hl.bind("XF86AudioPlay", hl.dsp.exec_cmd("playerctl play-pause"), { locked = tru
 hl.bind("XF86AudioPause", hl.dsp.exec_cmd("playerctl play-pause"), { locked = true })
 hl.bind("XF86AudioNext", hl.dsp.exec_cmd("playerctl next"), { locked = true })
 hl.bind("XF86AudioPrev", hl.dsp.exec_cmd("playerctl previous"), { locked = true })
+
+-- Waking the screen: hypridle turns it off in the submap "wake" (hypridle.conf),
+-- where any key only turns it on again. Without this, the key that wakes it was
+-- typed into hyprlock as the first character of the password.
+hl.define_submap("wake", function()
+    hl.bind("catchall", function()
+        hl.dispatch(hl.dsp.dpms({ action = "on" }))
+        hl.dispatch(hl.dsp.submap("reset"))
+    end, { locked = true })
+end)
