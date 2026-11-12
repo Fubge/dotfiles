@@ -2,9 +2,10 @@
 """Pet picker: a small popup with one card per bar pet, each playing its idle
 animations live. Click a card (or Left/Right + Enter) to switch, Escape closes.
 
-Opened from the Claude bar menu (claude-pad menu -> "Choose pet"). Hyprland
-floats it under the mouse and closes it when focus leaves (class "popup.pets",
-hypr/vars.lua M.popup). The pets are drawn straight from ~/.local/lib/pet/pet.py
+Opened from the Claude bar menu (claude-pad menu -> "Choose pet"), centered
+under the spot that was right-clicked. Hyprland floats it and closes it when
+focus leaves (class "popup.pets", hypr/vars.lua M.popup). A plain window, not a
+Gtk.Application: registering the app on D-Bus cost ~0.6 s before it showed. The pets are drawn straight from ~/.local/lib/pet/pet.py
 with GTK snapshot rectangles, so they stay crisp at any scale; the choice goes through
 `claude-pad pet NAME`.
 """
@@ -94,9 +95,9 @@ class Stage(Gtk.Widget):
             snapshot.append_color(color, rect)
 
 
-class Picker(Gtk.ApplicationWindow):
-    def __init__(self, app):
-        super().__init__(application=app, title="Pets")
+class Picker(Gtk.Window):
+    def __init__(self):
+        super().__init__(title="Pets")
         self.add_css_class("popup")
         self.add_css_class("menu")  # same look as the rofi menus
         self.set_decorated(False)
@@ -153,18 +154,17 @@ class Picker(Gtk.ApplicationWindow):
 
 
 def main():
-    app = Gtk.Application(application_id="popup.pets")
-
-    def activate(app):
-        provider = Gtk.CssProvider()
-        provider.load_from_path(str(CSS))
-        Gtk.StyleContext.add_provider_for_display(
-            Gdk.Display.get_default(), provider, Gtk.STYLE_PROVIDER_PRIORITY_USER
-        )
-        Picker(app).present()
-
-    app.connect("activate", activate)
-    return app.run([])
+    GLib.set_prgname("popup.pets")       # Wayland app id = window class for Hyprland
+    provider = Gtk.CssProvider()
+    provider.load_from_path(str(CSS))
+    Gtk.StyleContext.add_provider_for_display(
+        Gdk.Display.get_default(), provider, Gtk.STYLE_PROVIDER_PRIORITY_USER
+    )
+    loop = GLib.MainLoop()
+    win = Picker()
+    win.connect("close-request", lambda *_a: loop.quit())
+    win.present()
+    loop.run()
 
 
 if __name__ == "__main__":

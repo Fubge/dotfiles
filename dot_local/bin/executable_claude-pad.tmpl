@@ -52,6 +52,7 @@ WORKDIR = os.path.join(HOME, ".local/share/chezmoi")
 PET_DIR = os.path.join(HOME, ".config/waybar/pet")      # built by pet.py
 PET_FILE = os.path.join(HOME, ".local/state/claude-pad/pet")
 PETS = ("mochi", "kitty", "bunny")
+POPUP_TOP = 46       # = hypr/vars.lua M.popup.top
 NIGHT = (22, 6)      # idle turns into dozing between these hours
 
 # What the pet does per state: (animation, weight). Animations exist per pet in
@@ -282,7 +283,21 @@ def restart():
     show()
 
 
+def open_picker(x):
+    """Pet picker centered under x (where the bar was right-clicked), just below
+    the bar like the other bar popups (hypr/vars.lua M.popup.top)."""
+    picker = os.path.join(BIN, "pet-picker")
+    move = f"{x}-window_w*0.5 {POPUP_TOP}" if x is not None else None
+    rules = (", { move = '" + move + "' }") if move else ""
+    hypr("hl.dsp.exec_cmd('" + picker + "'" + rules + ")")
+
+
 def menu():
+    try:   # the menu is opened by a right click on the pet: remember where
+        x = int(float(subprocess.run(["hyprctl", "cursorpos"], capture_output=True,
+                                     text=True).stdout.split(",")[0]))
+    except (ValueError, IndexError):
+        x = None
     running = window() is not None
     rows = [("\U000F05AF  Show / hide", toggle),
             ("\U000F0415  New chat (/clear)", lambda: (show(), send("/clear"))),
@@ -290,9 +305,7 @@ def menu():
     if running:
         rows += [("\U000F0709  Restart Claude", restart),
                  ("\U000F0156  Quit Claude", quit_pad)]
-    rows.append(("\U000F03E9  Choose pet", lambda: subprocess.Popen(
-        [os.path.join(BIN, "popup"), "popup.pets", os.path.join(BIN, "pet-picker")],
-        start_new_session=True)))
+    rows.append(("\U000F03E9  Choose pet", lambda: open_picker(x)))
     pick = subprocess.run([os.path.join(BIN, "rofi-menu"), "--bar", "Claude", ""],
                           input="\n".join(r[0] for r in rows), capture_output=True, text=True)
     if pick.stdout.strip().isdigit():
