@@ -20,12 +20,14 @@ is used 1:1 (crisp), the plain one is only there for scale 1 setups.
 """
 import hashlib
 import json
+import math
 import os
 import sys
 
 W, H = 40, 20            # canvas in art pixels (60 x 30 logical = bar height)
 SCALE = 3                # device pixels per art pixel in the @2 image
-GROUND = H - 2           # feet stand on this row (one free row: the pill is rounded)
+GROUND = 15              # feet row: the body sits centered in the bar, room above
+                         # and below for jumps, raised tools and rising Zs
 CX = 9                   # where the pet stands (center column)
 
 # ---------------------------------------------------------------- colors
@@ -204,6 +206,7 @@ PAWS = {
     "up2":     lambda l, r, t, b: [(l - 2, t), (r + 1, t)],
     "wave":    lambda l, r, t, b: [(r + 1, t + 3)],
     "wave2":   lambda l, r, t, b: [(r + 2, t + 1)],
+    "wave_mid": lambda l, r, t, b: [(r + 2, t + 2)],
     "type":    lambda l, r, t, b: [(r + 1, b - 3), (r + 5, b - 2)],
     "type2":   lambda l, r, t, b: [(r + 1, b - 2), (r + 5, b - 3)],
     "gem":     lambda l, r, t, b: [(r + 1, t + 2)],
@@ -269,17 +272,32 @@ def draw_pet(kind, p):
 
 
 # ---------------------------------------------------------------- props
-PICK_UP = g("""
-...kkkkk...
-.kkmmmmmkk.
-kmmMkwkMmmk
-kMk.kwk.kMk
-kk..kwk..kk
-....kwk....
-....kwk....
-....kkk....
-""")
-PICK_HIT = rotate_cw(PICK_UP)
+PICK_LEN, PICK_HEAD = 5, 3.5     # handle length, half width of the head
+
+
+def pick(c, gx, gy, angle):
+    """Pickaxe held at (gx, gy), rotated clockwise from straight up (degrees).
+    Drawn from a few lines and sampled finely, so every swing angle works."""
+    core = Canvas()
+    a = math.radians(angle)
+
+    def put(lx, ly, col):
+        x = gx + lx * math.cos(a) - ly * math.sin(a)
+        y = gy + lx * math.sin(a) + ly * math.cos(a)
+        core.put(math.floor(x + 0.5), math.floor(y + 0.5), col)
+
+    t = 0.0
+    while t <= PICK_LEN:
+        put(0, -t, PROP_COLORS["w"])
+        t += 0.2
+    s = -PICK_HEAD
+    while s <= PICK_HEAD:   # arched head, tips bent back towards the grip
+        put(s, -PICK_LEN - 1 + 0.17 * s * s, PROP_COLORS["m" if abs(s) < 2.6 else "M"])
+        s += 0.2
+    outline(core, PROP_COLORS["k"])
+    c.merge(core)
+
+
 ROCK = g("""
 ...kkkkk...
 .kkRRrrrkk.
@@ -353,6 +371,15 @@ DOT = g("""
 tt
 tt
 """)
+z = g("""
+zzz
+.z.
+zzz
+""")
+
+
+def fade(color, alpha):
+    return color + "%02x" % int(255 * alpha)
 
 
 def props(c, items, box):
@@ -360,15 +387,15 @@ def props(c, items, box):
     for item in items:
         name, *args = item if isinstance(item, tuple) else (item,)
         if name == "rock":
-            c.grid(ROCK, r + 9, GROUND - 5)
-        elif name == "pick_up":       # raised over the shoulder, handle in the paw
-            c.grid(PICK_UP, r - 4, top - 6)
-        elif name == "pick_hit":      # swung down onto the rock
-            c.grid(PICK_HIT, r + 2, top + 1)
-        elif name == "sparks":
-            for dx, dy, col in ((9, -4, "spark"), (12, -6, "spark"), (16, -5, "chip"),
-                                (19, -3, "spark"), (14, -8, "chip"), (8, -1, "chip")):
-                c.put(r + dx, GROUND - 5 + dy, PROP[col])
+            c.grid(ROCK, r + 7, GROUND - 5)
+        elif name == "pick":          # (pick, angle): grip in the "hold" paw
+            pick(c, r + 2, top + 5, args[0])
+        elif name == "sparks":        # (sparks, step): fly out from the hit
+            k = args[0]
+            for dx, dy, col in ((1, -1, "spark"), (2, -2, "chip"), (-1, -2, "spark"),
+                                (3, 0, "spark"), (0, -3, "chip")):
+                x, y = r + 9 + dx * (k + 1), GROUND - 5 + dy * (k + 1) // 1 - k
+                c.put(x, y, fade(PROP[col], 1 - k * 0.3))
         elif name == "computer":      # monitor with code lines + keyboard
             c.grid(MONITOR, r + 9, GROUND - 10)
             c.grid(SCREEN[args[0]], r + 12, GROUND - 7, {"S": PROP_COLORS["S"], "s": "#ffffff"})
@@ -382,14 +409,20 @@ def props(c, items, box):
             c.grid(GEM, r - 1, top - 5 + (args[0] if args else 0))
         elif name == "bang":
             c.grid(BANG, r + 4, top - 3 + (args[0] if args else 0))
-        elif name == "Z":
-            c.grid(Z, r + args[0], args[1])
-        elif name == "confetti":
-            seed = args[0]
-            pts = [(l - 5, 4), (l - 3, 10), (r + 4, 2), (r + 7, 9), (l + 2, 0), (r + 1, 6),
-                   (r + 10, 4), (l - 6, 13), (r + 13, 11), (l + 6, 3)]
+        elif name == "Z":             # (Z, step 0..7): rises and fades out
+            k = args[0]
+            alpha = 1 if k < 5 else 1 - (k - 4) * 0.25
+            shape = z if k < 3 else Z
+            c.grid(shape, r + 2 + k // 2, GROUND - 7 - k, {"z": fade(PROP["z"], alpha)})
+        elif name == "confetti":      # (confetti, step): pieces drift down
+            k = args[0]
+            pts = [(l - 5, 0), (l - 3, 5), (r + 4, -1), (r + 7, 4), (l + 2, -3), (r + 1, 2),
+                   (r + 10, 1), (l - 6, 7), (r + 13, 5), (l + 6, -2)]
             for i, (x, y) in enumerate(pts):
-                c.put(x + (seed % 2), (y + seed * 2) % (H - 3), PROP["confetti"][(i + seed) % 6])
+                yy = y + k
+                wob = (1 if (k + i) % 4 < 2 else 0)
+                if 0 <= yy < GROUND + 2:
+                    c.put(x + wob, yy, PROP["confetti"][i % 6])
 
 
 BACK = ("rock", "computer")
@@ -399,10 +432,12 @@ def render(kind, pose):
     p = Pose(pose)
     body, box = draw_pet(kind, p)
     c = Canvas()
-    names = [x if isinstance(x, str) else x[0] for x in p.props]
-    props(c, [x for x, n in zip(p.props, names) if n in BACK], box)
+    # rock and computer stand behind the pet, so does a pickaxe swung back
+    back = [x for x in p.props if (x if isinstance(x, str) else x[0]) in BACK
+            or (isinstance(x, tuple) and x[0] == "pick" and x[1] < 0)]
+    props(c, back, box)
     c.merge(body)
-    props(c, [x for x, n in zip(p.props, names) if n not in BACK], box)
+    props(c, [x for x in p.props if x not in back], box)
     return c
 
 
@@ -415,50 +450,85 @@ def rep(seq, n):
     return seq * n
 
 
+def swing():
+    """One pickaxe blow: wind up, swing (several angles), hit, sparks, back."""
+    hold = dict(paws="hold", eyes="right", props=["rock"])
+
+    def at(ms, angle, **kw):
+        pose = dict(hold, **kw)
+        pose["props"] = pose["props"] + [("pick", angle)]
+        return F(ms, **pose)
+    return [at(160, 0), at(120, -15), at(260, -30), at(60, 0), at(50, 35),
+            at(50, 70), at(90, 100, eyes="focus", squash=1),
+            at(80, 100, eyes="focus", squash=1, props=["rock", ("sparks", 0)]),
+            at(80, 95, eyes="focus", props=["rock", ("sparks", 1)]),
+            at(90, 85, props=["rock", ("sparks", 2)]),
+            at(90, 60), at(110, 30)]
+
+
+def jump(ms=70, height=2, **pose):
+    """Crouch, rise, hang, fall, land: a little arc instead of a teleport."""
+    ys = list(range(-1, -height - 1, -1))
+    up = [F(ms, y=y, **pose) for y in ys]
+    return ([F(110, squash=1, **pose)] + up + [F(ms * 2, y=-height, **pose)] +
+            up[::-1][1:] + [F(ms, **pose), F(130, squash=1, **pose), F(ms, **pose)])
+
+
+def with_props(frames, fn):
+    """Give each frame props from fn(index), e.g. confetti that keeps falling."""
+    return [(dict(pose, props=list(pose.get("props", [])) + fn(i)), ms)
+            for i, (pose, ms) in enumerate(frames)]
+
+
+SMILE = dict(eyes="happy", mouth="smile")
 ANIMS = {
     # ---- idle (day)
     "rest":    [F(1800)],
-    "breathe": rep([F(700, squash=1), F(900)], 2),
-    "blink":   [F(130, eyes="blink"), F(400), F(130, eyes="blink"), F(600)],
-    "look":    [F(900, eyes="left"), F(250), F(900, eyes="right"), F(400)],
-    "wave":    [F(200, paws="wave", mouth="smile")] + rep([F(220, paws="wave2", eyes="happy", mouth="smile"),
-                                                          F(220, paws="wave", eyes="happy", mouth="smile")], 3),
-    "hop":     [F(150, squash=1), F(140, y=-1), F(200, y=-2), F(140, y=-1), F(160, squash=1), F(300)],
-    "wiggle":  rep([F(180, x=-1, squash=1), F(180), F(180, x=1, squash=1), F(180)], 2),
-    "yawn":    [F(300, eyes="half"), F(900, eyes="happy", mouth="open"), F(400, eyes="half"), F(400, eyes="blink"), F(300)],
-    "happy":   [F(1400, eyes="happy", mouth="smile")],
+    "breathe": rep([F(800, squash=1), F(1000)], 2),
+    "blink":   [F(90, eyes="half"), F(110, eyes="blink"), F(90, eyes="half"), F(700),
+                F(90, eyes="half"), F(110, eyes="blink"), F(90, eyes="half"), F(500)],
+    "look":    [F(900, eyes="left"), F(300), F(900, eyes="right"), F(400)],
+    "wave":    [F(120, paws="wave", **SMILE)] +
+               rep([F(110, paws="wave_mid", **SMILE), F(160, paws="wave2", **SMILE),
+                    F(110, paws="wave_mid", **SMILE), F(160, paws="wave", **SMILE)], 3) + [F(300, **SMILE)],
+    "hop":     jump() + [F(300)],
+    "wiggle":  rep([F(160, x=-1), F(160), F(160, x=1), F(160)], 2),
+    "yawn":    [F(200, eyes="half"), F(150, eyes="half", mouth="o"), F(900, eyes="happy", mouth="open"),
+                F(200, eyes="half", mouth="o"), F(400, eyes="half"), F(120, eyes="blink"), F(300)],
+    "happy":   [F(1400, **SMILE)],
     # mochi only
-    "twinkle": [F(220, star="glow"), F(220), F(220, star="glow"), F(600, eyes="up")],
+    "twinkle": [F(160, star="glow"), F(160), F(160, star="glow"), F(160), F(700, eyes="up")],
     # kitty only
-    "swish":   rep([F(260, tail=1), F(260, tail=0)], 3),
+    "swish":   rep([F(200, tail=1), F(240, tail=0)], 3),
     # ---- night / off
-    "sleep":   rep([F(900, eyes="sleep", star="off", props=[("Z", 3, 7)]),
-                    F(900, eyes="sleep", star="off", squash=1, props=[("Z", 5, 2)])], 2),
-    "doze":    [F(1200, eyes="half"), F(300, eyes="blink"), F(1500, eyes="sleep"), F(300, eyes="half"),
-                F(200, eyes="open"), F(800)],
+    "sleep":   [F(260, eyes="sleep", star="off", squash=1 if i % 4 < 2 else 0, props=[("Z", i)])
+                for i in range(8)] + [F(600, eyes="sleep", star="off")],
+    "doze":    [F(1200, eyes="half"), F(150, eyes="blink"), F(1500, eyes="sleep"), F(200, eyes="blink"),
+                F(250, eyes="half"), F(800)],
     # ---- starting
-    "wake":    [F(700, eyes="sleep", star="off"), F(300, eyes="half"), F(150, eyes="blink"), F(300),
-                F(150, eyes="blink"), F(200, star="glow"), F(900, eyes="happy", mouth="smile")],
+    "wake":    [F(700, eyes="sleep", star="off"), F(300, eyes="blink"), F(300, eyes="half"), F(150, eyes="blink"),
+                F(300), F(120, eyes="blink"), F(200, star="glow"), F(900, **SMILE)],
     # ---- busy
-    "mine":    rep([F(380, paws="hold_up", eyes="right", props=["rock", "pick_up"]),
-                    F(110, paws="hold", eyes="focus", squash=1, props=["rock", "pick_hit"]),
-                    F(260, paws="hold", eyes="focus", squash=1, props=["rock", "pick_hit", "sparks"])], 4),
-    "type":    rep([F(150, paws="type", eyes="right", props=[("computer", 0)]),
-                    F(150, paws="type2", eyes="right", props=[("computer", 1)])], 8),
+    "mine":    rep(swing(), 4),
+    "type":    rep([F(130, paws="type", eyes="right", props=[("computer", 0)]),
+                    F(130, paws="type2", eyes="right", props=[("computer", 1)])], 8),
     "think":   [F(500, eyes="up", props=[("dots", 1)]), F(500, eyes="up", props=[("dots", 2)]),
                 F(500, eyes="up", props=[("dots", 3)]), F(400, eyes="left", props=[("dots", 3)]),
+                F(120, eyes="wide", props=[("dots", 3)]),
                 F(900, eyes="happy", mouth="o", star="glow", props=["bulb"])],
     # ---- waiting
-    "alert":   [F(160, squash=1, props=[("bang", 0)]), F(220, y=-2, eyes="wide", paws="wave", props=[("bang", -1)]),
-                F(160, eyes="wide", paws="wave2", props=[("bang", 0)]), F(500, eyes="wide", paws="wave", props=[("bang", 0)]),
-                F(400, eyes="wide", mouth="o")],
+    "alert":   with_props(jump(60, 2, eyes="wide", paws="wave"), lambda i: [("bang", 0)]) +
+               [F(110, eyes="wide", paws="wave_mid", props=[("bang", 0)]),
+                F(160, eyes="wide", paws="wave2", props=[("bang", 0)]),
+                F(110, eyes="wide", paws="wave_mid", props=[("bang", 0)]),
+                F(400, eyes="wide", paws="wave", props=[("bang", 0)]), F(400, eyes="wide", mouth="o")],
     # ---- done
-    "cheer":   [F(150, squash=1, eyes="happy", mouth="open")] +
-               rep([F(200, y=-2, eyes="happy", mouth="open", paws="up", props=[("confetti", 0)]),
-                    F(200, y=-1, eyes="happy", mouth="open", paws="up2", props=[("confetti", 1)]),
-                    F(160, squash=1, eyes="happy", mouth="smile", paws="up", props=[("confetti", 2)])], 3),
-    "gem":     rep([F(400, eyes="happy", mouth="smile", paws="gem", props=[("gem", 0)]),
-                    F(400, eyes="happy", mouth="smile", paws="gem", squash=1, props=[("gem", 1)])], 3),
+    "cheer":   with_props(jump(70, 2, eyes="happy", mouth="open", paws="up") +
+                          jump(70, 2, eyes="happy", mouth="open", paws="up2") +
+                          [F(200, eyes="happy", mouth="smile", paws="up")] * 3,
+                          lambda i: [("confetti", i)]),
+    "gem":     rep([F(450, paws="gem", props=[("gem", 0)], **SMILE),
+                    F(450, paws="gem", props=[("gem", 1)], **SMILE)], 3),
 }
 ONLY = {"twinkle": "mochi", "swish": "kitty"}
 
