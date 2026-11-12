@@ -60,10 +60,11 @@ NIGHT = (22, 6)      # idle turns into dozing between these hours
 # What the pet does per state: (animation, weight). Animations exist per pet in
 # anims.json; names a pet does not have are skipped.
 ACTIVITIES = {
-    "idle": [("rest", 5), ("breathe", 3), ("blink", 4), ("look", 2), ("wave", 1),
-             ("hop", 1), ("wiggle", 1), ("yawn", 0.5), ("happy", 1),
-             ("twinkle", 1.5), ("swish", 1.5), ("twitch", 1),
-             ("nibble", 1.5), ("flop", 1), ("thump", 1)],
+    "idle": [("rest", 2), ("breathe", 1.5), ("blink", 2.5), ("look", 2), ("wave", 1.5),
+             ("hop", 1.5), ("wiggle", 1.5), ("yawn", 0.5), ("happy", 1),
+             ("twinkle", 2), ("swish", 2), ("twitch", 1.5),
+             ("nibble", 2), ("flop", 1.5), ("thump", 1.5),
+             ("butterfly", 3), ("fluff", 3)],
     "night": [("doze", 3), ("sleep", 2), ("breathe", 2), ("rest", 2), ("yawn", 1)],
     "off": [("sleep", 1)],
     "busy": [("mine", 4), ("type", 3), ("think", 2)],
@@ -427,6 +428,14 @@ def load_anims():
         return {}
 
 
+WIDEN_MS = 320          # a bit longer than the min-width transition in waybar style.css
+
+
+def cols(width):
+    """'w24' -> 24 (None -> 0)."""
+    return int(width[1:]) if width else 0
+
+
 def night():
     hour = time.localtime().tm_hour
     return hour >= NIGHT[0] or hour < NIGHT[1]
@@ -463,7 +472,7 @@ class Pet:
         self.last_pick = name
         steps = [list(x) for x in have[name]]
         if name == "rest":      # rest a random while, so the rhythm never repeats
-            steps[0][1] = random.randint(1200, 3500)
+            steps[0][1] = random.randint(600, 1600)
         return steps
 
     def poke(self):
@@ -489,7 +498,13 @@ class Pet:
             self.frame, self.until = None, now + 3600
             return True
         frame, ms, *width = self.queue.pop(0)
-        self.width = width[0] if width else None
+        width = width[0] if width else None
+        if width and self.frame and cols(width) > cols(self.width):
+            # make room first: the module grows over WIDEN_MS (css transition)
+            # while the old frame stays, so props never show up cut off
+            self.queue.insert(0, [frame, ms, width])
+            frame, ms = self.frame, WIDEN_MS
+        self.width = width
         self.until = now + ms / 1000
         changed = frame != self.frame
         self.frame = frame

@@ -27,8 +27,9 @@ import sys
 
 W, H = 40, 20            # canvas in art pixels (60 x 30 logical = bar height)
 SCALE = 3                # device pixels per art pixel in the @2 image
-GROUND = 16              # feet row: star to shadow sits centered in the bar, room above
-                         # and below for jumps, raised tools and rising Zs
+GROUND = 17              # feet row: shadow on row 18, one free row below; all the room
+                         # above is for jumps, raised tools and rising Zs
+TOP_SAFE = 1             # row 0 is the edge of the bar pill: nothing may be drawn there
 CX = 9                   # where the pet stands (center column)
 MIN_COLS = 18            # the module is as wide as each animation needs (columns
                          # it really uses, at least this), so the window title sits
@@ -53,7 +54,10 @@ PROP_COLORS = {
     "b": "#ff7f00",                                  # "!"
     "z": PROP["z"], "t": PROP["think"],
     "o": "#ff8a3d", "O": "#d9622b", "f": "#7bd88f",  # carrot, shade, leaves
+    "B": "#ffb3dc", "p": "#ffe3f2", "q": "#6a3a66",  # butterfly wing, light, body
+    "h": "#ff7aa8", "H": "#ffc2d8",                  # heart, shine
 }
+SOFT_LINE = {"butterfly": "#8a3f73", "heart": "#9c3557"}   # outlines not as hard as "k"
 
 PETS = {
     "mochi": dict(hi="#fff4e6", mid="#ffd8b5", shade="#f3b48a", line="#9c5a3c",
@@ -73,11 +77,16 @@ def blend(under, over):
     return "#%02x%02x%02x" % tuple(mix)
 
 
+CLIPPED = set()          # pixels drawn outside the canvas (build reports them)
+
+
 class Canvas:
     def __init__(self):
         self.px = {}
 
     def put(self, x, y, c):
+        if not (0 <= x < W and TOP_SAFE <= y < H):
+            CLIPPED.add((x, y))
         if 0 <= x < W and 0 <= y < H:
             under = self.px.get((x, y))
             if len(c) == 9 and under and len(under) == 7:   # translucent over opaque
@@ -152,7 +161,7 @@ class Pose(dict):
 
 
 DEFAULT = dict(eyes="open", mouth="dot", squash=0, x=0, y=0, paws=None, star="on",
-               tail=0, ear=0, props=())
+               tail=0, ear=0, puff=0, props=())
 SHADOW, SHADOW_EDGE = "#1c202950", "#1c202928"
 
 
@@ -253,15 +262,15 @@ BODY = {
 def bunny_ears(cx, top, ear):
     """Long ears as (x, y, inner) pixels; ear=1: the right one flops over."""
     px = []
-    for dy in range(1, 5):
-        px += [(cx - 2, top - dy, False), (cx - 1, top - dy, dy < 4)]
+    for dy in range(1, 4):
+        px += [(cx - 2, top - dy, False), (cx - 1, top - dy, dy < 3)]
     if ear:
         px += [(cx + 1, top - 1, True), (cx + 2, top - 1, False), (cx + 2, top - 2, False),
                (cx + 3, top - 2, True), (cx + 4, top - 2, False), (cx + 3, top - 1, False),
                (cx + 4, top - 1, False), (cx + 5, top - 1, False)]
     else:
-        for dy in range(1, 5):
-            px += [(cx + 1, top - dy, dy < 4), (cx + 2, top - dy, False)]
+        for dy in range(1, 4):
+            px += [(cx + 1, top - dy, dy < 3), (cx + 2, top - dy, False)]
     return px
 
 
@@ -269,6 +278,8 @@ def draw_pet(kind, p):
     pal = PETS[kind]
     c = Canvas()
     spans = squashed(BODY[kind], p.squash)
+    if p.puff:      # all fluffed up after a shake
+        spans = [sp + 0.5 * p.puff if 0 < i < len(spans) - 1 else sp for i, sp in enumerate(spans)]
     top = GROUND - len(spans) + p.y           # body ends one row above the feet
     cx = CX + p.x
     rows = spans_fill(c, spans, top, cx, pal)
@@ -467,7 +478,32 @@ def carrot(c, x0, y, length):
     c.merge(core)
 
 
-def props(c, items, box):
+BUTTERFLY = [g("""
+p...p
+BpqpB
+.BqB.
+"""), g("""
+..p..
+.BqB.
+..q..
+""")]
+HEART = g("""
+h.h
+hhh
+.h.
+""")
+
+
+def soft_sprite(c, rows, x, y, line, alpha=1.0):
+    """Small sprite with its own soft outline, optionally faded as a whole."""
+    core = Canvas()
+    core.grid(rows, x, y)
+    outline(core, line)
+    for (px, py), col in core.px.items():
+        c.put(px, py, col if alpha >= 1 else fade(col, alpha))
+
+
+def props(c, items, box, pal=None):
     l, r, top, bot = box
     for item in items:
         name, *args = item if isinstance(item, tuple) else (item,)
@@ -509,14 +545,45 @@ def props(c, items, box):
             alpha = 1 if k < 5 else 1 - (k - 4) * 0.25
             shape = z if k < 3 else Z
             c.grid(shape, r - 1 + k // 3, GROUND - 7 - k, {"z": fade(PROP["z"], alpha)})
+        elif name == "butterfly":     # (butterfly, x, y, wings 0 open / 1 folded[, alpha]): absolute spot
+            x, y, wing, *alpha = args      # optional alpha: fades out flying away
+            a = alpha[0] if alpha else 1
+            bc = Canvas()
+            soft_sprite(bc, BUTTERFLY[wing], x - 2, y, SOFT_LINE["butterfly"])
+            if not wing:              # little feelers
+                bc.put(x - 1, y - 1, PROP_COLORS["q"])
+                bc.put(x + 1, y - 1, PROP_COLORS["q"])
+            for (px, py), col in bc.px.items():
+                c.put(px, py, col if a >= 1 else fade(col, a))
+        elif name == "heart":         # (heart, x, y, alpha): absolute spot
+            x, y, alpha = args
+            hc = Canvas()
+            soft_sprite(hc, HEART, x - 1, y, SOFT_LINE["heart"])
+            hc.put(x - 1, y, PROP_COLORS["H"])
+            for (px, py), col in hc.px.items():
+                c.put(px, py, col if alpha >= 1 else fade(col, alpha))
+        elif name == "fluff":         # (fluff, step): tufts of fur fly off and drift down
+            k = args[0]
+            cx, cy = (l + r) // 2, (top + bot) // 2
+            alpha = (1, 0.9, 0.7, 0.45, 0.25)[k]
+            for i, (dx, dy) in enumerate(((-0.6, -1), (1, -1.2), (-0.7, -0.3), (1.3, -0.2),
+                                          (0.1, -1.4), (-0.4, -1.3), (0.7, -1.3))):
+                dist = 5 + k * 1.1
+                x = round(cx + dx * dist)
+                y = round(cy + dy * dist * 0.55 + k * k * 0.3)
+                col = pal["hi"] if i % 2 else pal["mid"]
+                c.put(x, y, fade(col, alpha))
+                c.put(x + (1 if dx >= 0 else -1), y, fade(pal["shade"], alpha * 0.8))
+                if k < 2:
+                    c.put(x, y - 1, fade(col, alpha * 0.6))
         elif name == "confetti":      # (confetti, step): pieces drift down
             k = args[0]
-            pts = [(l - 5, 0), (l - 3, 5), (r + 4, -1), (r + 7, 4), (l + 2, -3), (r + 1, 2),
-                   (r + 10, 1), (l - 6, 7), (r + 13, 5), (l + 6, -2)]
+            pts = [(l - 3, 2), (l - 2, 6), (r + 4, 1), (r + 7, 5), (l + 2, 1), (r + 1, 3),
+                   (r + 10, 2), (l - 3, 8), (r + 13, 6), (l + 6, 1)]
             for i, (x, y) in enumerate(pts):
                 yy = y + k
                 wob = (1 if (k + i) % 4 < 2 else 0)
-                if 0 <= yy < GROUND + 2:
+                if TOP_SAFE <= yy < GROUND + 2:
                     c.put(x + wob, yy, PROP["confetti"][i % 6])
 
 
@@ -530,9 +597,9 @@ def render(kind, pose):
     # rock and computer stand behind the pet, so does a pickaxe swung back
     back = [x for x in p.props if (x if isinstance(x, str) else x[0]) in BACK
             or (isinstance(x, tuple) and x[0] == "pick" and x[1] < 0)]
-    props(c, back, box)
+    props(c, back, box, PETS[kind])
     c.merge(body)
-    props(c, [x for x in p.props if x not in back], box)
+    props(c, [x for x in p.props if x not in back], box, PETS[kind])
     return c
 
 
@@ -583,6 +650,58 @@ def appear(poof, props, pose):
             F(110, props=props + [(name, 2, dx - 1, dy)], **pose)]
 
 
+def butterfly():
+    """A butterfly flutters down out of the sky, the pet watches it come,
+    it lands on its head, the pet melts into a smile (heart), then it lifts
+    off and the pet hops up trying to catch it. Happy little heart at the end."""
+    out = []
+    # approach in a wobbly curve from the top right
+    path = []
+    for i in range(16):
+        t = i / 15
+        x = 24 - 12 * t + 1.2 * math.sin(t * 9)
+        y = 4 - 0.5 * t + 1.8 * math.sin(t * 12)
+        path.append((round(x), round(y)))
+    for i, (x, y) in enumerate(path):
+        eyes = "up" if x < 15 else "right"
+        if i < 3:
+            eyes = "open" if i == 0 else "right"
+        out.append(F(100, eyes=eyes, props=[("butterfly", x, y, i % 2)]))
+    land = ("butterfly", 12, 3)          # on the right shoulder of the head
+    # sitting: slow wing beats, the pet looks up, then melts
+    out += [F(500, eyes="up", props=[land + (0,)]),
+            F(260, eyes="up", props=[land + (1,)]),
+            F(500, eyes="up", props=[land + (0,)]),
+            F(160, eyes="wide", props=[land + (0,)])]
+    for k in range(6):   # a heart rises and fades while the pet grins
+        out.append(F(200, squash=1 if k in (1, 2) else 0, **SMILE,
+                     props=[land + (k % 3 == 2,), ("heart", 3, 5 - k // 2, 1 - k * 0.15)]))
+    out.append(F(300, eyes="up", props=[land + (1,)]))
+    # takeoff: it lifts up and away, the pet reaches up after it
+    flight = [(13, 2), (15, 2), (17, 3), (19, 2), (21, 3), (23, 2), (25, 3)]
+    jumps = jump(70, 2, eyes="up", mouth="o", paws="up")
+    out += with_props(jumps, lambda i: [("butterfly", *flight[min(i, len(flight) - 1)], i % 2,
+                                         1 - max(0, i - 3) * 0.22)] if i < len(flight) else [])
+    out += [F(400, eyes="right"), F(150, eyes="blink"), F(120, eyes="right")]
+    for k in range(5):
+        out.append(F(170, **SMILE, props=[("heart", 15 + (k % 2), 5 - k // 2, 1 - k * 0.18)]))
+    out.append(F(700, **SMILE))
+    return out
+
+
+def fluff():
+    """Shakes like a wet puppy: squeezed eyes, wobble, poofs up twice its
+    fluff with tufts flying off, then settles down proud."""
+    shake = rep([F(55, x=-1, eyes="focus"), F(55, x=1, eyes="focus")], 5)
+    return ([F(300, eyes="half"), F(160, squash=1, eyes="focus")] + shake +
+            [F(110, puff=1, eyes="wide", mouth="o", props=[("fluff", 0)]),
+             F(120, puff=2, eyes="wide", mouth="o", props=[("fluff", 1)]),
+             F(140, puff=2, **SMILE, props=[("fluff", 2)]),
+             F(180, puff=1, **SMILE, props=[("fluff", 3)]),
+             F(220, puff=1, **SMILE, props=[("fluff", 4)]),
+             F(160, squash=1, **SMILE), F(900, **SMILE)])
+
+
 SMILE = dict(eyes="happy", mouth="smile")
 ANIMS = {
     # ---- idle (day)
@@ -599,6 +718,8 @@ ANIMS = {
     "yawn":    [F(200, eyes="half"), F(150, eyes="half", mouth="o"), F(900, eyes="happy", mouth="open"),
                 F(200, eyes="half", mouth="o"), F(400, eyes="half"), F(120, eyes="blink"), F(300)],
     "happy":   [F(1400, **SMILE)],
+    "butterfly": butterfly(),
+    "fluff":   fluff(),
     # mochi only
     "twinkle": [F(160, star="glow"), F(160), F(160, star="glow"), F(160), F(700, eyes="up")],
     # kitty only
@@ -669,14 +790,17 @@ def build(out):
     os.makedirs(frames_dir, exist_ok=True)
     for f in os.listdir(frames_dir):
         os.unlink(os.path.join(frames_dir, f))
-    ids, anims, css, widths = {}, {}, [], set()
+    ids, anims, css, widths, bad = {}, {}, [], set(), set()
     for kind in PETS:
         anims[kind] = {}
         for name in anims_for(kind):
             seq = ANIMS[name]
             steps, right = [], 0
             for pose, ms in seq:
+                CLIPPED.clear()
                 canvas = render(kind, pose)
+                if CLIPPED:
+                    bad.add(f"{kind}/{name}")
                 key = hashlib.sha1(repr(sorted(canvas.px.items())).encode()).hexdigest()
                 if key not in ids:
                     n = ids[key] = len(ids)
@@ -701,6 +825,8 @@ def build(out):
     with open(os.path.join(out, "anims.json"), "w") as f:
         json.dump({"anims": anims, "names": NAMES}, f)
     print(f"{len(ids)} frames -> {out}")
+    if bad:
+        print("WARNING: leaves the bar (clipped):", ", ".join(sorted(bad)), file=sys.stderr)
 
 
 def sheet(path, bg="#7583a8", scale=4):
