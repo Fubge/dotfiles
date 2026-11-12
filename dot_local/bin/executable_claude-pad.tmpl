@@ -31,6 +31,7 @@ import json
 import os
 import random
 import select
+import socket
 import subprocess
 import sys
 import time
@@ -53,6 +54,7 @@ PET_DIR = os.path.join(HOME, ".config/waybar/pet")      # built by pet.py
 PET_FILE = os.path.join(HOME, ".local/state/claude-pad/pet")
 PETS = ("mochi", "kitty", "bunny")
 POPUP_TOP = 46       # = hypr/vars.lua M.popup.top
+PICKER_SOCK = os.path.join(os.environ.get("XDG_RUNTIME_DIR", "/tmp"), "pet-picker.sock")
 NIGHT = (22, 6)      # idle turns into dozing between these hours
 
 # What the pet does per state: (animation, weight). Animations exist per pet in
@@ -285,11 +287,20 @@ def restart():
 
 def open_picker(x):
     """Pet picker centered under x (where the bar was right-clicked), just below
-    the bar like the other bar popups (hypr/vars.lua M.popup.top)."""
-    picker = os.path.join(BIN, "pet-picker")
-    move = f"{x}-window_w*0.5 {POPUP_TOP}" if x is not None else None
-    rules = (", { move = '" + move + "' }") if move else ""
-    hypr("hl.dsp.exec_cmd('" + picker + "'" + rules + ")")
+    the bar like the other bar popups (hypr/vars.lua M.popup.top). The picker
+    keeps running hidden (~/.local/bin/pet-picker), so a named window rule sets
+    the spot before it shows up again."""
+    if x is not None:
+        move = "'%d-window_w*0.5', '%d'" % (x, POPUP_TOP)
+        rule = ("hl.window_rule({ name = 'pet-picker-at', "
+                "match = { class = '^popup\\\\.pets$' }, move = { " + move + " } })")
+        subprocess.run(["hyprctl", "eval", rule], stdout=subprocess.DEVNULL)
+    try:
+        with socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM) as s:
+            s.sendto(b"show", PICKER_SOCK)
+    except OSError:     # not running yet
+        subprocess.Popen([os.path.join(BIN, "pet-picker")], start_new_session=True,
+                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 
 def menu():

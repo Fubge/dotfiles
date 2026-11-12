@@ -2,29 +2,33 @@
 """Pet picker: a small popup with one card per bar pet, each playing its idle
 animations live. Click a card (or Left/Right + Enter) to switch, Escape closes.
 
-Opened from the Claude bar menu (claude-pad menu -> "Choose pet"), centered
-under the spot that was right-clicked. Hyprland floats it and closes it when
-focus leaves (class "popup.pets", hypr/vars.lua M.popup). A plain window, not a
-Gtk.Application: registering the app on D-Bus cost ~0.6 s before it showed. The pets are drawn straight from ~/.local/lib/pet/pet.py
-with GTK snapshot rectangles, so they stay crisp at any scale; the choice goes through
-`claude-pad pet NAME`.
+    pet-picker            run, show the window right away
+    pet-picker --hidden   run in the background (login autostart, hypr/vars.lua)
+    pet-picker show       show the running picker (starts one if there is none)
+    pet-picker quit       stop the running picker (after pet.py changed)
+
+It stays alive in the background and only hides its window: starting Python and
+GTK took ~0.5 s per click, showing a hidden window is instant. Commands come in
+over a small socket ($XDG_RUNTIME_DIR/pet-picker.sock); the cards only animate
+while the window is shown.
+
+Opened from the Claude bar menu (claude-pad menu -> "Choose pet"), which sets
+the window position first (Hyprland rule "pet-picker-at": centered under the
+spot that was right-clicked). Hyprland floats it and closes it when focus
+leaves (class "popup.pets", hypr/vars.lua M.popup); a close only hides it. A
+plain window, not a Gtk.Application (that registers on D-Bus, ~0.6 s). The pets
+are drawn straight from ~/.local/lib/pet/pet.py with GTK snapshot rectangles,
+so they stay crisp at any scale; the choice goes through `claude-pad pet NAME`.
 """
+import os
 import random
+import socket
 import subprocess
 import sys
 from pathlib import Path
 
-import gi
-
-gi.require_version("Gtk", "4.0")
-gi.require_version("Gdk", "4.0")
-gi.require_version("Graphene", "1.0")
-from gi.repository import Gdk, GLib, Graphene, Gtk  # noqa: E402
-
 HOME = Path.home()
-sys.path.insert(0, str(HOME / ".local/lib/pet"))
-import pet  # noqa: E402
-
+SOCK = os.path.join(os.environ.get("XDG_RUNTIME_DIR", "/tmp"), "pet-picker.sock")
 CSS = HOME / ".config/popups/style.css"
 STATE = HOME / ".local/state/claude-pad/pet"
 CLAUDE_PAD = HOME / ".local/bin/claude-pad"
@@ -39,133 +43,202 @@ SHOW = [("rest", 3), ("blink", 3), ("breathe", 2), ("look", 2), ("wave", 2),
         ("thump", 2)]
 
 
-def current():
+def send(cmd):
+    """Send a command to the running picker; False if none is running."""
     try:
-        name = STATE.read_text().strip()
+        with socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM) as s:
+            s.sendto(cmd.encode(), SOCK)
+        return True
     except OSError:
-        name = ""
-    return name if name in pet.PETS else "mochi"
-
-
-def rgba(color):
-    c = Gdk.RGBA()
-    c.parse(color[:7])
-    c.alpha = int(color[7:9], 16) / 255 if len(color) == 9 else 1.0
-    return c
-
-
-class Stage(Gtk.Widget):
-    """One pet, looping random animations from SHOW."""
-
-    def __init__(self, kind):
-        super().__init__()
-        self.kind = kind
-        self.have = [(n, w) for n, w in SHOW if n in pet.anims_for(kind)]
-        self.cache = {}
-        self.queue = [(f, ms) for f, ms in pet.ANIMS["wave"]]
-        self.canvas = None
-        self.last = None
-        self.set_size_request(len(COLS) * PX, len(ROWS) * PX)
-        self.step()
-
-    def render(self, pose):
-        key = repr(pose)
-        if key not in self.cache:     # [(Gdk.RGBA, Graphene.Rect), ...]
-            self.cache[key] = [
-                (rgba(color), Graphene.Rect().init((x - COLS.start) * PX, (y - ROWS.start) * PX, PX, PX))
-                for (x, y), color in pet.render(self.kind, pose).px.items()
-                if x in COLS and y in ROWS]
-        return self.cache[key]
-
-    def step(self):
-        if not self.queue:
-            options = [(n, w) for n, w in self.have if n != self.last] or self.have
-            self.last = random.choices([n for n, _ in options], [w for _, w in options])[0]
-            self.queue = list(pet.ANIMS[self.last])
-            if self.last == "rest":
-                self.queue = [(self.queue[0][0], random.randint(600, 1800))]
-        pose, ms = self.queue.pop(0)
-        self.canvas = self.render(pose)
-        self.queue_draw()
-        GLib.timeout_add(ms, self.step)
         return False
 
-    def do_snapshot(self, snapshot):
-        for color, rect in self.canvas:
-            snapshot.append_color(color, rect)
 
+def serve(show):
+    import gi
 
-class Picker(Gtk.Window):
-    def __init__(self):
-        super().__init__(title="Pets")
-        self.add_css_class("popup")
-        self.add_css_class("menu")  # same look as the rofi menus
-        self.set_decorated(False)
+    gi.require_version("Gtk", "4.0")
+    gi.require_version("Gdk", "4.0")
+    gi.require_version("Graphene", "1.0")
+    from gi.repository import Gdk, GLib, Graphene, Gtk
 
-        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10, css_classes=["menu-box"])
-        box.append(Gtk.Label(label="Pet", css_classes=["menu-title"]))
-        row = Gtk.Box(spacing=8, halign=Gtk.Align.CENTER)
-        self.cards = []
-        chosen = current()
-        for kind in pet.PETS:
-            card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4, css_classes=["pet-card"])
-            card.append(Stage(kind))
-            card.append(Gtk.Label(label=pet.NAMES.get(kind, kind.title()), css_classes=["pet-name"]))
-            if kind == chosen:
-                card.add_css_class("current")
-            click = Gtk.GestureClick()
-            click.connect("released", lambda *_a, k=kind: self.choose(k))
-            card.add_controller(click)
-            motion = Gtk.EventControllerMotion()
-            motion.connect("enter", lambda *_a, i=len(self.cards): self.select(i))
-            card.add_controller(motion)
-            row.append(card)
-            self.cards.append((kind, card))
-        box.append(row)
-        self.set_child(box)
-        self.selected = 0
-        self.select(next(i for i, (k, _) in enumerate(self.cards) if k == chosen))
+    sys.path.insert(0, str(HOME / ".local/lib/pet"))
+    import pet
 
-        keys = Gtk.EventControllerKey()
-        keys.connect("key-pressed", self.on_key)
-        self.add_controller(keys)
+    def current():
+        try:
+            name = STATE.read_text().strip()
+        except OSError:
+            name = ""
+        return name if name in pet.PETS else "mochi"
 
-    def select(self, i):
-        self.cards[self.selected][1].remove_css_class("selected")
-        self.selected = i % len(self.cards)
-        self.cards[self.selected][1].add_css_class("selected")
+    def rgba(color):
+        c = Gdk.RGBA()
+        c.parse(color[:7])
+        c.alpha = int(color[7:9], 16) / 255 if len(color) == 9 else 1.0
+        return c
 
-    def choose(self, kind):
-        subprocess.Popen([str(CLAUDE_PAD), "pet", kind])
-        self.close()
+    class Stage(Gtk.Widget):
+        """One pet, looping random animations from SHOW while it is visible."""
 
-    def on_key(self, _ctrl, keyval, _code, _state):
-        if keyval == Gdk.KEY_Escape:
-            self.close()
-        elif keyval in (Gdk.KEY_Left, Gdk.KEY_h):
-            self.select(self.selected - 1)
-        elif keyval in (Gdk.KEY_Right, Gdk.KEY_l):
-            self.select(self.selected + 1)
-        elif keyval in (Gdk.KEY_Return, Gdk.KEY_KP_Enter, Gdk.KEY_space):
-            self.choose(self.cards[self.selected][0])
-        else:
+        def __init__(self, kind):
+            super().__init__()
+            self.kind = kind
+            self.have = [(n, w) for n, w in SHOW if n in pet.anims_for(kind)]
+            self.cache = {}
+            self.queue, self.canvas, self.last, self.timer = [], [], None, None
+            self.set_size_request(len(COLS) * PX, len(ROWS) * PX)
+
+        def render(self, pose):
+            key = repr(pose)
+            if key not in self.cache:     # [(Gdk.RGBA, Graphene.Rect), ...]
+                self.cache[key] = [
+                    (rgba(color), Graphene.Rect().init((x - COLS.start) * PX,
+                                                       (y - ROWS.start) * PX, PX, PX))
+                    for (x, y), color in pet.render(self.kind, pose).px.items()
+                    if x in COLS and y in ROWS]
+            return self.cache[key]
+
+        def start(self):
+            """Every opening starts with a wave."""
+            if self.timer:
+                GLib.source_remove(self.timer)
+            self.queue = list(pet.ANIMS["wave"])
+            self.step()
+
+        def step(self):
+            self.timer = None
+            if not self.queue:
+                options = [(n, w) for n, w in self.have if n != self.last] or self.have
+                self.last = random.choices([n for n, _ in options], [w for _, w in options])[0]
+                self.queue = list(pet.ANIMS[self.last])
+                if self.last == "rest":
+                    self.queue = [(self.queue[0][0], random.randint(600, 1800))]
+            pose, ms = self.queue.pop(0)
+            self.canvas = self.render(pose)
+            self.queue_draw()
+            self.timer = GLib.timeout_add(ms, self.tick)
+
+        def tick(self):
+            if self.get_mapped():     # hidden: stop, start() runs again on show
+                self.step()
+            else:
+                self.timer = None
             return False
-        return True
 
+        def do_snapshot(self, snapshot):
+            for color, rect in self.canvas:
+                snapshot.append_color(color, rect)
 
-def main():
+    class Picker(Gtk.Window):
+        def __init__(self):
+            super().__init__(title="Pets")
+            self.add_css_class("popup")
+            self.add_css_class("menu")  # same look as the rofi menus
+            self.set_decorated(False)
+            self.set_hide_on_close(True)
+
+            box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10, css_classes=["menu-box"])
+            box.append(Gtk.Label(label="Pet", css_classes=["menu-title"]))
+            row = Gtk.Box(spacing=8, halign=Gtk.Align.CENTER)
+            self.cards = []
+            for kind in pet.PETS:
+                card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4, css_classes=["pet-card"])
+                stage = Stage(kind)
+                card.append(stage)
+                card.append(Gtk.Label(label=pet.NAMES.get(kind, kind.title()), css_classes=["pet-name"]))
+                click = Gtk.GestureClick()
+                click.connect("released", lambda *_a, k=kind: self.choose(k))
+                card.add_controller(click)
+                motion = Gtk.EventControllerMotion()
+                motion.connect("enter", lambda *_a, i=len(self.cards): self.select(i))
+                card.add_controller(motion)
+                row.append(card)
+                self.cards.append((kind, card, stage))
+            box.append(row)
+            self.set_child(box)
+            self.selected = 0
+
+            keys = Gtk.EventControllerKey()
+            keys.connect("key-pressed", self.on_key)
+            self.add_controller(keys)
+
+        def show_up(self):
+            chosen = current()
+            for i, (kind, card, stage) in enumerate(self.cards):
+                (card.add_css_class if kind == chosen else card.remove_css_class)("current")
+                if kind == chosen:
+                    self.select(i)
+            self.present()
+            for _kind, _card, stage in self.cards:
+                stage.start()
+
+        def select(self, i):
+            self.cards[self.selected][1].remove_css_class("selected")
+            self.selected = i % len(self.cards)
+            self.cards[self.selected][1].add_css_class("selected")
+
+        def choose(self, kind):
+            subprocess.Popen([str(CLAUDE_PAD), "pet", kind])
+            self.close()
+
+        def on_key(self, _ctrl, keyval, _code, _state):
+            if keyval == Gdk.KEY_Escape:
+                self.close()
+            elif keyval in (Gdk.KEY_Left, Gdk.KEY_h):
+                self.select(self.selected - 1)
+            elif keyval in (Gdk.KEY_Right, Gdk.KEY_l):
+                self.select(self.selected + 1)
+            elif keyval in (Gdk.KEY_Return, Gdk.KEY_KP_Enter, Gdk.KEY_space):
+                self.choose(self.cards[self.selected][0])
+            else:
+                return False
+            return True
+
     GLib.set_prgname("popup.pets")       # Wayland app id = window class for Hyprland
     provider = Gtk.CssProvider()
     provider.load_from_path(str(CSS))
     Gtk.StyleContext.add_provider_for_display(
-        Gdk.Display.get_default(), provider, Gtk.STYLE_PROVIDER_PRIORITY_USER
-    )
+        Gdk.Display.get_default(), provider, Gtk.STYLE_PROVIDER_PRIORITY_USER)
+
     loop = GLib.MainLoop()
     win = Picker()
-    win.connect("close-request", lambda *_a: loop.quit())
-    win.present()
+    sock = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
+    try:
+        os.unlink(SOCK)
+    except OSError:
+        pass
+    sock.bind(SOCK)
+
+    def on_cmd(*_a):
+        cmd = sock.recv(64).decode().strip()
+        if cmd == "show":
+            win.show_up()
+        elif cmd == "quit":
+            loop.quit()
+        return True
+    GLib.io_add_watch(sock.fileno(), GLib.PRIORITY_DEFAULT, GLib.IOCondition.IN, on_cmd)
+    if show:
+        win.show_up()
     loop.run()
+    os.unlink(SOCK)
+
+
+def main():
+    args = sys.argv[1:]
+    if args == ["show"]:
+        if not send("show"):
+            serve(show=True)
+    elif args == ["quit"]:
+        send("quit")
+    elif args in ([], ["--hidden"]):
+        if send("ping"):          # already running
+            if not args:
+                send("show")
+            return
+        serve(show=not args)
+    else:
+        sys.exit(__doc__)
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    main()

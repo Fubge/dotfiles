@@ -4,3 +4,4 @@
 # pet.py: {{ include "dot_local/lib/pet/pet.py" | sha256sum }}
 set -euo pipefail
 python3 "$HOME/.local/lib/pet/pet.py" build "$HOME/.config/waybar/pet"
+"$HOME/.local/bin/pet-picker" quit   # the hidden picker reloads pet.py on next open
