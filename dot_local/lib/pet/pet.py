@@ -29,6 +29,8 @@ SCALE = 3                # device pixels per art pixel in the @2 image
 GROUND = 15              # feet row: the body sits centered in the bar, room above
                          # and below for jumps, raised tools and rising Zs
 CX = 9                   # where the pet stands (center column)
+COMPACT = 20             # columns shown while idle (no props): the window title
+                         # stays close; busy/done widen the module to W
 
 # ---------------------------------------------------------------- colors
 PROP = {
@@ -59,12 +61,21 @@ PETS = {
 
 
 # ---------------------------------------------------------------- canvas
+def blend(under, over):
+    a = int(over[7:9], 16) / 255
+    mix = [round(int(under[i:i + 2], 16) * (1 - a) + int(over[i:i + 2], 16) * a) for i in (1, 3, 5)]
+    return "#%02x%02x%02x" % tuple(mix)
+
+
 class Canvas:
     def __init__(self):
         self.px = {}
 
     def put(self, x, y, c):
         if 0 <= x < W and 0 <= y < H:
+            under = self.px.get((x, y))
+            if len(c) == 9 and under and len(under) == 7:   # translucent over opaque
+                c = blend(under, c)
             self.px[(x, y)] = c
 
     def grid(self, rows, x, y, colors=PROP_COLORS):
@@ -75,7 +86,8 @@ class Canvas:
                     self.put(x + i, y + j, colors[ch])
 
     def merge(self, other):
-        self.px.update(other.px)
+        for (x, y), col in other.px.items():
+            self.put(x, y, col)
 
 
 def outline(c, color):
@@ -134,7 +146,8 @@ class Pose(dict):
 
 
 DEFAULT = dict(eyes="open", mouth="dot", squash=0, x=0, y=0, paws=None, star="on",
-               tail=0, props=())
+               tail=0, ear=0, props=())
+SHADOW, SHADOW_EDGE = "#1c202950", "#1c202928"
 
 
 def face(c, kind, cx, ey, p, pal):
@@ -241,11 +254,12 @@ def draw_pet(kind, p):
         c.put(l0 - 1, top + 1, pal["mid"])     # soft tufts
         c.put(rows[3][1] + 1, top + 3, pal["mid"])
     else:
-        for dx, dy in ((0, -2), (0, -1), (1, -1)):   # ears
-            c.put(l0 + dx, top + dy, pal["mid"])
+        for dx, dy in ((0, -2), (0, -1), (1, -1)):   # ears (ear=1: left one twitches)
+            c.put(l0 + dx - (1 if p.ear and dy == -2 else 0), top + dy, pal["mid"])
             c.put(r0 - dx, top + dy, pal["mid"])
         tail = [[(1, 0), (2, -1), (2, -2), (2, -3)],
-                [(1, 0), (2, -1), (3, -2), (3, -3)]][p.tail]
+                [(1, 0), (2, -1), (3, -2), (3, -3)],
+                [(1, 0), (2, -1), (3, -2), (4, -3)]][p.tail]
         for dx, dy in tail:
             c.put(rows[-1][1] + dx, bot + dy, pal["shade"])
     box = (min(r[0] for r in rows), max(r[1] for r in rows), top, bot)
@@ -267,6 +281,14 @@ def draw_pet(kind, p):
     if p.y == 0:
         for fx in (cx - 3, cx - 2, cx + 2, cx + 3):
             c.put(fx, GROUND, pal["line"])
+    # soft shadow on the "floor", smaller while in the air
+    half = 4 + (p.squash > 0) + p.y
+    shadow = Canvas()
+    for x in range(cx - half, cx + half + 1):
+        edge = abs(x - cx) == half
+        shadow.put(x, GROUND + 1, SHADOW_EDGE if edge else SHADOW)
+    shadow.merge(c)
+    c = shadow
     face(c, kind, cx, top + 4 - (1 if p.squash > 0 else 0), p, pal)
     return c, box
 
@@ -306,14 +328,27 @@ krrrrRrrrdk
 krrrrrrrddk
 kkkkkkkkkkk
 """)
-SCREEN = [g("""
-SSSs.
-Ss.SS
-SSSSs
+CODE = ["SSs..", "SS.Ss", ".SSs.", "SSSs.", "Ss...", ".SS.S", "SSSSs", "Ss.SS"]
+
+
+def screen(k):
+    """Three lines of 'code', scrolling up one line per step."""
+    return [CODE[(k + i) % len(CODE)] for i in range(3)]
+
+
+POOF = [g("""
+..tt...
+.tttt..
+..tt...
 """), g("""
-SSs.S
-SSSSs
-Ss...
+.tt.tt.
+ttttttt
+.ttttt.
+..t.t..
+"""), g("""
+t.....t
+...t...
+t.....t
 """)]
 MONITOR = g("""
 .kkkkkkkkk.
@@ -398,22 +433,30 @@ def props(c, items, box):
                 c.put(x, y, fade(PROP[col], 1 - k * 0.3))
         elif name == "computer":      # monitor with code lines + keyboard
             c.grid(MONITOR, r + 9, GROUND - 10)
-            c.grid(SCREEN[args[0]], r + 12, GROUND - 7, {"S": PROP_COLORS["S"], "s": "#ffffff"})
+            c.grid(screen(args[0]), r + 12, GROUND - 7, {"S": PROP_COLORS["S"], "s": "#ffffff"})
             c.grid(KEYBOARD, r, GROUND - 2)
         elif name == "dots":
             for i in range(args[0]):
                 c.grid(DOT, r + 2 + i * 3, top - 3 - i)
         elif name == "bulb":
             c.grid(BULB, r + 2, top - 7)
-        elif name == "gem":
-            c.grid(GEM, r - 1, top - 5 + (args[0] if args else 0))
+        elif name == "gem":           # (gem, bob, sparkle)
+            gy = top - 5 + args[0]
+            c.grid(GEM, r - 1, gy)
+            if len(args) > 1 and args[1]:
+                sx, sy = r + 5, gy - 1
+                for dx, dy in ((0, 0), (-1, 0), (1, 0), (0, -1), (0, 1)):
+                    c.put(sx + dx, sy + dy, "#ffffff" if (dx, dy) == (0, 0) else fade("#ffffff", 0.6))
+        elif name == "poof":          # (poof, step, dx, dy): little cloud where a prop appears
+            k, dx, dy = args
+            c.grid(POOF[k], r + dx, GROUND + dy, {"t": fade(PROP["think"], (1, 0.85, 0.55)[k])})
         elif name == "bang":
             c.grid(BANG, r + 4, top - 3 + (args[0] if args else 0))
         elif name == "Z":             # (Z, step 0..7): rises and fades out
             k = args[0]
             alpha = 1 if k < 5 else 1 - (k - 4) * 0.25
             shape = z if k < 3 else Z
-            c.grid(shape, r + 2 + k // 2, GROUND - 7 - k, {"z": fade(PROP["z"], alpha)})
+            c.grid(shape, r + k // 3, GROUND - 7 - k, {"z": fade(PROP["z"], alpha)})
         elif name == "confetti":      # (confetti, step): pieces drift down
             k = args[0]
             pts = [(l - 5, 0), (l - 3, 5), (r + 4, -1), (r + 7, 4), (l + 2, -3), (r + 1, 2),
@@ -480,6 +523,14 @@ def with_props(frames, fn):
             for i, (pose, ms) in enumerate(frames)]
 
 
+def appear(poof, props, pose):
+    """A prop pops in: puff of cloud first, the prop shows up inside it."""
+    name, dx, dy = poof
+    return [F(90, props=[(name, 0, dx, dy)], **pose),
+            F(90, props=props + [(name, 1, dx - 1, dy)], **pose),
+            F(110, props=props + [(name, 2, dx - 1, dy)], **pose)]
+
+
 SMILE = dict(eyes="happy", mouth="smile")
 ANIMS = {
     # ---- idle (day)
@@ -499,7 +550,8 @@ ANIMS = {
     # mochi only
     "twinkle": [F(160, star="glow"), F(160), F(160, star="glow"), F(160), F(700, eyes="up")],
     # kitty only
-    "swish":   rep([F(200, tail=1), F(240, tail=0)], 3),
+    "swish":   rep([F(140, tail=1), F(200, tail=2), F(140, tail=1), F(200, tail=0)], 3),
+    "twitch":  [F(120, ear=1), F(160), F(120, ear=1), F(900)],
     # ---- night / off
     "sleep":   [F(260, eyes="sleep", star="off", squash=1 if i % 4 < 2 else 0, props=[("Z", i)])
                 for i in range(8)] + [F(600, eyes="sleep", star="off")],
@@ -509,9 +561,10 @@ ANIMS = {
     "wake":    [F(700, eyes="sleep", star="off"), F(300, eyes="blink"), F(300, eyes="half"), F(150, eyes="blink"),
                 F(300), F(120, eyes="blink"), F(200, star="glow"), F(900, **SMILE)],
     # ---- busy
-    "mine":    rep(swing(), 4),
-    "type":    rep([F(130, paws="type", eyes="right", props=[("computer", 0)]),
-                    F(130, paws="type2", eyes="right", props=[("computer", 1)])], 8),
+    "mine":    appear(("poof", 9, -4), ["rock"], dict(paws="hold", eyes="right")) + rep(swing(), 4),
+    "type":    appear(("poof", 11, -7), [("computer", 0)], dict(eyes="right")) +
+               [F(130, paws="type" if i % 2 else "type2", eyes="right", props=[("computer", i // 2)])
+                for i in range(20)],
     "think":   [F(500, eyes="up", props=[("dots", 1)]), F(500, eyes="up", props=[("dots", 2)]),
                 F(500, eyes="up", props=[("dots", 3)]), F(400, eyes="left", props=[("dots", 3)]),
                 F(120, eyes="wide", props=[("dots", 3)]),
@@ -527,10 +580,14 @@ ANIMS = {
                           jump(70, 2, eyes="happy", mouth="open", paws="up2") +
                           [F(200, eyes="happy", mouth="smile", paws="up")] * 3,
                           lambda i: [("confetti", i)]),
-    "gem":     rep([F(450, paws="gem", props=[("gem", 0)], **SMILE),
-                    F(450, paws="gem", props=[("gem", 1)], **SMILE)], 3),
+    "gem":     rep([F(450, paws="gem", props=[("gem", 0, 0)], **SMILE),
+                    F(150, paws="gem", props=[("gem", 1, 1)], **SMILE),
+                    F(300, paws="gem", props=[("gem", 1, 0)], **SMILE)], 3),
+    # ---- clicked
+    "poke":    [F(90, eyes="wide", mouth="o")] + jump(60, 2, eyes="happy", mouth="open") +
+               [F(700, **SMILE)],
 }
-ONLY = {"twinkle": "mochi", "swish": "kitty"}
+ONLY = {"twinkle": "mochi", "swish": "kitty", "twitch": "kitty"}
 
 
 # ---------------------------------------------------------------- build
@@ -568,7 +625,9 @@ def build(out):
     w, h = W * SCALE // 2, H * SCALE // 2
     with open(os.path.join(out, "pet.css"), "w") as f:
         f.write("/* Generated by ~/.local/lib/pet/pet.py build: one class per pet frame */\n")
-        f.write(f"#custom-claude {{ min-width: {w}px; min-height: {h}px; background-size: {w}px {h}px; }}\n")
+        f.write(f"#custom-claude {{ min-width: {COMPACT * SCALE // 2}px; min-height: {h}px; "
+                f"background-size: {w}px {h}px; }}\n")
+        f.write(f"#custom-claude.wide {{ min-width: {w}px; }}\n")
         f.write("\n".join(css) + "\n")
     with open(os.path.join(out, "anims.json"), "w") as f:
         json.dump({"anims": anims}, f)
