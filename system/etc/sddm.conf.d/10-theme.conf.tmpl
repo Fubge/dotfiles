@@ -1,0 +1,14 @@
+# Login screen settings (installed from the dotfiles repo, system/)
+[General]
+# No on-screen keyboard
+InputMethod=
+
+[Theme]
+Current=slate
+CursorTheme=breeze_cursors
+CursorSize=24
+
+[X11]
+# Greeter DPI follows the display scale from `chezmoi init` (96 x scale)
+{{- $scale := .machine.monitor_scale }}{{ if eq $scale "auto" }}{{ $scale = "1" }}{{ end }}
+ServerArguments=-nolisten tcp -dpi {{ mulf 96.0 (float64 $scale) | int }}

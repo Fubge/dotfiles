@@ -1,10 +1,17 @@
 #!/usr/bin/env bash
-# Create the wallpaper folder and pick a first wallpaper.
+# Create the wallpaper folder and pick a first wallpaper. An empty folder gets
+# a plain gradient in the palette colors, so a fresh install never shows black.
 set -euo pipefail
 dir="{{ .chezmoi.homeDir }}/Pictures/Wallpapers"
 state="{{ .chezmoi.homeDir }}/.local/state/wallpaper"
 mkdir -p "$dir" "$state"
+has_images() { find -L "$dir" -type f \( -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' -o -iname '*.webp' \) | grep -q .; }
+if ! has_images && command -v magick >/dev/null; then
+    magick -size 3840x2400 "gradient:{{ .palette.bg_alt }}-{{ .palette.bg_dark }}" \
+        "$dir/slate-gradient.png"
+    echo "wallpaper: created $dir/slate-gradient.png (drop your own images next to it)"
+fi
 if [[ ! -e $state/current ]]; then
-    first=$(find -L "$dir" -type f \( -iname '*.jpg' -o -iname '*.png' \) 2>/dev/null | head -1)
+    first=$(find -L "$dir" -type f \( -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' -o -iname '*.webp' \) 2>/dev/null | head -1)
     [[ -n $first ]] && ln -sfn "$first" "$state/current" && echo fixed > "$state/mode"
 fi

@@ -1,0 +1,7 @@
+# NVIDIA graphics (Turing / GTX 16xx and newer; open kernel modules)
+# Untested in this setup: see docs/install.md for the Hyprland notes
+nvidia-open
+nvidia-utils
+lib32-nvidia-utils    # 32-bit for Steam/Proton
+egl-wayland
+libva-nvidia-driver

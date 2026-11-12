@@ -1,0 +1,53 @@
+{{- /*
+  Machine settings. `chezmoi init` asks these once and stores the answers in
+  ~/.config/chezmoi/chezmoi.toml; change them there (or delete a key and run
+  `chezmoi init` again to be asked anew). Templates read them as .machine.*
+*/ -}}
+{{- $cpuDefault := "intel" -}}
+{{- if contains "AuthenticAMD" (output "cat" "/proc/cpuinfo") -}}{{ $cpuDefault = "amd" }}{{- end -}}
+
+{{- $cpu := promptChoiceOnce . "machine.cpu" "CPU vendor (microcode package)" (list "intel" "amd") $cpuDefault -}}
+{{- $gpu := promptChoiceOnce . "machine.gpu" "Graphics (driver packages)" (list "intel" "amd" "nvidia" "none") "intel" -}}
+{{- $layout := promptStringOnce . "machine.kb_layout" "Keyboard layout (xkb, e.g. us, de, fr)" "us" -}}
+{{- $kbopts := promptStringOnce . "machine.kb_options" "xkb options (caps:swapescape = Caps Lock is Escape; altwin:swap_lalt_lwin swaps left Alt and Super)" "caps:swapescape" -}}
+{{- $clock := promptStringOnce . "machine.clock_locale" "Locale for dates in the bar (must be in `locale -a`)" "en_US.UTF-8" -}}
+{{- $mode := promptStringOnce . "machine.monitor_mode" "Internal display mode (preferred, or e.g. 2560x1600@165)" "preferred" -}}
+{{- $scale := promptStringOnce . "machine.monitor_scale" "Internal display scale (auto, 1, 1.5, 2, ...)" "auto" -}}
+{{- $gaming := promptBoolOnce . "machine.gaming" "Install the gaming stack (Steam, GameMode, MangoHud, Minecraft launcher)" true -}}
+{{- $apps := promptBoolOnce . "machine.apps" "Install personal apps (Vivaldi, Discord, Bitwarden, Spotify)" true -}}
+{{- $boot := promptBoolOnce . "machine.boot" "Manage the boot chain (GRUB theme + entries, kernel cmdline, console font)? Only say yes for the documented UKI + GRUB layout, see docs/install.md" false -}}
+
+[data.machine]
+cpu = {{ $cpu | quote }}
+gpu = {{ $gpu | quote }}
+kb_layout = {{ $layout | quote }}
+kb_options = {{ $kbopts | quote }}
+clock_locale = {{ $clock | quote }}
+monitor_mode = {{ $mode | quote }}
+monitor_scale = {{ $scale | quote }}
+gaming = {{ $gaming }}
+apps = {{ $apps }}
+boot = {{ $boot }}
+# First login-screen background, relative to ~/Pictures/Wallpapers
+# ("" = the current desktop wallpaper)
+login_wallpaper = {{ dig "machine" "login_wallpaper" "" . | quote }}
+{{- if $boot }}
+{{- $espDefault := output "findmnt" "-no" "UUID" "/boot" | trim }}
+{{- $cmdDefault := "" }}
+{{- if stat "/etc/kernel/cmdline" }}{{ $cmdDefault = output "cat" "/etc/kernel/cmdline" | trim }}{{ end }}
+{{- $esp := promptStringOnce . "machine.esp_uuid" "UUID of the EFI partition (findmnt -no UUID /boot)" $espDefault }}
+{{- $cmdline := promptStringOnce . "machine.cmdline" "Kernel command line baked into the UKI" $cmdDefault }}
+{{- $keymap := promptStringOnce . "machine.console_keymap" "Console keymap (also the LUKS prompt), e.g. us, de-latin1" "us" }}
+{{- $font := promptStringOnce . "machine.console_font" "Console font (ter-132b for HiDPI, ter-v22b for 1080p)" "ter-v22b" }}
+{{- $res := promptStringOnce . "machine.grub_resolution" "GRUB resolution = native panel size, e.g. 1920x1080" "1920x1080" }}
+{{- $win := promptBoolOnce . "machine.windows" "Add a Windows Boot Manager entry to GRUB" false }}
+esp_uuid = {{ $esp | quote }}
+cmdline = {{ $cmdline | quote }}
+console_keymap = {{ $keymap | quote }}
+console_font = {{ $font | quote }}
+grub_resolution = {{ $res | quote }}
+windows = {{ $win }}
+{{- end }}
+
+[data.locale]
+clock = {{ $clock | quote }}

@@ -22,7 +22,8 @@ from pathlib import Path
 sys.path.insert(0, os.path.expanduser("~/.local/lib/popup"))
 import resident  # noqa: E402
 
-DEVICE = Path("/sys/class/backlight/intel_backlight")
+# first backlight device (intel_backlight, amdgpu_bl0, ...)
+DEVICE = next(Path("/sys/class/backlight").iterdir(), Path("/sys/class/backlight/none"))
 EXPONENT = 2
 CSS = Path.home() / ".config/popups/style.css"
 ICONS = ["\U000F0594", "\U000F0595", "\U000F05A8"]  # moon / cloud / sun, as in the bar

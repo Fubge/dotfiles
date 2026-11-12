@@ -1,0 +1,6 @@
+# Intel graphics (Arc, Xe, UHD): Vulkan + VA-API video acceleration
+vulkan-intel
+lib32-vulkan-intel    # 32-bit Vulkan for Steam/Proton
+intel-media-driver
+vpl-gpu-rt
+libvpl

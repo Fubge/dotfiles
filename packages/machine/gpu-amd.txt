@@ -1,0 +1,3 @@
+# AMD graphics (RADV Vulkan; VA-API is part of mesa)
+vulkan-radeon
+lib32-vulkan-radeon   # 32-bit Vulkan for Steam/Proton

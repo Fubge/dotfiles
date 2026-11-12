@@ -57,17 +57,17 @@ exit
 |---|---|
 | Get changes from GitHub (other machine) | `chezmoi update` |
 | Anything out of sync? | `dots-check` / `chezmoi status` |
-| New machine | `gh auth login`, then `chezmoi init --apply Fubge/dotfiles` |
+| New machine | see [install.md](install.md) |
+| Change machine settings (keyboard, GPU, monitor, ...) | edit `[data.machine]` in `~/.config/chezmoi/chezmoi.toml`, then `chezmoi apply` |
 | Changed something outside `$HOME` (`/etc`, ...) | note it in `docs/system-changes.md` |
 | Roll back the system after a broken update | see `docs/system-changes.md` |
 
 ## Change colors, gaps, rounding or fonts
 
-All apps read the same two files:
+All apps read the same files:
 
 - `.chezmoidata/palette.toml` - every color (accent, backgrounds, text, ...)
 - `.chezmoidata/design.toml` - rounding, border width, gaps, fonts
-- `.chezmoidata/locale.toml` - language of the dates in the bar (default German)
 
 Edit them (`dots`, then `nvim .chezmoidata/palette.toml`), run `chezmoi apply`,
 then reload: `hyprctl reload`, `systemctl --user restart waybar`, restart kitty/apps.
@@ -78,13 +78,13 @@ Files ending in `.tmpl` are generated from these values.
 - `SUPER+W` opens the picker: pick an image, or "Shuffle" (new image every 30 min).
 - Your own images: drop them into `~/Pictures/Wallpapers` (subfolders work).
 - Every login picks a random desktop image and a different one for the next login screen (`wallpaper-random.service`). A menu choice holds until the next login.
-- Login screen background: SUPER+W, then Shift+Enter (Ctrl+Enter = desktop and login). Stored in `/var/lib/login-wallpaper` (user-owned); `login_wallpaper` in `.chezmoidata/design.toml` only seeds it.
+- Login screen background: SUPER+W, then Shift+Enter (Ctrl+Enter = desktop and login). Stored in `/var/lib/login-wallpaper` (user-owned); `machine.login_wallpaper` in `~/.config/chezmoi/chezmoi.toml` only seeds it.
 
 ## Shortcuts and menus
 
-- **SUPER is the left Alt key** (next to the space bar): left Alt and the Windows key
-  are swapped (`altwin:swap_lalt_lwin` in `hypr/vars.lua`), so apps get Alt from the
-  Windows key. While a game has focus the swap is undone (see Gaming).
+- **SUPER** is the Windows key, unless `machine.kb_options` contains
+  `altwin:swap_lalt_lwin`: then the left Alt key (next to the space bar) is SUPER and
+  apps get Alt from the Windows key. While a game has focus the swap is undone (see Gaming).
 - **`SUPER+H`** lists every shortcut (built live from the descriptions in `hypr/binds.lua`).
 - The small menus (Wi-Fi `SUPER+N`, power profile `SUPER+P`,
   power `SUPER+Escape`) open in the middle of the screen; clicking the same icon in the

@@ -29,6 +29,7 @@ quick prompt show it, so a reply can go straight back from the prompt pill.
 import html
 import json
 import os
+import shutil
 import random
 import select
 import socket
@@ -147,7 +148,7 @@ def kitty(*args, text=None):
 # --------------------------------------------------------------- window
 def start():
     """Start the session (hidden: the window rule opens it silently)."""
-    if window():
+    if window() or not shutil.which("claude"):   # no Claude Code: the pet just sleeps
         return
     os.makedirs(RUN, exist_ok=True)
     try:

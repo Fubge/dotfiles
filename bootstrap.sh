@@ -4,17 +4,19 @@
 # Expects the base install to be done (see "Not covered" below): booting
 # system, user with sudo, network. Then, as that user:
 #
-#   sudo pacman -S --needed git github-cli
-#   gh auth login                       # the repo is private
-#   gh repo clone Fubge/dotfiles ~/.local/share/chezmoi
+#   sudo pacman -S --needed git
+#   git clone https://github.com/Fubge/dotfiles ~/.local/share/chezmoi
 #   ~/.local/share/chezmoi/bootstrap.sh
+#
+# chezmoi asks a few questions first (CPU/GPU, keyboard, display, optional
+# package groups, boot chain); the answers land in ~/.config/chezmoi/chezmoi.toml.
 #
 # Every step checks first and only changes what is missing, so running it
 # again on a finished system is safe. --dry-run prints what it would do.
 #
-# Not covered (one-time manual work during the Arch install): partitions,
-# LUKS, btrfs subvolumes (@, @home, @snapshots) and fstab, mkinitcpio/UKI,
-# GRUB install to the ESP, locale, hostname, user + sudo.
+# Not covered (one-time manual work during the Arch install, see
+# docs/install.md): partitions, LUKS, btrfs subvolumes and fstab, bootloader,
+# locale, hostname, user + sudo.
 set -euo pipefail
 
 dry=false
@@ -60,7 +62,7 @@ fi
 run sudo pacman -Syu --needed --noconfirm git chezmoi
 
 # ---------------------------------------------------------------- dotfiles
-# Packages (packages/*.txt), configs, root files from system/, SDDM + GRUB
+# Packages (packages/), configs, root files from system/ (+ system-boot/), SDDM + GRUB
 # themes and the user services all come from chezmoi's run_* scripts.
 step "chezmoi: packages, dotfiles, system files, themes"
 run chezmoi init --source "$repo"     # only writes chezmoi's config, keeps the repo

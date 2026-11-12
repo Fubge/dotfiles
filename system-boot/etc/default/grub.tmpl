@@ -8,12 +8,12 @@ GRUB_PRELOAD_MODULES="part_gpt part_msdos"
 GRUB_TERMINAL_INPUT=console
 GRUB_TERMINAL_OUTPUT=gfxterm
 
-# Native panel resolution; the theme's fonts are sized for it
-GRUB_GFXMODE=2880x1800,auto
+# Native panel resolution (machine.grub_resolution); the theme is drawn for it
+GRUB_GFXMODE={{ .machine.grub_resolution }},auto
 GRUB_GFXPAYLOAD_LINUX=keep
 GRUB_THEME=/boot/grub/themes/slate/theme.txt
 
-# Only "Arch Linux" and "Windows 11" (from 40_custom): hide the firmware's
+# Only the entries from 40_custom: hide the firmware's
 # ~30 BootNext entries (Lenovo tools, PXE, USB...) and other generators
 GRUB_DISABLE_BOOTNEXT=true
 GRUB_DISABLE_RECOVERY=true

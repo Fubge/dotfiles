@@ -1,1 +1,0 @@
-cryptdevice=PARTUUID=be6d10ae-1e30-438c-93ed-68e60cbd28cf:root:allow-discards root=/dev/mapper/root zswap.enabled=0 rootflags=subvol=@ rw rootfstype=btrfs quiet loglevel=3 rd.udev.log_level=3 vt.global_cursor_default=0

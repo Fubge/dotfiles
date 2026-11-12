@@ -1,0 +1,7 @@
+# Console keymap and font (also used for the LUKS prompt via the consolefont hook).
+# Set by `chezmoi init` (machine.console_keymap / console_font).
+KEYMAP={{ .machine.console_keymap }}
+FONT={{ .machine.console_font }}
+XKBLAYOUT={{ .machine.kb_layout }}
+XKBMODEL=pc105
+XKBOPTIONS=terminate:ctrl_alt_bksp

@@ -13,7 +13,9 @@ ok()      { printf '  %s✓%s %s\n' "$green" "$reset" "$1"; }
 
 # --- 1. Packages ---------------------------------------------------------------
 section "Packages"
-listed=$(sed 's/#.*//; s/[[:space:]]//g; /^$/d' "$src"/packages/*.txt | sort -u)
+# the same lists the installer uses (machine/ and optional groups per chezmoi init)
+mapfile -t lists < <(chezmoi execute-template '{{ $l := list "base" "hardware" "desktop" "shell" "dev" (printf "machine/cpu-%s" .machine.cpu) (printf "machine/gpu-%s" .machine.gpu) }}{{ if .machine.apps }}{{ $l = append $l "apps" }}{{ end }}{{ if .machine.gaming }}{{ $l = append $l "gaming" }}{{ end }}{{ range $l }}{{ . }}{{ "\n" }}{{ end }}')
+listed=$(for l in "${lists[@]}"; do sed 's/#.*//; s/[[:space:]]//g; /^$/d' "$src/packages/$l.txt"; done | sort -u)
 installed=$(pacman -Qqe | sort -u)
 
 untracked=$(comm -23 <(echo "$installed") <(echo "$listed"))

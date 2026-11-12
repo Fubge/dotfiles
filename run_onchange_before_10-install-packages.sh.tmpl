@@ -1,13 +1,20 @@
 #!/usr/bin/env bash
 # Installs all packages listed in packages/*.txt (official repos only).
-# chezmoi re-runs this script whenever one of the lists changes:
-{{ range (list "base" "hardware" "desktop" "shell" "apps" "gaming" "dev") -}}
+# Which lists are used depends on `chezmoi init` (see .chezmoi.toml.tmpl):
+{{- $lists := list "base" "hardware" "desktop" "shell" "dev" }}
+{{- if .machine.apps }}{{ $lists = append $lists "apps" }}{{ end }}
+{{- if .machine.gaming }}{{ $lists = append $lists "gaming" }}{{ end }}
+{{- $lists = append $lists (printf "machine/cpu-%s" .machine.cpu) }}
+{{- $lists = append $lists (printf "machine/gpu-%s" .machine.gpu) }}
+# chezmoi re-runs this script whenever one of them changes:
+{{ range $lists -}}
 # {{ . }}: {{ include (printf "packages/%s.txt" .) | sha256sum }}
 {{ end -}}
 set -euo pipefail
 
 src="{{ .chezmoi.sourceDir }}/packages"
-mapfile -t pkgs < <(sed 's/#.*//; s/[[:space:]]//g; /^$/d' "$src"/*.txt | sort -u)
+lists=({{ range $lists }}"$src/{{ . }}.txt" {{ end }})
+mapfile -t pkgs < <(sed 's/#.*//; s/[[:space:]]//g; /^$/d' "${lists[@]}" | sort -u)
 
 missing=()
 for p in "${pkgs[@]}"; do

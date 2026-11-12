@@ -1,15 +1,11 @@
-# Intel Arc (Xe3) graphics & video acceleration
-# Refined in phase 2 (hardware & power)
-vulkan-intel
-intel-media-driver
-vpl-gpu-rt
-libvpl
+# Hardware support every machine gets (CPU/GPU drivers: packages/machine/)
 
-# Fingerprint reader (Synaptics 06cb:019d)
+# Fingerprint reader (fprintd-enroll; harmless without one)
 fprintd
 
 # Diagnostics
 libva-utils
 vulkan-tools
 usbutils
+pciutils
 python-gobject   # required by powerprofilesctl

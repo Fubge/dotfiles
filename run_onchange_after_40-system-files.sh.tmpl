@@ -1,28 +1,47 @@
 #!/usr/bin/env bash
-# Install files from system/ into / (root-owned, not symlinked).
-# Re-runs when any of them changes:
-{{ range (glob (joinPath .chezmoi.sourceDir "system/**/*")) -}}
-{{ if not (stat .).isDir -}}
-# {{ . | trimPrefix $.chezmoi.sourceDir }}: {{ include . | sha256sum }}
-{{ end -}}
-{{ end -}}
+# Install root-owned files into / (copied, not symlinked):
+#   system/       every machine (SDDM theme, power profile switching)
+#   system-boot/  only with machine.boot = true (GRUB, kernel cmdline, console)
+# *.tmpl files are rendered with the chezmoi data first.
+# Re-runs when any of them (or their rendered output) changes:
+{{- $dirs := list "system" }}
+{{- if .machine.boot }}{{ $dirs = append $dirs "system-boot" }}{{ end }}
+{{ range $dirs }}
+{{- range (glob (joinPath $.chezmoi.sourceDir . "**/*")) }}
+{{- if not (stat .).isDir }}
+# {{ . | trimPrefix $.chezmoi.sourceDir }}: {{ if hasSuffix ".tmpl" . }}{{ includeTemplate . $ | sha256sum }}{{ else }}{{ include . | sha256sum }}{{ end }}
+{{- end }}
+{{- end }}
+{{- end }}
 set -euo pipefail
-src="{{ .chezmoi.sourceDir }}/system"
+cd "{{ .chezmoi.sourceDir }}"
+dirs=({{ range $dirs }}{{ . }} {{ end }})
 
-cd "$src"
 # Console font and kernel command line are baked into the UKI: rebuild it when they change
 rebuild_uki=false
-for f in etc/vconsole.conf etc/kernel/cmdline; do
-    cmp -s "$f" "/$f" || rebuild_uki=true
-done
+installed=()
 
-find . -type f | while read -r f; do
-    dest="/${f#./}"
-    mode=0644
-    [[ $dest == */bin/* || $dest == /etc/grub.d/* ]] && mode=0755
-    sudo install -D -m "$mode" -o root -g root "$f" "$dest"
-    echo "system: installed $dest"
+for d in "${dirs[@]}"; do
+    while read -r f; do
+        rel=${f#"$d"/}
+        dest="/${rel%.tmpl}"
+        tmp=$(mktemp)
+        if [[ $f == *.tmpl ]]; then
+            chezmoi execute-template <"$f" >"$tmp"
+        else
+            cp "$f" "$tmp"
+        fi
+        if [[ $dest == /etc/vconsole.conf || $dest == /etc/kernel/cmdline ]] && ! cmp -s "$tmp" "$dest"; then
+            rebuild_uki=true
+        fi
+        mode=0644
+        [[ $dest == */bin/* || $dest == /etc/grub.d/* ]] && mode=0755
+        sudo install -D -m "$mode" -o root -g root "$tmp" "$dest"
+        rm -f "$tmp"
+        installed+=("$dest")
+    done < <(find "$d" -type f)
 done
+echo "system: installed ${#installed[@]} files: ${installed[*]}"
 
 if $rebuild_uki; then
     echo "system: console font or kernel cmdline changed, rebuilding UKI"

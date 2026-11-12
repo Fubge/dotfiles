@@ -7,9 +7,13 @@
 
 hl.monitor({ output = "", mode = "preferred", position = "auto", scale = "auto" })
 
--- Internal OLED panel (2880x1800, 120 Hz)
+-- Internal panel (mode and scale come from `chezmoi init`, see
+-- ~/.config/chezmoi/chezmoi.toml [data.machine])
 local internal = "eDP-1"
-hl.monitor({ output = internal, mode = "2880x1800@120", position = "auto", scale = 2 })
+local function internal_on()
+    hl.monitor({ output = internal, mode = "{{ .machine.monitor_mode }}", position = "auto", scale = {{ if eq .machine.monitor_scale "auto" }}"auto"{{ else }}{{ .machine.monitor_scale }}{{ end }} })
+end
+internal_on()
 
 -- Known external monitors (add when they arrive):
 -- hl.monitor({ output = "desc:Dell Inc. DELL U2723QE XXXXXXX", mode = "preferred", position = "auto-left", scale = 1.5 })
@@ -23,5 +27,5 @@ hl.bind("switch:on:Lid Switch", function()
 end, { locked = true })
 
 hl.bind("switch:off:Lid Switch", function()
-    hl.monitor({ output = internal, mode = "2880x1800@120", position = "auto", scale = 2 })
+    internal_on()
 end, { locked = true })

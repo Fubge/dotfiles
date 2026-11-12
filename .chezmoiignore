@@ -1,8 +1,9 @@
 README.md
+LICENSE
 bootstrap.sh
 packages/
 docs/
+assets/
 system/
-
+system-boot/
 **/__pycache__
-.gitignore

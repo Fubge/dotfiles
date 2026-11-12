@@ -106,7 +106,7 @@ M.overlay = {
 -- altwin:swap_lalt_lwin  left Alt <-> left Super: the key next to the space bar is
 --                        the Hyprland modifier, apps get Alt from the Windows key.
 --                        game-watch drops this swap while a game has focus.
-M.keyboard = { layout = "de", options = "caps:swapescape,altwin:swap_lalt_lwin" }
+M.keyboard = { layout = "{{ .machine.kb_layout }}", options = "{{ .machine.kb_options }}" }
 M.touchpad = "gxtp5400:00-27c6:0f96-touchpad"
 
 -- Screenshots ----------------------------------------------------------------

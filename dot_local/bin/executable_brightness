@@ -6,7 +6,9 @@
 #   brightness status -> one JSON line for the waybar custom module
 #   brightness watch  -> a JSON line now and after every change (udev event)
 set -uo pipefail
-dev=/sys/class/backlight/intel_backlight
+# first backlight device (intel_backlight, amdgpu_bl0, ...); no panel = no module
+dev=$(find /sys/class/backlight -mindepth 1 -maxdepth 1 | head -1)
+[[ -n $dev ]] || exit 0
 
 # Icon only (percent in the tooltip), a little day cycle:
 #   1-33% moon and stars, 34-66% sun behind a cloud, 67-100% full sun
