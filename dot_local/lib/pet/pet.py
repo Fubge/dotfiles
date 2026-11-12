@@ -57,6 +57,7 @@ PROP_COLORS = {
     "B": "#ffb3dc", "p": "#ffe3f2", "q": "#6a3a66",  # butterfly wing, light, body
     "h": "#ff7aa8", "H": "#ffc2d8",                  # heart, shine
 }
+BALLS = [("#ff8a3d", "#ffd0a8"), ("#8fe3ff", "#e6f9ff"), ("#ff9eb0", "#ffe0e7")]   # color, shine
 SOFT_LINE = {"butterfly": "#8a3f73", "heart": "#9c3557"}   # outlines not as hard as "k"
 
 PETS = {
@@ -240,6 +241,9 @@ PAWS = {
     "type":    lambda l, r, t, b: [(r + 1, b - 3), (r + 5, b - 2)],
     "type2":   lambda l, r, t, b: [(r + 1, b - 2), (r + 5, b - 3)],
     "gem":     lambda l, r, t, b: [(r + 1, t + 2)],
+    "juggle":  lambda l, r, t, b: [(l - 2, t + 4), (r + 1, t + 4)],
+    "juggle_l": lambda l, r, t, b: [(l - 2, t + 3), (r + 1, t + 4)],
+    "juggle_r": lambda l, r, t, b: [(l - 2, t + 4), (r + 1, t + 3)],
 }
 
 
@@ -576,6 +580,26 @@ def props(c, items, box, pal=None):
                 c.put(x + (1 if dx >= 0 else -1), y, fade(pal["shade"], alpha * 0.8))
                 if k < 2:
                     c.put(x, y - 1, fade(col, alpha * 0.6))
+        elif name == "ball":          # (ball, x, y, color): 2x2 juggling ball, top left at x, y
+            x, y, i = args
+            col, shine = BALLS[i]
+            bc = Canvas()
+            for dx, dy in ((0, 0), (1, 0), (0, 1), (1, 1)):
+                bc.put(x + dx, y + dy, col)
+            outline(bc, PROP_COLORS["k"])
+            bc.put(x, y, shine)
+            c.merge(bc)
+        elif name == "dizzy":         # (dizzy, step): little stars circling the head after a bonk
+            k = args[0]
+            cx = (l + r) // 2
+            for i in range(3):
+                a = (k * 0.9 + i * 2.1)
+                x = round(cx + 6 * math.cos(a))
+                y = round(top - 1 + 1.5 * math.sin(a))
+                c.put(x, y, PROP["spark"])
+                if (k + i) % 2:
+                    for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                        c.put(x + dx, y + dy, fade(PROP["spark"], 0.55))
         elif name == "confetti":      # (confetti, step): pieces drift down
             k = args[0]
             pts = [(l - 3, 2), (l - 2, 6), (r + 4, 1), (r + 7, 5), (l + 2, 1), (r + 1, 3),
@@ -689,6 +713,54 @@ def butterfly():
     return out
 
 
+def juggle():
+    """Juggles three balls (Claude orange, blue, pink) in a shower pattern:
+    up from the right paw, over the head, down into the left paw. Then
+    catches two, the third bonks it on the head and bounces away, dizzy
+    stars, and the pet laughs it off."""
+    top = GROUND - 10                    # body top while standing
+    hy = top + 3                         # ball row at the paws
+    lx, rx = CX - 8, CX + 6              # ball x in the left / right paw
+    cx, rxx, ry = (lx + rx) / 2, (rx - lx) / 2, hy - 2   # arc: apex on row 2
+
+    def at(p):
+        """Ball position for phase p in 0..1."""
+        if p < 0.8:                      # in the air, right to left
+            a = math.pi * p / 0.8
+            return round(cx + rxx * math.cos(a)), round(hy - ry * math.sin(a))
+        return (lx, hy) if p < 0.9 else (rx, hy)   # quick pass in the paws
+
+    out = []
+    steps = 12
+    for k in range(steps * 3):
+        t = k / steps
+        balls = [("ball", *at((t + i / 3) % 1), i) for i in range(3)]
+        throw = (k % 4) in (0, 1)
+        eyes = "focus" if k % 12 in (5, 6) else "up"
+        out.append(F(95, paws="juggle_r" if throw else "juggle_l", eyes=eyes, props=balls))
+    # catch two, the third (blue) comes straight down on the head
+    held = [("ball", lx, hy, 0), ("ball", rx, hy, 2)]
+    for y in (2, 3, top - 3):
+        out.append(F(90, paws="juggle", eyes="up", props=held + [("ball", CX - 1, y, 1)]))
+    out.append(F(110, paws="juggle", eyes="blink", squash=1, mouth="o",
+                 props=held + [("ball", CX - 1, top - 2, 1)]))
+    # it bounces off to the right and rolls away; the pet is dizzy
+    bounce = [(CX + 2, top - 4), (CX + 5, top - 4), (CX + 7, top - 2), (CX + 9, top + 2),
+              (CX + 10, GROUND - 2), (CX + 11, GROUND - 3), (CX + 12, GROUND - 2),
+              (CX + 13, GROUND - 2), (CX + 14, GROUND - 2)]
+    for k, (x, y) in enumerate(bounce):
+        out.append(F(100, paws="juggle", eyes="sleep" if k < 6 else "half",
+                     props=held + [("ball", x, y, 1), ("dizzy", k)]))
+    rest = held + [("ball", CX + 14, GROUND - 2, 1)]
+    out += [F(160, paws="juggle", eyes="blink", props=rest), F(140, paws="juggle", props=rest),
+            F(140, paws="juggle", eyes="right", props=rest)]
+    for k in range(4):                   # giggle
+        out.append(F(140, paws="juggle", eyes="happy", mouth="open" if k % 2 == 0 else "smile",
+                     squash=k % 2, props=rest))
+    out.append(F(500, paws="juggle", **SMILE, props=rest))
+    return out
+
+
 def fluff():
     """Shakes like a wet puppy: squeezed eyes, wobble, poofs up twice its
     fluff with tufts flying off, then settles down proud."""
@@ -746,6 +818,7 @@ ANIMS = {
     "type":    appear(("poof", 11, -7), [("computer", 0)], dict(eyes="right")) +
                [F(130, paws="type" if i % 2 else "type2", eyes="right", props=[("computer", i // 2)])
                 for i in range(20)],
+    "juggle":  juggle(),
     "think":   [F(500, eyes="up", props=[("dots", 1)]), F(500, eyes="up", props=[("dots", 2)]),
                 F(500, eyes="up", props=[("dots", 3)]), F(400, eyes="left", props=[("dots", 3)]),
                 F(120, eyes="wide", props=[("dots", 3)]),
