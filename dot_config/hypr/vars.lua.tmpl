@@ -40,6 +40,8 @@ M.background = {
     M.bin .. "claude-pad start",          -- Claude session waits hidden on special:claude
     M.bin .. "pet-picker --hidden",       -- pet picker waits hidden, opens instantly
     M.bin .. "brightness-popup --hidden", -- brightness slider, same
+    M.bin .. "list-menu-popup --hidden",  -- Wi-Fi/Bluetooth/power... menus, same
+    M.bin .. "sound-popup --hidden",      -- sound popup, same
 }
 
 -- Look -----------------------------------------------------------------------
@@ -75,12 +77,18 @@ M.floating = {
 -- close when focus leaves. Size per window class.
 M.popup = {
     classes = {
-        ["org.pulseaudio.pavucontrol"] = { 460, 520 },
+        ["org.pulseaudio.pavucontrol"] = { 640, 560 },  -- narrower: app sliders scroll sideways
         ["popup-term"]                 = { 460, 520 },
         ["popup.brightness"]           = { 260, 96 },   -- = narrowest rofi menu; GTK needs 96 high
         ["popup.pets"]                 = { 340, 170 },  -- pet picker (claude-pad menu)
     },
-    top = 46,   -- bar margin (8) + bar height (30) + gap (8), same as the rofi menus
+    -- Their own size, placed by the popup itself on every show (named rule
+    -- "<class>-at", ~/.local/lib/popup/resident.py: under the mouse, kept on screen)
+    placed = {
+        "popup.menu",    -- list menus: Wi-Fi, Bluetooth, power... (~/.local/bin/list-menu)
+        "popup.sound",   -- volume, outputs, app volumes (~/.local/bin/sound-popup)
+    },
+    top = 46,   -- bar margin (8) + bar height (30) + gap (8), also in resident.py
 }
 -- Centered overlays that also close when focus leaves (shortcut overview).
 -- Same frame as the rofi overlays (launcher, wallpapers, clipboard): design.toml

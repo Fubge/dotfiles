@@ -5,7 +5,7 @@
 # The bar module refreshes on signal 8 (sent after a change) and every few seconds
 # (the charger udev rule and gamemode also switch profiles).
 set -uo pipefail
-menu() { "$HOME/.local/bin/rofi-menu" "$@"; }
+menu() { "$HOME/.local/bin/list-menu" "$@"; }
 
 profiles=(performance balanced power-saver)
 names=("Performance" "Balanced" "Power saver")

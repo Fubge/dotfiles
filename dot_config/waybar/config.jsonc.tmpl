@@ -197,11 +197,11 @@
         // Material speakers; the glyphs are
         // drawn small, so they get a larger size
         "format": "<span size='larger'>{icon}</span>",   // icon only, percent in the tooltip
-        "tooltip-format": "Volume {volume}%\n{node_name}\nClick: outputs, right click: mute",
+        "tooltip-format": "Volume {volume}%\n{node_name}\nClick: sound, right click: mute",
         "format-muted": "<span size='larger'>\udb81\udf5f</span>",
         "format-icons": ["\udb81\udd7f", "\udb81\udd80", "\udb81\udd7e"],
         "scroll-step": 2,
-        "on-click": "~/.local/bin/rofi-volume --bar",
+        "on-click": "~/.local/bin/sound-popup toggle",
         "on-click-right": "wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle"
     },
     // Icon only (signal strength); name and speed in the tooltip

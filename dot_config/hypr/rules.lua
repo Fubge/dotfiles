@@ -27,6 +27,16 @@ for class, size in pairs(v.popup.classes) do
     })
 end
 
+for _, class in ipairs(v.popup.placed) do
+    hl.window_rule({
+        name = "popup-" .. class,
+        match = { class = escape(class) },
+        float = true,
+        pin = true,
+        move = { "cursor_x-window_w*0.5", tostring(v.popup.top) },   -- until it places itself
+    })
+end
+
 -- Overlays: same size and spot as the rofi overlays (horizontally centered)
 for _, class in ipairs(v.overlays) do
     hl.window_rule({
@@ -43,6 +53,11 @@ end
 local function is_popup(win)
     if v.popup.classes[win.class] then
         return true
+    end
+    for _, class in ipairs(v.popup.placed) do
+        if win.class == class then
+            return true
+        end
     end
     for _, class in ipairs(v.overlays) do
         if win.class == class then

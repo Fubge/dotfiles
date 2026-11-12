@@ -5,7 +5,7 @@
 # "Scan again" keeps a "Scanning..." menu in the same spot until the fresh list is in.
 #   rofi-wifi [--bar] [--same-place] [--rescan]
 set -uo pipefail
-menu() { "$HOME/.local/bin/rofi-menu" "$@"; }
+menu() { "$HOME/.local/bin/list-menu" "$@"; }
 
 bar=() rescan=no
 for arg; do
@@ -54,7 +54,7 @@ if ((idx == n)); then
     menu "${bar[@]}" --same-place --compact "Wi-Fi" "" <<<"$i_scan  Scanning..." >/dev/null &
     placeholder=$!
     nmcli -t device wifi list --rescan yes >/dev/null 2>&1
-    pkill -x rofi; wait "$placeholder"
+    "$HOME/.local/bin/list-menu" --close; wait "$placeholder"
     exec "$0" "${bar[@]}" --same-place
 elif ((idx == n + 1)); then
     nmcli radio wifi off && notify-send -t 2000 "Wi-Fi" "Turned off"; exit 0
@@ -66,7 +66,7 @@ if [[ $idx == "$active" ]]; then
 elif nmcli -t -f NAME connection show | grep -Fxq "$ssid"; then
     nmcli connection up id "$ssid" >/dev/null && notify-send -t 2000 "Wi-Fi" "Connected to $ssid"
 elif [[ -n ${secured[idx]} ]]; then
-    # Plain rofi, not rofi-menu: hide the bar tooltips here too (~/.local/bin/bar-tooltips)
+    # Plain rofi, not list-menu: hide the bar tooltips here too (~/.local/bin/bar-tooltips)
     "$HOME/.local/bin/bar-tooltips" off $$
     trap '"$HOME/.local/bin/bar-tooltips" on $$' EXIT
     pass=$(rofi -dmenu -password -p "Password" -theme menu -theme-str "

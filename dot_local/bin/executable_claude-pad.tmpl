@@ -317,7 +317,7 @@ def menu():
         rows += [("\U000F0709  Restart Claude", restart),
                  ("\U000F0156  Quit Claude", quit_pad)]
     rows.append(("\U000F03E9  Choose pet", lambda: open_picker(x)))
-    pick = subprocess.run([os.path.join(BIN, "rofi-menu"), "--bar", "Claude", ""],
+    pick = subprocess.run([os.path.join(BIN, "list-menu"), "--bar", "Claude", ""],
                           input="\n".join(r[0] for r in rows), capture_output=True, text=True)
     if pick.stdout.strip().isdigit():
         rows[int(pick.stdout.strip())][1]()

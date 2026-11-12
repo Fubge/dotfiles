@@ -1,0 +1,78 @@
+#!/usr/bin/env bash
+# list-menu: shared list for all small menus (Wi-Fi, Bluetooth, power, power
+# profile, Claude, music). Shown by a resident GTK window
+# (~/.local/bin/list-menu-popup, style: ~/.config/popups/style.css) that waits
+# hidden in the background, so it opens at once (rofi took ~0.2 s).
+#
+#   list-menu [options] TITLE PLACEHOLDER [-a N] [-selected-row N] < lines
+#     --bar        open under the mouse, just below the bar (used by bar clicks);
+#                  without it the menu opens in the middle of the screen
+#     --compact    never show the search field (it only appears for lists > 7 rows anyway)
+#     --width PX   menu width (default: fits the longest line, 260-420)
+#     --same-place with --bar: reopen where the last --bar menu was (not under the
+#                  mouse), e.g. when a menu reopens itself after "Scan again"
+#     --at DX      with --bar: center the menu DX logical px right of the screen's
+#                  middle instead of under the mouse (a fixed spot, e.g. the music widget)
+#     -a N         highlight row N (connected network, current profile...)
+#     -selected-row N   start with row N selected
+#   list-menu --close   close the open menu
+#
+# Prints the index of the chosen line (empty / exit 1 when cancelled). A click on
+# another bar icon replaces the open menu, on the same icon it just closes it.
+set -uo pipefail
+
+run=${XDG_RUNTIME_DIR:-/tmp}
+fifo=$run/popup.menu.fifo
+server=$HOME/.local/bin/list-menu-popup
+
+running() { [[ -p $fifo ]] && kill -0 "$(<"$run/popup.menu.pid")" 2>/dev/null; }
+
+if [[ ${1-} == --close ]]; then
+    running && echo close >"$fifo"
+    exit 0
+fi
+
+bar=0 compact=0 same=0 width= at= active= selected=
+while [[ ${1-} == --* ]]; do
+    case $1 in
+        --bar)        bar=1 ;;
+        --compact)    compact=1 ;;
+        --width)      width=$2; shift ;;
+        --same-place) same=1 ;;
+        --at)         at=$2; shift ;;
+    esac
+    shift
+done
+title=$1 hint=$2
+shift 2
+while (($#)); do
+    case $1 in
+        -a)            active=$2; shift ;;
+        -selected-row) selected=$2; shift ;;
+    esac
+    shift
+done
+
+if ! running; then   # not started at login (or it was quit after an update)
+    setsid -f "$server" --hidden >/dev/null 2>&1
+    for _ in {1..150}; do running && break; sleep 0.02; done
+    running || exit 1
+fi
+
+req=$run/list-menu.$$
+trap 'rm -f "$req.req" "$req.reply"' EXIT
+mkfifo "$req.reply"
+{
+    printf '%s\n%s\n' "$title" "$hint"
+    echo "compact=$compact width=$width bar=$bar same=$same at=$at active=$active selected=$selected"
+    cat
+} >"$req.req"
+exec 3<>"$req.reply"   # read+write: opening does not wait for the server
+echo $$ >"$fifo"
+
+# The answer, as long as the server lives (a menu may stay open a long time)
+while ! read -r -t 2 -u 3 idx; do
+    running || exit 1
+done
+[[ -n $idx ]] || exit 1
+echo "$idx"

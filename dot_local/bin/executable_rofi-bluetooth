@@ -4,7 +4,7 @@
 #   - "Add a device": scans ~10 s, then pick a new device to pair + trust + connect
 #   - turn Bluetooth on/off
 set -uo pipefail
-menu() { "$HOME/.local/bin/rofi-menu" "$@"; }
+menu() { "$HOME/.local/bin/list-menu" "$@"; }
 
 bar=(); [[ ${1-} == --bar ]] && bar=(--bar)
 

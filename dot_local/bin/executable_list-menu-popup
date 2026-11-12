@@ -1,0 +1,296 @@
+#!/usr/bin/env python3
+"""List menu server: the GTK window behind ~/.local/bin/list-menu (Wi-Fi,
+Bluetooth, power, power profile, Claude and music menus).
+
+    list-menu-popup --hidden   login autostart: waits hidden (hypr/vars.lua)
+    list-menu-popup quit       stop it (list-menu starts a new one)
+
+Resident like the brightness slider (~/.local/lib/popup/resident.py): rofi
+needed ~90 ms to start plus ~100 ms of script around it, a hidden GTK window
+shows up at once. Same look as the rofi menus it replaces (popups/style.css).
+
+Requests come over the FIFO $XDG_RUNTIME_DIR/popup.menu.fifo, one line per
+request: the client's PID. The request itself is the file
+$XDG_RUNTIME_DIR/list-menu.PID.req:
+
+    TITLE
+    PLACEHOLDER (search field hint)
+    key=value options: compact width bar same at active selected
+    rows...
+
+The answer goes to the FIFO $XDG_RUNTIME_DIR/list-menu.PID.reply: the index of
+the chosen row, or an empty line (cancelled). A new request while a menu is
+open cancels that one; with the same title it only closes it (a second click
+on the same bar icon). "close" instead of a PID closes the open menu.
+"""
+import os
+import subprocess
+import sys
+
+sys.path.insert(0, os.path.expanduser("~/.local/lib/popup"))
+import resident  # noqa: E402
+
+APP = "popup.menu"
+RUN = resident.RUN
+FIFO = os.path.join(RUN, APP + ".fifo")
+PIDFILE = os.path.join(RUN, APP + ".pid")
+CSS = os.path.expanduser("~/.config/popups/style.css")
+MAX_ROWS = 10        # longer lists scroll
+SEARCH_FROM = 8      # lists this long get a search field (shorter: typing still filters)
+
+
+def build():
+    import gi
+
+    gi.require_version("Gtk", "4.0")
+    gi.require_version("Gdk", "4.0")
+    from gi.repository import Gdk, GLib, Gtk, Pango
+
+    class Menu(Gtk.Window):
+        def __init__(self):
+            super().__init__(title="Menu")
+            self.add_css_class("popup")
+            self.add_css_class("menu")
+            self.add_css_class("list-menu")
+            self.set_decorated(False)
+            self.req = None          # the request being shown
+            self.client = None       # its PID (gets the answer)
+            self.last_left = None    # where the last bar menu was (--same-place)
+            self.query = ""
+
+            box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8,
+                          css_classes=["menu-box"])
+            self.title_label = Gtk.Label(css_classes=["menu-title"])
+            self.entry = Gtk.Entry(css_classes=["menu-search"], xalign=0.5)
+            self.entry.connect("changed", lambda e: self.set_query(e.get_text()))
+            self.list = Gtk.ListBox(css_classes=["menu-list"])
+            self.list.set_selection_mode(Gtk.SelectionMode.SINGLE)
+            self.list.set_filter_func(self.matches)
+            self.list.connect("row-activated", lambda _l, row: self.answer(row.index))
+            self.scroll = Gtk.ScrolledWindow(child=self.list)
+            self.scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+            for w in (self.title_label, self.entry, self.scroll):
+                box.append(w)
+            self.set_child(box)
+            self.sizes = Gtk.SizeGroup(mode=Gtk.SizeGroupMode.HORIZONTAL)
+
+            hover = Gtk.EventControllerMotion()
+            hover.connect("motion", self.on_motion)
+            self.list.add_controller(hover)
+            keys = Gtk.EventControllerKey()
+            keys.set_propagation_phase(Gtk.PropagationPhase.CAPTURE)
+            keys.connect("key-pressed", self.on_key)
+            self.add_controller(keys)
+            self.connect("notify::visible", self.on_visible)
+
+        # ------------------------------------------------------------ requests
+        def request(self, client):
+            path = os.path.join(RUN, f"list-menu.{client}.req")
+            try:
+                with open(path) as f:
+                    title, hint, opts, *rows = f.read().split("\n")
+            except (OSError, ValueError):
+                return self.reply(client, "")
+            opts = dict(o.split("=", 1) for o in opts.split() if "=" in o)
+            while rows and rows[-1] == "":
+                rows.pop()
+            if self.get_visible():
+                same = self.req and self.req["title"] == title
+                self.close()                      # cancels the open menu
+                if same:
+                    return self.reply(client, "")
+            self.req = dict(title=title, hint=hint, rows=rows, **opts)
+            self.client = client
+            self.bring_up()
+
+        def reply(self, client, text):
+            path = os.path.join(RUN, f"list-menu.{client}.reply")
+            try:   # O_NONBLOCK: never hang on a client that is gone
+                fd = os.open(path, os.O_WRONLY | os.O_NONBLOCK)
+                os.write(fd, (text + "\n").encode())
+                os.close(fd)
+            except OSError:
+                pass
+
+        def answer(self, index):
+            client, self.client = self.client, None
+            if client:
+                self.reply(client, str(index))
+            self.close()
+
+        def on_visible(self, *_a):
+            if not self.get_visible() and self.client:      # Escape, focus left, replaced
+                client, self.client = self.client, None
+                self.reply(client, "")
+
+        # ------------------------------------------------------------ showing
+        def show_up(self):
+            req = self.req
+            rows = req["rows"]
+            longest = max((len(r) for r in rows), default=0)
+            width = int(req.get("width") or 0) or min(420, max(260, longest * 10 + 90))
+            if req.get("bar") == "1":
+                same = req.get("same") == "1" and self.last_left is not None
+                at = int(req["at"]) if req.get("at") else None
+                left = resident.place(APP, width, x=self.last_left if same else None, at=at)
+                if left is not None:
+                    self.last_left = left
+            else:
+                resident.place(APP, width, center=True)
+
+            self.title_label.set_text(req["title"])
+            searchable = req.get("compact") != "1" and len(rows) >= SEARCH_FROM
+            self.entry.set_visible(searchable)
+            self.entry.set_placeholder_text(req["hint"])
+            self.query = ""
+            self.entry.set_text("")
+
+            self.list.remove_all()
+            self.sizes = Gtk.SizeGroup(mode=Gtk.SizeGroupMode.HORIZONTAL)
+            active = {int(a) for a in req.get("active", "").split(",") if a.isdigit()}
+            for i, text in enumerate(rows):
+                # one width for all labels, centered: the icons line up in a column
+                label = Gtk.Label(label=text, xalign=0, halign=Gtk.Align.CENTER,
+                                  ellipsize=Pango.EllipsizeMode.END)
+                self.sizes.add_widget(label)
+                row = Gtk.ListBoxRow(child=label, css_classes=["active"] if i in active else [])
+                row.index = i
+                row.text = text.lower()
+                self.list.append(row)
+
+            # exact height: the window shrinks to the list (max MAX_ROWS rows);
+            # measure() includes the CSS margins between the rows
+            height = sum(r.measure(Gtk.Orientation.VERTICAL, width)[1]
+                         for r in self.rows()[:MAX_ROWS])
+            self.scroll.set_max_content_height(-1)    # min may not exceed the old max
+            self.scroll.set_min_content_height(height)
+            self.scroll.set_max_content_height(height)
+            self.scroll.get_vadjustment().set_value(0)
+            self.set_default_size(width, 1)
+
+            sel = req.get("selected", "")
+            self.select(self.rows()[int(sel)] if sel.isdigit() and int(sel) < len(rows)
+                        else self.list.get_row_at_index(0))
+            self.present()
+            if searchable:
+                self.entry.grab_focus()
+
+        # ------------------------------------------------------------ rows
+        def rows(self):
+            out, row = [], self.list.get_first_child()
+            while row:
+                out.append(row)
+                row = row.get_next_sibling()
+            return out
+
+        def visible_rows(self):
+            return [r for r in self.rows() if r.get_child_visible()]
+
+        def matches(self, row):
+            return all(word in row.text for word in self.query.lower().split())
+
+        def set_query(self, text):
+            self.query = text
+            self.list.invalidate_filter()
+            shown = self.visible_rows()
+            if shown and self.list.get_selected_row() not in shown:
+                self.select(shown[0])
+
+        def select(self, row):
+            if row is None:
+                return
+            self.list.select_row(row)
+            # keep it in view (long lists scroll)
+            ok, bounds = row.compute_bounds(self.list)
+            if ok:
+                adj = self.scroll.get_vadjustment()
+                top, bottom = bounds.get_y(), bounds.get_y() + bounds.get_height()
+                if top < adj.get_value():
+                    adj.set_value(top)
+                elif bottom > adj.get_value() + adj.get_page_size():
+                    adj.set_value(bottom - adj.get_page_size())
+
+        def move(self, step):
+            shown = self.visible_rows()
+            if not shown:
+                return
+            cur = self.list.get_selected_row()
+            i = shown.index(cur) if cur in shown else -step
+            self.select(shown[(i + step) % len(shown)])
+
+        def on_motion(self, _ctrl, _x, y):
+            row = self.list.get_row_at_y(int(y))
+            if row and row is not self.list.get_selected_row():
+                self.list.select_row(row)
+
+        def on_key(self, _ctrl, keyval, _code, state):
+            ctrl = state & Gdk.ModifierType.CONTROL_MASK
+            if keyval == Gdk.KEY_Escape:
+                self.close()
+            elif keyval in (Gdk.KEY_Down, Gdk.KEY_Tab) or (ctrl and keyval == Gdk.KEY_j):
+                self.move(1)
+            elif keyval in (Gdk.KEY_Up, Gdk.KEY_ISO_Left_Tab) or (ctrl and keyval == Gdk.KEY_k):
+                self.move(-1)
+            elif keyval in (Gdk.KEY_Return, Gdk.KEY_KP_Enter):
+                row = self.list.get_selected_row()
+                if row and row.get_child_visible():
+                    self.answer(row.index)
+            elif not self.entry.get_visible():
+                # no search field (short list): typing still filters, like rofi
+                if keyval == Gdk.KEY_BackSpace:
+                    self.set_query(self.query[:-1])
+                elif (ch := chr(Gdk.keyval_to_unicode(keyval))).isprintable() and ch and not ctrl:
+                    self.set_query(self.query + ch)
+                else:
+                    return False
+            else:
+                return False
+            return True
+
+    provider = Gtk.CssProvider()
+    provider.load_from_path(CSS)
+    Gtk.StyleContext.add_provider_for_display(
+        Gdk.Display.get_default(), provider, Gtk.STYLE_PROVIDER_PRIORITY_USER)
+    win = Menu()
+
+    # request FIFO: read+write open, so it never reports end-of-file
+    try:
+        os.unlink(FIFO)
+    except OSError:
+        pass
+    os.mkfifo(FIFO, 0o600)
+    fd = os.open(FIFO, os.O_RDWR | os.O_NONBLOCK)
+    with open(PIDFILE, "w") as f:
+        f.write(str(os.getpid()))
+    buf = b""
+
+    def on_fifo(*_a):
+        nonlocal buf
+        try:
+            buf += os.read(fd, 4096)
+        except BlockingIOError:
+            return True
+        *lines, buf = buf.split(b"\n")
+        for line in lines:
+            line = line.decode().strip()
+            if line == "close":
+                win.close()
+            elif line.isdigit():
+                win.request(line)
+        return True
+    GLib.io_add_watch(fd, GLib.PRIORITY_DEFAULT, GLib.IOCondition.IN, on_fifo)
+    return win
+
+
+if __name__ == "__main__":
+    if sys.argv[1:] in ([], ["--hidden"]):
+        sys.argv[1:] = ["--hidden"]       # a menu only shows up on a request
+    try:
+        resident.main(APP, build, __doc__)
+    finally:
+        try:   # only the server cleans up (not a second start that found it running)
+            if open(PIDFILE).read() == str(os.getpid()):
+                os.unlink(FIFO)
+                os.unlink(PIDFILE)
+        except OSError:
+            pass

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Power menu (SUPER+Escape, or bar click with --bar): lock, logout, suspend, reboot, shutdown
 set -uo pipefail
-menu() { "$HOME/.local/bin/rofi-menu" "$@"; }
+menu() { "$HOME/.local/bin/list-menu" "$@"; }
 
 bar=(); [[ ${1-} == --bar ]] && bar=(--bar)
 

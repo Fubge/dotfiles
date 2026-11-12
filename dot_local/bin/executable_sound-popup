@@ -1,0 +1,299 @@
+#!/usr/bin/env python3
+"""Sound popup (click on the speaker in the bar, SUPER+A): volume, microphone,
+output device and the volume of each app that plays sound.
+
+    sound-popup toggle [--center]  bar click: show it, or hide it when open
+                                   (--center: middle of the screen, SUPER+A)
+    sound-popup --hidden           login autostart: waits hidden, opens instantly
+    sound-popup quit               stop it (it reloads on the next click)
+
+Resident like the brightness slider (~/.local/lib/popup/resident.py). It
+follows `pactl subscribe` in the background, so what it shows is always
+current without asking PipeWire on every click. Click an icon to mute that
+slider; click an output to make it the default (playing apps move along).
+Escape closes, "Open mixer" opens pavucontrol for everything else.
+"""
+import json
+import os
+import subprocess
+import sys
+import threading
+import time
+
+sys.path.insert(0, os.path.expanduser("~/.local/lib/popup"))
+import resident  # noqa: E402
+
+APP = "popup.sound"
+WIDTH = 360
+CSS = os.path.expanduser("~/.config/popups/style.css")
+POPUP = os.path.expanduser("~/.local/bin/popup")
+
+# Nerd Font icons, as in the bar (written as escapes: editors drop these glyphs)
+I_VOL = ["\U000F057F", "\U000F0580", "\U000F057E"]   # low / medium / high
+I_MUTED = "\U000F075F"
+I_MIC, I_MIC_OFF = "\U000F036C", "\U000F036D"
+I_SPEAKER, I_HEADPHONES, I_SCREEN = "\U000F04C3", "\U000F02CB", "\U000F0379"
+I_APP = "\U000F075A"                                  # music note: app without icon
+I_MIXER = "\U000F062E"                                 # sliders
+NOISY = 0.6     # s after a drag in which PipeWire's echo does not move the slider
+
+
+def pactl_json(*args):
+    out = subprocess.run(["pactl", "-f", "json", *args], capture_output=True, text=True).stdout
+    try:
+        return json.loads(out)
+    except ValueError:
+        return {} if args[0] == "info" else []
+
+
+def percent(node):
+    vals = [int(c["value_percent"].rstrip("%")) for c in node.get("volume", {}).values()]
+    return round(sum(vals) / len(vals)) if vals else 0
+
+
+def fetch():
+    """Everything the popup shows, in one plain dict (runs in a thread)."""
+    info = pactl_json("info")
+    default_sink = info.get("default_sink_name", "")
+    default_source = info.get("default_source_name", "")
+    outputs = []
+    for s in pactl_json("list", "sinks"):
+        ports = [p.get("availability") for p in s.get("ports", [])]
+        if s["name"] != default_sink and "not available" in ports:
+            continue          # nothing plugged in (HDMI without a screen...)
+        name = s["properties"].get("device.profile.description") or s["description"]
+        icon = (I_HEADPHONES if s["name"].startswith("bluez") or "Headphone" in name
+                else I_SCREEN if "HDMI" in name or "DisplayPort" in name else I_SPEAKER)
+        outputs.append(dict(name=s["name"], label=name, icon=icon, volume=percent(s),
+                            mute=s["mute"]))
+    mic = next((dict(name=s["name"], volume=percent(s), mute=s["mute"])
+                for s in pactl_json("list", "sources") if s["name"] == default_source), None)
+    apps = []
+    for i in pactl_json("list", "sink-inputs"):
+        p = i["properties"]
+        if p.get("media.role") == "event":       # notification sounds
+            continue
+        apps.append(dict(index=i["index"], volume=percent(i), mute=i["mute"],
+                         label=p.get("application.name") or p.get("media.name") or "App",
+                         icon=p.get("application.icon_name") or p.get("application.process.binary")
+                         or (p.get("application.name") or "").lower()))
+    return dict(default=default_sink, outputs=outputs, mic=mic, apps=apps)
+
+
+def build():
+    import gi
+
+    gi.require_version("Gtk", "4.0")
+    gi.require_version("Gdk", "4.0")
+    from gi.repository import Gdk, GLib, Gtk, Pango
+
+    theme = Gtk.IconTheme.get_for_display(Gdk.Display.get_default())
+
+    class Slider(Gtk.Box):
+        """Icon (click: mute) + slider + percent for one sink, source or app."""
+
+        def __init__(self, kind, target, icon=None):
+            super().__init__(spacing=12, css_classes=["slider-row"])
+            self.kind, self.target = kind, target       # pactl set-KIND-volume TARGET
+            self.touched = 0.0
+            self.pending = None
+            self.loading = False
+            self.button = Gtk.Button(css_classes=["slider-icon", "flat"])
+            self.button.connect("clicked", lambda _b: self.pactl("mute", "toggle"))
+            if icon and theme.has_icon(icon):
+                self.button.set_child(Gtk.Image(icon_name=icon, pixel_size=18))
+            else:
+                self.button.set_child(Gtk.Label())
+            self.scale = Gtk.Scale.new_with_range(Gtk.Orientation.HORIZONTAL, 0, 100, 1)
+            self.scale.set_draw_value(False)
+            self.scale.set_hexpand(True)
+            self.scale.connect("value-changed", self.on_change)
+            self.value = Gtk.Label(css_classes=["slider-value"], xalign=1)
+            for w in (self.button, self.scale, self.value):
+                self.append(w)
+
+        def pactl(self, what, value):
+            subprocess.Popen(["pactl", f"set-{self.kind}-{what}", str(self.target), value])
+
+        def update(self, volume, mute, glyph=None):
+            if time.monotonic() - self.touched > NOISY:
+                self.loading = True
+                self.scale.set_value(min(volume, 100))
+                self.loading = False
+                self.value.set_text(f"{volume}%")
+            child = self.button.get_child()
+            if isinstance(child, Gtk.Label):
+                child.set_text(glyph or (I_MUTED if mute else I_APP))
+            for w in (self.button, self.value):
+                (w.add_css_class if mute else w.remove_css_class)("muted")
+
+        def on_change(self, _scale):
+            if self.loading:
+                return
+            self.touched = time.monotonic()
+            self.value.set_text(f"{int(self.scale.get_value())}%")
+            if self.pending is None:          # at most every 30 ms while dragging
+                self.pending = GLib.timeout_add(30, self.apply)
+
+        def apply(self):
+            self.pactl("volume", f"{int(self.scale.get_value())}%")
+            self.pending = None
+            return False
+
+    def section(text):
+        return Gtk.Label(label=text, xalign=0, css_classes=["section"])
+
+    def row_button(text, on_click, classes=()):
+        label = Gtk.Label(label=text, xalign=0, ellipsize=Pango.EllipsizeMode.END)
+        button = Gtk.Button(child=label, css_classes=["sound-row", "flat", *classes])
+        button.connect("clicked", lambda _b: on_click())
+        return button
+
+    class Popup(Gtk.Window):
+        popup_width = WIDTH       # resident.place() puts it under the mouse
+
+        def __init__(self):
+            super().__init__(title="Sound")
+            for c in ("popup", "menu", "sound"):
+                self.add_css_class(c)
+            self.set_decorated(False)
+            self.set_default_size(WIDTH, 1)
+            self.data = None
+            self.shape = None          # what the dynamic part was built for
+            self.apps = {}             # sink-input index -> Slider
+
+            box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4,
+                          css_classes=["menu-box"])
+            box.append(Gtk.Label(label="Sound", css_classes=["menu-title"]))
+            self.master = Slider("sink", "@DEFAULT_SINK@")
+            self.mic = Slider("source", "@DEFAULT_SOURCE@")
+            box.append(self.master)
+            box.append(self.mic)
+            self.dynamic = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
+            box.append(self.dynamic)
+            box.append(Gtk.Separator(css_classes=["sound-sep"]))
+            box.append(row_button(f"{I_MIXER}  Open mixer", self.open_mixer))
+            self.set_child(box)
+
+            keys = Gtk.EventControllerKey()
+            keys.connect("key-pressed", self.on_key)
+            self.add_controller(keys)
+            self.fetching = False
+            self.again = False
+            self.timer = None
+            self.refresh()
+            threading.Thread(target=self.follow, daemon=True).start()
+
+        # ------------------------------------------------------------ data
+        def follow(self):
+            """pactl subscribe: re-read after changes (debounced, any thread)."""
+            while True:
+                proc = subprocess.Popen(["pactl", "subscribe"], stdout=subprocess.PIPE, text=True)
+                for line in proc.stdout:
+                    if any(f"on {k} #" in line for k in ("sink", "source", "sink-input", "server")):
+                        GLib.idle_add(self.soon)
+                time.sleep(2)        # PipeWire restarted: subscribe again
+
+        def soon(self):
+            if self.timer is None:
+                self.timer = GLib.timeout_add(80, self.refresh)
+            return False
+
+        def refresh(self):
+            self.timer = None
+            if self.fetching:
+                self.again = True
+                return False
+            self.fetching = True
+
+            def work():
+                data = fetch()
+                GLib.idle_add(self.got, data)
+            threading.Thread(target=work, daemon=True).start()
+            return False
+
+        def got(self, data):
+            self.fetching = False
+            self.data = data
+            self.render()
+            if self.again:
+                self.again = False
+                self.refresh()
+            return False
+
+        # ------------------------------------------------------------ view
+        def render(self):
+            d = self.data
+            out = next((o for o in d["outputs"] if o["name"] == d["default"]), None)
+            if out:
+                level = 0 if out["volume"] <= 33 else 1 if out["volume"] <= 66 else 2
+                self.master.update(out["volume"], out["mute"],
+                                   I_MUTED if out["mute"] else I_VOL[level])
+            self.mic.set_visible(d["mic"] is not None)
+            if d["mic"]:
+                self.mic.update(d["mic"]["volume"], d["mic"]["mute"],
+                                I_MIC_OFF if d["mic"]["mute"] else I_MIC)
+
+            shape = (d["default"], tuple((o["name"], o["label"]) for o in d["outputs"]),
+                     tuple((a["index"], a["label"], a["icon"]) for a in d["apps"]))
+            if shape != self.shape:
+                self.shape = shape
+                self.rebuild()
+            for a in d["apps"]:
+                self.apps[a["index"]].update(a["volume"], a["mute"])
+
+        def rebuild(self):
+            d = self.data
+            while child := self.dynamic.get_first_child():
+                self.dynamic.remove(child)
+            if len(d["outputs"]) > 1:
+                self.dynamic.append(section("Output"))
+                for o in d["outputs"]:
+                    active = o["name"] == d["default"]
+                    self.dynamic.append(row_button(
+                        f"{o['icon']}  {o['label']}", lambda n=o["name"]: self.set_output(n),
+                        ["active"] if active else []))
+            self.apps = {}
+            if d["apps"]:
+                self.dynamic.append(section("Apps"))
+            for a in d["apps"]:
+                self.dynamic.append(Gtk.Label(label=a["label"], xalign=0,
+                                              ellipsize=Pango.EllipsizeMode.END,
+                                              css_classes=["app-name"]))
+                slider = Slider("sink-input", a["index"], a["icon"])
+                self.apps[a["index"]] = slider
+                self.dynamic.append(slider)
+            if self.get_visible():
+                self.set_default_size(WIDTH, 1)    # grow / shrink with the list
+
+        def set_output(self, name):
+            subprocess.Popen(["pactl", "set-default-sink", name])
+
+        def open_mixer(self):
+            self.close()
+            subprocess.Popen([POPUP, "org.pulseaudio.pavucontrol", "pavucontrol"],
+                             start_new_session=True)
+
+        def show_up(self):
+            self.set_default_size(WIDTH, 1)
+            self.present()
+            self.master.scale.grab_focus()
+
+        def on_key(self, _ctrl, keyval, _code, _state):
+            if keyval == Gdk.KEY_Escape:
+                self.close()
+                return True
+            if keyval == Gdk.KEY_m:
+                self.master.pactl("mute", "toggle")
+                return True
+            return False
+
+    provider = Gtk.CssProvider()
+    provider.load_from_path(CSS)
+    Gtk.StyleContext.add_provider_for_display(
+        Gdk.Display.get_default(), provider, Gtk.STYLE_PROVIDER_PRIORITY_USER)
+    return Popup()
+
+
+if __name__ == "__main__":
+    resident.main(APP, build, __doc__)

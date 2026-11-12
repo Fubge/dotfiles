@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# Resident popups (~/.local/lib/popup/resident.py) keep their old code until
+# restarted: stop them after a change and start them hidden again.
+# {{ include "dot_local/lib/popup/resident.py" | sha256sum }}
+# {{ include "dot_local/bin/executable_list-menu-popup" | sha256sum }}
+# {{ include "dot_local/bin/executable_sound-popup" | sha256sum }}
+# {{ include "dot_local/bin/executable_brightness-popup" | sha256sum }}
+# {{ include "dot_local/bin/executable_pet-picker" | sha256sum }}
+# {{ include "dot_config/popups/style.css.tmpl" | sha256sum }}
+set -uo pipefail
+[[ -n ${HYPRLAND_INSTANCE_SIGNATURE-} ]] || exit 0    # not in a session (bootstrap)
+for p in list-menu-popup sound-popup brightness-popup pet-picker; do
+    "$HOME/.local/bin/$p" quit
+done
+sleep 0.3
+for p in list-menu-popup sound-popup brightness-popup pet-picker; do
+    setsid -f "$HOME/.local/bin/$p" --hidden >/dev/null 2>&1
+done

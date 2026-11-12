@@ -6,7 +6,7 @@
 #
 # OWNER is the caller's PID: "on" only takes effect for the last caller of "off",
 # so a menu that was replaced by a newer one does not bring the tooltips back.
-#   rofi-menu, popup, rofi-wifi (password prompt) call this.
+#   list-menu-popup, the resident popups, popup, rofi-wifi (password prompt) call this.
 css=$HOME/.config/waybar/menu-state.css
 owner_file=${XDG_RUNTIME_DIR:-/tmp}/bar-tooltips-owner
 

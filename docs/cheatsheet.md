@@ -86,14 +86,19 @@ Files ending in `.tmpl` are generated from these values.
   are swapped (`altwin:swap_lalt_lwin` in `hypr/vars.lua`), so apps get Alt from the
   Windows key. While a game has focus the swap is undone (see Gaming).
 - **`SUPER+H`** lists every shortcut (built live from the descriptions in `hypr/binds.lua`).
-- The small menus (Wi-Fi `SUPER+N`, Bluetooth `SUPER+SHIFT+B`, audio `SUPER+A`, power
-  profile `SUPER+P`, power `SUPER+Escape`) open in the middle of the screen; clicking the
-  same icon in the bar opens them under the mouse. All of them go through `rofi-menu`
-  and share the style in `rofi/menu.rasi`; the search field only appears for long lists.
-- Clicking the brightness icon opens a slider. The slider and the shortcut overview are
-  small GTK4 scripts (`brightness-popup`, `pet-picker`, `keybinds`) styled by `popups/style.css`;
-  slider and pet picker stay resident and only hide (`~/.local/lib/popup/resident.py`,
-  autostart `--hidden`, `SCRIPT quit` reloads them): they open instantly.
+- The small menus (Wi-Fi `SUPER+N`, Bluetooth `SUPER+SHIFT+B`, power profile `SUPER+P`,
+  power `SUPER+Escape`) open in the middle of the screen; clicking the same icon in the
+  bar opens them under the mouse. All of them go through `list-menu`: a resident GTK
+  window (`list-menu-popup`) in the old rofi look; the search field only appears for
+  long lists, typing filters anyway.
+- **Sound** (`SUPER+A` or a click on the speaker; right click mutes): volume and
+  microphone sliders, output device, one slider per app that plays sound, "Open mixer"
+  for pavucontrol. Click an icon to mute that slider, `m` mutes the output.
+- Clicking the brightness icon opens a slider. All these popups and the shortcut overview
+  are small GTK4 scripts (`list-menu-popup`, `sound-popup`, `brightness-popup`,
+  `pet-picker`, `keybinds`) styled by `popups/style.css`. All but the overview stay
+  resident and only hide (`~/.local/lib/popup/resident.py`, autostart `--hidden`,
+  restarted by `chezmoi apply` when their code changes): they open instantly.
 
 ## Claude scratchpad
 

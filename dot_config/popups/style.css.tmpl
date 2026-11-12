@@ -140,3 +140,78 @@ entry.search text placeholder { color: {{ .palette.comment }}; }
 }
 .pet-card.selected .pet-name,
 .pet-card.current .pet-name { color: {{ .palette.accent }}; }
+
+/* ---------------------------------------------------------------- list menus */
+/* Wi-Fi, Bluetooth, power... (~/.local/bin/list-menu): the look of the old
+   rofi menus (rofi/menu.rasi): centered rows, steel highlight, accent for
+   the connected / current row */
+.menu-search {
+    min-height: 0;
+    padding: 9px 14px;
+    border: none;
+    border-radius: 8px;
+    box-shadow: none;
+    outline: none;
+    background-color: alpha({{ .palette.steel }}, 0.45);
+    color: {{ .palette.fg }};
+}
+.menu-search placeholder,
+.menu-search text placeholder { color: {{ .palette.comment }}; }
+.menu-list { background: none; }
+.menu-list row {
+    padding: 9px 14px;
+    margin-top: 2px;
+    border-radius: 8px;
+    outline: none;
+    background: none;
+    color: {{ .palette.fg }};
+}
+.menu-list row:first-child { margin-top: 0; }
+.menu-list row.active { color: {{ .palette.accent }}; }
+.menu-list row:selected {
+    background-color: {{ .palette.steel }};
+    color: {{ .palette.accent }};
+}
+.list-menu scrollbar { opacity: 0; }
+
+/* ---------------------------------------------------------------- sound */
+/* ~/.local/bin/sound-popup: sliders like the brightness popup, outputs as rows */
+.sound .section {
+    color: {{ .palette.comment }};
+    font-size: 10pt;
+    margin: 8px 14px 2px 14px;
+}
+button.slider-icon {
+    min-width: 20px;
+    min-height: 0;
+    padding: 0;
+    border: none;
+    box-shadow: none;
+    background: none;
+    color: {{ .palette.accent }};
+}
+button.slider-icon:hover { color: {{ .palette.fg }}; }
+.slider-icon.muted, .slider-value.muted { color: {{ .palette.comment }}; }
+button.slider-icon.muted image { opacity: 0.4; }
+.sound .slider-row { padding: 7px 14px; }
+.app-name {
+    font-size: 10pt;
+    color: {{ .palette.fg_muted }};
+    margin: 4px 14px -6px 14px;
+}
+button.sound-row {
+    min-height: 0;
+    padding: 7px 14px;
+    border: none;
+    border-radius: 8px;
+    box-shadow: none;
+    background: none;
+    color: {{ .palette.fg }};
+    font-weight: normal;
+}
+button.sound-row:hover, button.sound-row:focus-visible { background-color: {{ .palette.steel }}; }
+button.sound-row.active { color: {{ .palette.accent }}; }
+.sound-sep {
+    margin: 6px 14px 2px 14px;
+    background-color: alpha({{ .palette.steel }}, 0.6);
+}

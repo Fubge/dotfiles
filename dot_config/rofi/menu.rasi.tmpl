@@ -1,7 +1,6 @@
-/* Small list menus (Wi-Fi, Bluetooth, audio, power, power profile).
-   Used through ~/.local/bin/rofi-menu, which also positions them: centered when
-   opened by a shortcut, under the mouse when clicked in the bar.
-   Everything is centered: title, search field, rows.
+/* Small rofi prompts in the look of the list menus (Wi-Fi password).
+   The list menus themselves are a GTK window now (~/.local/bin/list-menu,
+   popups/style.css copies this look). Everything is centered.
    Builds on config.rasi (colors, base look). */
 @import "config.rasi"
 
@@ -18,7 +17,7 @@ mainbox {
     spacing: 8px;
 }
 
-/* Header: small accent title, search field below it (rofi-menu hides the field
+/* Header: small accent title, search field below it (list-menu hides the field
    for short lists) */
 inputbar {
     orientation: vertical;
