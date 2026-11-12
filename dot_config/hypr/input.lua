@@ -9,10 +9,13 @@ hl.config({
         sensitivity = 0,
         touchpad = {
             natural_scroll = true,
-            scroll_factor = 0.8, -- 1.0 felt a bit too fast
+            scroll_factor = 0.5, -- 1.0 and 0.8 felt too fast
             disable_while_typing = true,
             clickfinger_behavior = false, -- click zones like Windows: bottom right = right click (2-finger tap = right still)
         },
+    },
+    cursor = {
+        no_warps = true, -- the mouse pointer stays put when a new window takes focus
     },
 })
 
