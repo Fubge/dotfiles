@@ -67,9 +67,6 @@ ACTIVITIES = {
 }
 # played once when a state begins
 INTROS = {"starting": "wake", "done": "cheer", "waiting": "alert"}
-# states whose animations use props: the module widens for them (class "wide"),
-# otherwise it stays as narrow as the pet so the window title sits close
-WIDE = ("busy", "waiting", "done")
 TIPS = {"off": "Claude is not running", "starting": "Claude starts…",
         "idle": "Claude is ready", "busy": "Claude is working…",
         "waiting": "Claude needs you", "done": "Claude is done"}
@@ -419,6 +416,7 @@ class Pet:
         self.state = None
         self.queue = []          # [[frame, ms], ...] left of the current animation
         self.frame = None
+        self.width = None        # class w<cols>: how wide this animation is
         self.until = 0.0
         self.last_pick = None
 
@@ -464,7 +462,8 @@ class Pet:
         if not self.queue:
             self.frame, self.until = None, now + 3600
             return True
-        frame, ms = self.queue.pop(0)
+        frame, ms, *width = self.queue.pop(0)
+        self.width = width[0] if width else None
         self.until = now + ms / 1000
         changed = frame != self.frame
         self.frame = frame
@@ -491,8 +490,8 @@ def watch():
         state = read_state()
         pet.update(state, read_pet())
         classes = ["pet", pet.kind, state] + ([pet.frame] if pet.frame else [])
-        if state in WIDE:
-            classes.append("wide")
+        if pet.width:
+            classes.append(pet.width)
         tip = TIPS.get(state, "") + "\n\n<small>Click show · Right click menu</small>"
         out = json.dumps({"text": NBSP, "class": classes, "tooltip": tip})
         if out != last:

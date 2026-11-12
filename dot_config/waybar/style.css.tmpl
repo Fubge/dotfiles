@@ -69,7 +69,7 @@ tooltip {
 }
 #workspaces button.urgent { color: @crit; }
 
-#custom-window { padding: 0 16px; }
+#custom-window { padding: 0 16px 0 8px; }
 
 /* Claude's bar pet (~/.local/bin/claude-pad watch): the frame is a background
    image per class (pet/pet.css, also sets the size), the text is only a
@@ -79,6 +79,7 @@ tooltip {
     margin: 0 0 0 8px;
     background-repeat: no-repeat;
     background-position: left bottom;
+    transition: min-width 300ms ease-in-out;   /* the window title glides along */
 }
 
 /* ---------------------------------------------------------------- center */
