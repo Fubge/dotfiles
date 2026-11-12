@@ -76,6 +76,30 @@ hl.on("window.active", function(active)
     end
 end)
 
+-- ...and on a click next to them. A click on the empty desktop moves no focus
+-- (no window.active above), so watch the mouse buttons themselves; the bind
+-- does not swallow the click. The bar is left out: its icons toggle popups
+-- themselves, closing here first would make the same icon open it again.
+local function close_popups_outside()
+    local p = hl.get_cursor_pos()
+    local mon = hl.get_active_monitor()
+    if not p or (mon and p.y - (mon.y or 0) < v.popup.top) then
+        return
+    end
+    for _, win in ipairs(hl.get_windows()) do
+        if is_popup(win) and not win.hidden then
+            local inside = p.x >= win.at.x and p.x < win.at.x + win.size.x
+                and p.y >= win.at.y and p.y < win.at.y + win.size.y
+            if not inside then
+                hl.dispatch(hl.dsp.window.close({ window = win }))
+            end
+        end
+    end
+end
+for _, button in ipairs({ "mouse:272", "mouse:273", "mouse:274" }) do
+    hl.bind(button, close_popups_outside, { non_consuming = true })
+end
+
 -- Spotify floats big and centered on its own special workspace "music": it
 -- appears over the current workspace and never pushes tiled windows around.
 -- Toggle: SUPER+O or a click on the music icon in the bar (~/.local/bin/music show)
@@ -151,6 +175,21 @@ hl.window_rule({
     workspace = "6",
     immediate = true,
     no_anim = true,
+})
+
+-- Steam (CEF) scrolls far more per touchpad swipe than other apps: slow it down
+hl.window_rule({
+    name = "steam-scroll",
+    match = { class = "^steam$" },
+    scroll_touchpad = 0.15,
+})
+
+-- Vivaldi (Chromium, also its app windows like YouTube) scrolls much further
+-- per swipe than the terminal, although it runs natively on Wayland
+hl.window_rule({
+    name = "vivaldi-scroll",
+    match = { class = "^vivaldi-.*$" },
+    scroll_touchpad = 0.22,
 })
 
 -- Steam client: small dialogs float
