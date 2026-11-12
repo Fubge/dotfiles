@@ -1,3 +1,4 @@
 # Files this repo used to install; `chezmoi apply` deletes them
 .local/bin/rofi-menu
 .local/bin/rofi-volume
+.local/bin/rofi-bluetooth

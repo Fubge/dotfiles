@@ -22,7 +22,8 @@ Plain Gtk.Window, no Gtk.Application: registering that on D-Bus costs ~0.6 s.
 
 Position: a window with a `popup_width` attribute is placed by place() on
 every show: centered under the mouse just below the bar (--center: in the
-middle of the screen). Others keep their static rule (hypr/rules.lua).
+middle of the screen). When its content grows or shrinks while it is open,
+keep_top() keeps it below the bar. Others keep their static rule (hypr/rules.lua).
 The server sets win.bring_up(center=False) for windows that show themselves
 (the list menu shows up on a request, not on a command).
 """
@@ -89,7 +90,20 @@ def place(app_id, width, center=False, x=None, at=None):
     cls = "^" + app_id.replace(".", "\\\\.") + "$"
     hypr("eval hl.window_rule({ name = '%s-at', match = { class = '%s' }, "
          "float = true, pin = true, move = { '%d', '%s' } })" % (app_id, cls, left, top))
+    PLACED[app_id] = None if center else (mon["x"] + left, mon["y"] + POPUP_TOP)
     return left
+
+
+PLACED = {}     # app_id -> global (x, y) of a bar popup's top left corner
+
+
+def keep_top(app_id):
+    """Hyprland grows and shrinks a floating window around its middle, so a bar
+    popup whose content grows would slide up behind the bar: put it back."""
+    at = PLACED.get(app_id)
+    if at:
+        hypr('dispatch hl.dsp.window.move({ window = "class:%s", x = %d, y = %d })'
+             % (app_id, *at))
 
 
 def close_rofi():
@@ -125,6 +139,18 @@ def serve(app_id, build, show):
         if hasattr(win, "popup_width"):
             place(app_id, win.popup_width, center=center)
         win.show_up()
+        surface = win.get_surface()
+        if surface and not getattr(win, "keeps_top", False):
+            win.keeps_top = True
+            last = [None]
+
+            def on_layout(_s, _w, height):
+                if height != last[0]:
+                    if last[0] is not None and win.get_visible():
+                        # after Hyprland got the new size (it re-centers then)
+                        GLib.timeout_add(40, lambda: keep_top(app_id) and False)
+                    last[0] = height
+            surface.connect("layout", on_layout)
     win.bring_up = show_up
 
     loop = GLib.MainLoop()

@@ -176,7 +176,7 @@ entry.search text placeholder { color: {{ .palette.comment }}; }
 
 /* ---------------------------------------------------------------- sound */
 /* ~/.local/bin/sound-popup: sliders like the brightness popup, outputs as rows */
-.sound .section {
+.sound .section, .bluetooth .section {
     color: {{ .palette.comment }};
     font-size: 10pt;
     margin: 8px 14px 2px 14px;
@@ -214,4 +214,84 @@ button.sound-row.active { color: {{ .palette.accent }}; }
 .sound-sep {
     margin: 6px 14px 2px 14px;
     background-color: alpha({{ .palette.steel }}, 0.6);
+}
+
+/* ---------------------------------------------------------------- bluetooth */
+/* ~/.local/bin/bluetooth-popup: rows like the sound outputs, a status line
+   under each device name, on/off switch next to the title */
+.bt-head { margin: 0 4px 4px 4px; }
+.bt-icon {
+    color: {{ .palette.accent }};
+    min-width: 20px;
+}
+.bt-status {
+    font-size: 9pt;
+    color: {{ .palette.comment }};
+}
+button.bt-device.active .bt-status { color: {{ .palette.fg_muted }}; }
+button.bt-device.busy .bt-status { color: {{ .palette.accent }}; }
+.bt-note {
+    color: {{ .palette.comment }};
+    font-size: 10pt;
+    margin: 6px 14px;
+}
+button.bt-more {
+    min-height: 0;
+    min-width: 0;
+    padding: 4px 10px;
+    border: none;
+    border-radius: 8px;
+    box-shadow: none;
+    background: none;
+    color: {{ .palette.comment }};
+}
+button.bt-more:hover, button.bt-more:focus-visible {
+    background-color: {{ .palette.steel }};
+    color: {{ .palette.fg }};
+}
+/* an opened device: framed, its address and the action buttons below */
+.bt-card {
+    padding-bottom: 8px;
+    border-radius: 10px;
+    background-color: alpha({{ .palette.steel }}, 0.25);
+}
+.bt-info {
+    font-size: 9pt;
+    color: {{ .palette.comment }};
+    margin: -4px 14px 0 46px;
+}
+.bt-actions { margin: 0 10px; }
+button.bt-action {
+    min-height: 0;
+    padding: 5px 8px;
+    border: none;
+    border-radius: 8px;
+    box-shadow: none;
+    background-color: alpha({{ .palette.steel }}, 0.5);
+    color: {{ .palette.fg }};
+    font-size: 10pt;
+    font-weight: normal;
+}
+button.bt-action:hover, button.bt-action:focus-visible {
+    background-color: {{ .palette.steel }};
+    color: {{ .palette.accent }};
+}
+button.bt-action.danger { background-color: {{ .palette.red }}; color: {{ .palette.bg }}; }
+.bt-found scrollbar { opacity: 0; }
+.bluetooth switch {
+    min-height: 18px;
+    border: none;
+    border-radius: 99px;
+    background-color: alpha({{ .palette.steel }}, 0.6);
+    box-shadow: none;
+}
+.bluetooth switch:checked { background-color: {{ .palette.accent }}; }
+.bluetooth switch slider {
+    min-width: 18px;
+    min-height: 18px;
+    margin: 2px;
+    border: none;
+    border-radius: 99px;
+    background-color: {{ .palette.fg }};
+    box-shadow: none;
 }

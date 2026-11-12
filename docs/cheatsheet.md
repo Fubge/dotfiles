@@ -86,16 +86,21 @@ Files ending in `.tmpl` are generated from these values.
   are swapped (`altwin:swap_lalt_lwin` in `hypr/vars.lua`), so apps get Alt from the
   Windows key. While a game has focus the swap is undone (see Gaming).
 - **`SUPER+H`** lists every shortcut (built live from the descriptions in `hypr/binds.lua`).
-- The small menus (Wi-Fi `SUPER+N`, Bluetooth `SUPER+SHIFT+B`, power profile `SUPER+P`,
+- The small menus (Wi-Fi `SUPER+N`, power profile `SUPER+P`,
   power `SUPER+Escape`) open in the middle of the screen; clicking the same icon in the
   bar opens them under the mouse. All of them go through `list-menu`: a resident GTK
   window (`list-menu-popup`) in the old rofi look; the search field only appears for
   long lists, typing filters anyway.
+- **Bluetooth** (`SUPER+SHIFT+B` or a click on the Bluetooth icon; right click opens
+  `bluetoothctl`): on/off switch, paired devices with battery (click connects or
+  disconnects; the arrow next to it opens "Pair again" and "Forget"). "Add a device"
+  searches right in the popup, new devices show up live, a click pairs, trusts and
+  connects; a passkey to type on a keyboard appears in its row.
 - **Sound** (`SUPER+A` or a click on the speaker; right click mutes): volume and
   microphone sliders, output device, one slider per app that plays sound, "Open mixer"
   for pavucontrol. Click an icon to mute that slider, `m` mutes the output.
 - Clicking the brightness icon opens a slider. All these popups and the shortcut overview
-  are small GTK4 scripts (`list-menu-popup`, `sound-popup`, `brightness-popup`,
+  are small GTK4 scripts (`list-menu-popup`, `sound-popup`, `bluetooth-popup`, `brightness-popup`,
   `pet-picker`, `keybinds`) styled by `popups/style.css`. All but the overview stay
   resident and only hide (`~/.local/lib/popup/resident.py`, autostart `--hidden`,
   restarted by `chezmoi apply` when their code changes): they open instantly.

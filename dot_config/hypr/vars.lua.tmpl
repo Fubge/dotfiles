@@ -42,6 +42,7 @@ M.background = {
     M.bin .. "brightness-popup --hidden", -- brightness slider, same
     M.bin .. "list-menu-popup --hidden",  -- Wi-Fi/Bluetooth/power... menus, same
     M.bin .. "sound-popup --hidden",      -- sound popup, same
+    M.bin .. "bluetooth-popup --hidden",  -- Bluetooth popup, same
 }
 
 -- Look -----------------------------------------------------------------------
@@ -87,6 +88,7 @@ M.popup = {
     placed = {
         "popup.menu",    -- list menus: Wi-Fi, Bluetooth, power... (~/.local/bin/list-menu)
         "popup.sound",   -- volume, outputs, app volumes (~/.local/bin/sound-popup)
+        "popup.bluetooth", -- devices, pairing (~/.local/bin/bluetooth-popup)
     },
     top = 46,   -- bar margin (8) + bar height (30) + gap (8), also in resident.py
 }
