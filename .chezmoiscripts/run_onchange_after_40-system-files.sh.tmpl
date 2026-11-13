@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Install root-owned files into / (copied, not symlinked):
-#   system/       every machine (SDDM theme, power profile switching)
+#   system/       every machine (SDDM theme, power profile switching, iwd Wi-Fi backend)
 #   system-boot/  only with machine.boot = true (GRUB, kernel cmdline, console)
 # *.tmpl files are rendered with the chezmoi data first.
 # Re-runs when any of them (or their rendered output) changes:
@@ -19,6 +19,7 @@ dirs=({{ range $dirs }}{{ . }} {{ end }})
 
 # Console font and kernel command line are baked into the UKI: rebuild it when they change
 rebuild_uki=false
+restart_nm=false
 installed=()
 
 for d in "${dirs[@]}"; do
@@ -33,6 +34,9 @@ for d in "${dirs[@]}"; do
         fi
         if [[ $dest == /etc/vconsole.conf || $dest == /etc/kernel/cmdline ]] && ! cmp -s "$tmp" "$dest"; then
             rebuild_uki=true
+        fi
+        if [[ $dest == /etc/NetworkManager/* || $dest == /etc/iwd/* ]] && ! cmp -s "$tmp" "$dest"; then
+            restart_nm=true
         fi
         mode=0644
         [[ $dest == */bin/* || $dest == /etc/grub.d/* ]] && mode=0755
@@ -51,3 +55,11 @@ fi
 sudo udevadm control --reload
 sudo systemctl daemon-reload
 sudo systemctl enable --now power-profile-auto.service
+
+# Wi-Fi backend: iwd instead of wpa_supplicant (system/etc/NetworkManager/conf.d/wifi-backend.conf)
+sudo systemctl disable --now wpa_supplicant.service 2>/dev/null || true
+sudo systemctl enable --now iwd.service
+if $restart_nm; then
+    echo "system: Wi-Fi config changed, restarting NetworkManager (Wi-Fi drops for a few seconds)"
+    sudo systemctl restart iwd.service NetworkManager.service
+fi
