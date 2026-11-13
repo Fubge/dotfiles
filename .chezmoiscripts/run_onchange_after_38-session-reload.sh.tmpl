@@ -13,6 +13,7 @@
 # {{ include "dot_local/bin/executable_session-popup.tmpl" | sha256sum }}
 # {{ include "dot_local/bin/executable_brightness-popup" | sha256sum }}
 # {{ include "dot_local/bin/executable_pet-picker" | sha256sum }}
+# {{ include "dot_local/bin/executable_keybinds" | sha256sum }}
 # {{ include "dot_config/popups/style.css.tmpl" | sha256sum }}
 {{ range (glob (joinPath .chezmoi.sourceDir "dot_config/hypr/*.lua*")) -}}
 # {{ include . | sha256sum }}
@@ -20,7 +21,7 @@
 set -uo pipefail
 [[ -n ${HYPRLAND_INSTANCE_SIGNATURE-} ]] || exit 0    # not in a session (bootstrap)
 
-popups=(list-menu-popup sound-popup bluetooth-popup wifi-popup power-popup session-popup brightness-popup pet-picker)
+popups=(list-menu-popup sound-popup bluetooth-popup wifi-popup power-popup session-popup brightness-popup pet-picker keybinds)
 for p in "${popups[@]}"; do
     "$HOME/.local/bin/$p" quit
 done

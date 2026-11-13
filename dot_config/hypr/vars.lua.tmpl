@@ -8,8 +8,10 @@ M.launch      = "uwsm app -- "
 M.terminal    = "kitty"
 M.browser     = "vivaldi"
 M.fileManager = "dolphin"
--- App launcher; text without a matching app is searched on the web
+-- App launcher; text without a matching app is searched on the web.
+-- rofi itself starts without uwsm (faster), the apps it starts get their scope
 M.menu        = "rofi -show combi -modes combi,web:" .. os.getenv("HOME") .. "/.local/bin/rofi-web-mode -combi-modes web,drun -display-combi Apps -theme launcher"
+    .. " -run-command 'uwsm app -- {cmd}'"
 M.bin         = os.getenv("HOME") .. "/.local/bin/"
 -- Apps whose window SUPER+X keeps (lowercase window classes) and what it does
 -- instead; SUPER+SHIFT+X really closes them. Spotify: hide its workspace (keeps
@@ -46,6 +48,7 @@ M.background = {
     M.bin .. "wifi-popup --hidden",       -- Wi-Fi popup, same
     M.bin .. "power-popup --hidden",      -- power popup (battery, profile), same
     M.bin .. "session-popup --hidden",    -- lock / reboot / shut down, same
+    M.bin .. "keybinds --hidden",         -- shortcut overview (SUPER+H), same
 }
 
 -- Look -----------------------------------------------------------------------

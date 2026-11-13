@@ -11,7 +11,12 @@ function; the same script then works as server and as client:
     SCRIPT quit             stop the running popup (e.g. after its code changed)
 
 Commands go over a datagram socket $XDG_RUNTIME_DIR/<class>.sock. The client
-side never imports GTK, so it starts fast.
+side never imports GTK, so it starts fast. Still, a Python client costs ~80 ms
+per press (interpreter, imports, compiling the whole script: executables without
+.py get no bytecode cache). Key binds and bar clicks therefore go through the
+bash client ~/.local/bin/popup-cmd (~5 ms), which writes the command into the
+FIFO $XDG_RUNTIME_DIR/popup-cmd/<script>.fifo (next to <script>.pid) and only
+runs the script itself when no server is running.
 
 build() runs in the server after GTK is loaded and returns a Gtk.Window with a
 show_up() method (refresh its content, then present()). Closing only hides the
@@ -53,7 +58,7 @@ BLINKS = 3          # caret blinks after typing, then it goes away
 # widgets that slide in on their own (their children move with them)
 ROW_CLASSES = ("sound-row", "slider-row", "item-card", "section", "note", "app-name",
                "segment", "battery", "more", "pet-card", "sound-sep", "menu-search",
-               "menu-info")
+               "menu-info", "card")
 
 
 def sock_path(app_id):
@@ -143,7 +148,6 @@ def animate_in(win):
             w = w.get_next_sibling()
 
     walk(win.get_child())
-    win.remove_css_class("enter")
     if getattr(win, "enter_timer", None):
         GLib.source_remove(win.enter_timer)
 
@@ -156,7 +160,15 @@ def animate_in(win):
         win.remove_css_class("enter")
         win.enter_timer = None
         return False
-    GLib.timeout_add(16, start)       # after the first frame: the animation starts fresh
+
+    if not win.has_css_class("enter"):
+        # usual case (shown from hidden): start before the first frame, so the
+        # rows never flash in their end position
+        start()
+    else:
+        # still running (shown again quickly): restart it after one frame
+        win.remove_css_class("enter")
+        GLib.timeout_add(16, start)
 
 
 def type_title(label):
@@ -207,7 +219,7 @@ def serve(app_id, build, show):
     import gi
 
     gi.require_version("Gtk", "4.0")
-    from gi.repository import GLib
+    from gi.repository import GLib, Gtk
 
     GLib.set_prgname(app_id)       # Wayland app id = window class for Hyprland
     win = build()
@@ -249,8 +261,8 @@ def serve(app_id, build, show):
         pass
     sock.bind(path)
 
-    def on_cmd(*_a):
-        cmd, *opts = sock.recv(64).decode().split() or [""]
+    def handle(line):
+        cmd, *opts = line.split() or [""]
         center = "--center" in opts
         if cmd == "show":
             show_up(center)
@@ -258,12 +270,57 @@ def serve(app_id, build, show):
             win.close() if win.get_visible() else show_up(center)
         elif cmd == "quit":
             loop.quit()
+
+    def on_cmd(*_a):
+        handle(sock.recv(64).decode())
         return True
     GLib.io_add_watch(sock.fileno(), GLib.PRIORITY_DEFAULT, GLib.IOCondition.IN, on_cmd)
+
+    # FIFO for ~/.local/bin/popup-cmd. Opened read-write: a writer always
+    # exists, so it never reports EOF, and nothing blocks while we run
+    fifo_dir = os.path.join(RUN, "popup-cmd")
+    os.makedirs(fifo_dir, exist_ok=True)
+    base = os.path.join(fifo_dir, os.path.basename(sys.argv[0]))
+    try:
+        os.unlink(base + ".fifo")
+    except OSError:
+        pass
+    os.mkfifo(base + ".fifo", 0o600)
+    fifo = os.open(base + ".fifo", os.O_RDWR | os.O_NONBLOCK)
+    with open(base + ".pid", "w") as f:
+        f.write(str(os.getpid()))
+    pending = [b""]
+
+    def on_fifo(*_a):
+        try:
+            pending[0] += os.read(fifo, 4096)
+        except BlockingIOError:
+            return True
+        *lines, pending[0] = pending[0].split(b"\n")
+        for line in lines:
+            handle(line.decode(errors="replace"))
+        return True
+    GLib.io_add_watch(fifo, GLib.PRIORITY_DEFAULT, GLib.IOCondition.IN, on_fifo)
+
     if show:
         show_up()
+    else:
+        # warm up while hidden: CSS, layout and fonts of the first show would
+        # otherwise cost ~80 ms on the first press after login
+        def warm_up():
+            if not win.get_visible():
+                win.realize()
+                child = win.get_child()
+                if child:
+                    child.measure(Gtk.Orientation.VERTICAL, getattr(win, "popup_width", -1))
+            return False
+        GLib.idle_add(warm_up)
     loop.run()
-    os.unlink(path)
+    for p in (path, base + ".fifo", base + ".pid"):
+        try:
+            os.unlink(p)
+        except OSError:
+            pass
 
 
 def main(app_id, build, usage):

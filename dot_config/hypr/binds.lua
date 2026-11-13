@@ -3,6 +3,12 @@ local mod = "SUPER" -- the physical left Alt key (Alt and Super are swapped, see
 local run = function(cmd)
     return hl.dsp.exec_cmd(v.launch .. cmd)
 end
+-- Menus and popups start directly: a systemd scope (uwsm app) costs ~0.2 s per
+-- press, and they are no apps (resident popups get their command through
+-- popup-cmd, ~5 ms; rofi starts apps through uwsm itself, vars.lua M.menu)
+local menu = function(cmd)
+    return hl.dsp.exec_cmd(cmd)
+end
 -- bind(keys, action, description[, extra options]): binds with a description show
 -- up in the shortcut overview (SUPER+H, built from `hyprctl binds`), grouped into
 -- cards by the last group() call above them
@@ -31,21 +37,21 @@ bind(mod .. " + D", function()
     end
     hl.dispatch(run(v.bin .. "focus-or-run discord discord"))
 end, "Discord")
-bind(mod .. " + space", run(v.menu), "App launcher / web")
-bind(mod .. " + V", run(v.bin .. "rofi-clipboard"), "Clipboard history")
-bind(mod .. " + Return", run(v.bin .. "rofi-websearch"), "Web search")
-bind(mod .. " + W", run(v.bin .. "wallpaper pick"), "Wallpaper picker")
-bind(mod .. " + H", run(v.bin .. "keybinds"), "This overview")
+bind(mod .. " + space", menu(v.menu), "App launcher / web")
+bind(mod .. " + V", menu(v.bin .. "rofi-clipboard"), "Clipboard history")
+bind(mod .. " + Return", menu(v.bin .. "rofi-websearch"), "Web search")
+bind(mod .. " + W", menu(v.bin .. "wallpaper pick"), "Wallpaper picker")
+bind(mod .. " + H", menu(v.bin .. "popup-cmd keybinds toggle"), "This overview")
 bind(mod .. " + C", hl.dsp.exec_cmd(v.bin .. "claude-pad toggle"), "Claude (show / hide)")
 bind(mod .. " + SHIFT + C", hl.dsp.exec_cmd(v.bin .. "claude-pad ask"), "Quick question to Claude")
 
 -- Menus (the same menus open under the mouse when clicked in the bar)
 group("Menus")
-bind(mod .. " + Escape", run(v.bin .. "session-popup toggle --center"), "Lock, suspend, log out, reboot, shut down")
-bind(mod .. " + P", run(v.bin .. "power-popup toggle --center"), "Power profile, battery")
-bind(mod .. " + N", run(v.bin .. "wifi-popup toggle --center"), "Wi-Fi: networks, password, forget")
-bind(mod .. " + SHIFT + B", run(v.bin .. "bluetooth-popup toggle --center"), "Bluetooth: devices, pairing")
-bind(mod .. " + A", run(v.bin .. "sound-popup toggle --center"), "Sound: volume, outputs, apps")
+bind(mod .. " + Escape", menu(v.bin .. "popup-cmd session-popup toggle --center"), "Lock, suspend, log out, reboot, shut down")
+bind(mod .. " + P", menu(v.bin .. "popup-cmd power-popup toggle --center"), "Power profile, battery")
+bind(mod .. " + N", menu(v.bin .. "popup-cmd wifi-popup toggle --center"), "Wi-Fi: networks, password, forget")
+bind(mod .. " + SHIFT + B", menu(v.bin .. "popup-cmd bluetooth-popup toggle --center"), "Bluetooth: devices, pairing")
+bind(mod .. " + A", menu(v.bin .. "popup-cmd sound-popup toggle --center"), "Sound: volume, outputs, apps")
 bind(mod .. " + O", run(v.bin .. "music show"), "Spotify (show / hide)")
 bind(mod .. " + G", hl.dsp.exec_cmd(v.bin .. "game-watch toggle"), "Game mode for this window")
 group("Session")

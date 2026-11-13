@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+# popup-cmd SCRIPT COMMAND [--center]: fast client for the resident popups
+# (~/.local/lib/popup/resident.py), used by key binds and bar clicks.
+#   popup-cmd power-popup toggle --center
+# Writes the command into the running popup's FIFO (~5 ms; the popup's own
+# Python client needs ~80 ms). No popup running: runs SCRIPT, which starts one.
+dir=${XDG_RUNTIME_DIR:-/tmp}/popup-cmd
+script=$1
+shift
+pid=
+{ read -r pid <"$dir/$script.pid"; } 2>/dev/null
+if [[ -p $dir/$script.fifo && -n $pid ]] && kill -0 "$pid" 2>/dev/null; then
+    echo "$*" >"$dir/$script.fifo"
+else
+    exec "$HOME/.local/bin/$script" "$@"
+fi
