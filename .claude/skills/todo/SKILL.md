@@ -1,11 +1,11 @@
 ---
 name: todo
-description: Work through the open system tasks (bugs, improvements, ideas) the user collected in the Obsidian note "10 - Linux/Arch Setup/Aufgaben.md". Use when the user types /todo or asks to process the task list.
+description: Work through the open system tasks (bugs, improvements, ideas) the user collected in the Obsidian note "02 - Linux/Arch Setup/Aufgaben.md". Use when the user types /todo or asks to process the task list.
 ---
 
 # Process the Arch setup task list
 
-Task file: `~/Nextcloud/Obsidian/10 - Linux/Arch Setup/Aufgaben.md` (German, the user writes it).
+Task file: `~/Nextcloud/Obsidian/02 - Linux/Arch Setup/Aufgaben.md` (German, the user writes it).
 
 Format: checkbox lines under `## Offen`, tagged `#bug`, `#verbesserung` or `#idee`,
 optional indented sub-bullets with details. Done items move to `## Erledigt`.
