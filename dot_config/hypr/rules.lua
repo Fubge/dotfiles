@@ -164,6 +164,14 @@ hl.window_rule({
     workspace = "5 silent",
 })
 
+-- Obsidian (notes, vault in ~/Nextcloud/Obsidian) has its own workspace 8,
+-- SUPER+J jumps there and starts it if needed (focus-or-run)
+hl.window_rule({
+    name = "obsidian",
+    match = { class = "^obsidian$" },
+    workspace = "8 silent",
+})
+
 -- YouTube runs as a Vivaldi app window (own class) on workspace 4, whether
 -- youtube-autostart opens it or Vivaldi restores it with the last session
 hl.window_rule({

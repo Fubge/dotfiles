@@ -37,6 +37,16 @@ bind(mod .. " + D", function()
     end
     hl.dispatch(run(v.bin .. "focus-or-run discord " .. v.bin .. "discord-start"))
 end, "Discord")
+-- Obsidian: same idea, its window lives on workspace 8 (rules.lua)
+bind(mod .. " + J", function()
+    for _, w in ipairs(hl.get_windows()) do
+        if w.class == "obsidian" and not w.workspace.special then
+            hl.dispatch(hl.dsp.focus({ window = w }))
+            return
+        end
+    end
+    hl.dispatch(run(v.bin .. "focus-or-run obsidian obsidian"))
+end, "Obsidian (notes)")
 -- YouTube: workspace 4; reopens the Vivaldi app window if it was closed
 -- (rules.lua puts it on workspace 4, so switching there right away is enough)
 bind(mod .. " + Y", function()
