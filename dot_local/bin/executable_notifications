@@ -31,8 +31,9 @@ Look (style: ~/.config/popups/style.css, section "notifications"):
 - leaving: slides out, the cards below glide up (Gtk.Revealer)
 - critical: red frame that pulses, no timeout
 
-Mouse: left click runs the default action (or focuses the app's window) and
-takes it out of the center's history too, right click dismisses, middle click dismisses all. Volume-style updates
+Mouse: left click runs the default action (or focuses the app's window); that
+and the action buttons take it out of the center's history too (and off the
+bell's unread count), right click dismisses, middle click dismisses all. Volume-style updates
 (same id, or the same x-canonical-private-synchronous / x-dunst-stack-tag)
 change the card in place.
 """
@@ -469,11 +470,10 @@ def main():
         def on_click(self, gesture, _n, _x, _y):
             button = gesture.get_current_button()
             if button == 1:
-                forget(self.nid)
-                changed()
                 if "default" in self.actions:
                     self.invoke("default")
                     return
+                self.opened()
                 focus_app(self.names)
                 self.dismiss(DISMISSED)
             elif button == 3:
@@ -483,8 +483,16 @@ def main():
                     card.dismiss(DISMISSED)
 
         def invoke(self, key):
+            # any action counts as opened (Claude's "Open" button, not only
+            # a click on the card)
+            self.opened()
             emit("ActionInvoked", GLib.Variant("(us)", (self.nid, key)))
             self.dismiss(DISMISSED)
+
+        def opened(self):
+            """Dealt with: off the center's list, the bell's dot goes with it."""
+            forget(self.nid)
+            changed()
 
         def dismiss(self, reason):
             if self.leaving:
