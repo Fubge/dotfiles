@@ -52,15 +52,15 @@ bind(mod .. " + O", function()
     end
     hl.dispatch(run(v.bin .. "focus-or-run md.obsidian.Obsidian obsidian '" .. obsidianVault .. "'"))
 end, "Obsidian (notes)")
--- YouTube: workspace 4; reopens the Vivaldi app window if it was closed
--- (rules.lua puts it on workspace 4, so switching there right away is enough)
+-- YouTube: workspace 6; reopens the Vivaldi app window if it was closed
+-- (rules.lua puts it on workspace 6, so switching there right away is enough)
 bind(mod .. " + Y", function()
     local open = false
     for _, w in ipairs(hl.get_windows()) do
         if w.class and w.class:find("^vivaldi%-www%.youtube%.com__") then open = true end
     end
     if not open then hl.dispatch(run(v.browser .. " --app=https://www.youtube.com")) end
-    hl.dispatch(hl.dsp.focus({ workspace = "4" }))
+    hl.dispatch(hl.dsp.focus({ workspace = "6" }))
 end, "YouTube")
 bind(mod .. " + space", menu(v.menu), "App launcher / web")
 bind(mod .. " + V", menu(v.bin .. "popup-cmd clipboard-popup toggle --center"), "Clipboard history")

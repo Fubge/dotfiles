@@ -155,13 +155,13 @@ for class, size in pairs(v.floating) do
     })
 end
 
--- Discord has its own workspace 5 (chat) and opens there, tiled full size,
+-- Discord has its own workspace 7 (chat) and opens there, tiled full size,
 -- without switching (it starts at login). SUPER+D jumps there (focus-or-run).
 -- Title must end in "Discord": the updater splash stays where it pops up.
 hl.window_rule({
     name = "discord",
     match = { class = "^discord$", title = ".*Discord$" },
-    workspace = "5 silent",
+    workspace = "7 silent",
 })
 
 -- Obsidian (notes, vault in ~/Nextcloud/Obsidian) has its own workspace 8,
@@ -172,12 +172,12 @@ hl.window_rule({
     workspace = "8 silent",
 })
 
--- YouTube runs as a Vivaldi app window (own class) on workspace 4, whether
+-- YouTube runs as a Vivaldi app window (own class) on workspace 6, whether
 -- youtube-autostart opens it or Vivaldi restores it with the last session
 hl.window_rule({
     name = "youtube",
     match = { class = "^vivaldi-www\\.youtube\\.com__.*$" },
-    workspace = "4 silent",
+    workspace = "6 silent",
 })
 
 -- Ignore maximize requests from apps
@@ -195,12 +195,12 @@ hl.window_rule({
 })
 
 -- Games: Steam games (steam_app_*) and gamescope open fullscreen on
--- workspace 6 (never tiled next to the launcher, no bar), may tear (lower
+-- workspace 4 (never tiled next to the launcher, no bar), may tear (lower
 -- latency) and skip animations.
 hl.window_rule({
     name = "games",
     match = { class = "^(steam_app_.*|gamescope)$" },
-    workspace = "6",
+    workspace = "4",
     fullscreen = true,
     immediate = true,
     no_anim = true,
@@ -211,17 +211,17 @@ hl.window_rule({
 hl.window_rule({
     name = "minecraft",
     match = { class = "^com\\.mojang\\.minecraft$" },
-    workspace = "6",
+    workspace = "4",
     fullscreen = true,
     no_anim = true,
 })
 
--- Launchers (Steam client, Modrinth App) live on the games workspace 6 too
+-- Launchers (Steam client, Modrinth App) live on the games workspace 4 too
 -- (all their windows, dialogs included) and switch there when started
 hl.window_rule({
     name = "steam",
     match = { class = "^(steam|modrinth-app)$" },
-    workspace = "6",
+    workspace = "4",
 })
 
 -- Steam (CEF) scrolls far more per touchpad swipe than other apps: slow it down
