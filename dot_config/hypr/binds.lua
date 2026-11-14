@@ -37,15 +37,20 @@ bind(mod .. " + D", function()
     end
     hl.dispatch(run(v.bin .. "focus-or-run discord " .. v.bin .. "discord-start"))
 end, "Discord")
--- Obsidian: same idea, its window lives on workspace 8 (rules.lua)
+-- Obsidian: same idea, its window lives on workspace 8 (rules.lua). The window
+-- class is md.obsidian.Obsidian (it was "obsidian" before 1.15); with the wrong
+-- class SUPER+O started a second Obsidian, which only shows the vault picker.
+-- The obsidian:// link opens the vault directly, even if Obsidian still runs
+-- without a window.
+local obsidianVault = "obsidian://open?vault=Obsidian"
 bind(mod .. " + O", function()
     for _, w in ipairs(hl.get_windows()) do
-        if w.class == "obsidian" and not w.workspace.special then
+        if w.class == "md.obsidian.Obsidian" and not w.workspace.special then
             hl.dispatch(hl.dsp.focus({ window = w }))
             return
         end
     end
-    hl.dispatch(run(v.bin .. "focus-or-run obsidian obsidian"))
+    hl.dispatch(run(v.bin .. "focus-or-run md.obsidian.Obsidian obsidian '" .. obsidianVault .. "'"))
 end, "Obsidian (notes)")
 -- YouTube: workspace 4; reopens the Vivaldi app window if it was closed
 -- (rules.lua puts it on workspace 4, so switching there right away is enough)

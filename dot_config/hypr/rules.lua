@@ -168,7 +168,7 @@ hl.window_rule({
 -- SUPER+O jumps there and starts it if needed (focus-or-run)
 hl.window_rule({
     name = "obsidian",
-    match = { class = "^obsidian$" },
+    match = { class = "^md\\.obsidian\\.Obsidian$" },
     workspace = "8 silent",
 })
 
@@ -249,7 +249,7 @@ hl.window_rule({
 -- Obsidian (Electron) as well
 hl.window_rule({
     name = "obsidian-scroll",
-    match = { class = "^obsidian$" },
+    match = { class = "^md\\.obsidian\\.Obsidian$" },
     scroll_touchpad = 0.15,
 })
 
