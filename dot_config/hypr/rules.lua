@@ -102,7 +102,7 @@ end
 
 -- Spotify floats big and centered on its own special workspace "music": it
 -- appears over the current workspace and never pushes tiled windows around.
--- Toggle: SUPER+O or a click on the music icon in the bar (~/.local/bin/music show)
+-- Toggle: SUPER+M or a click on the music icon in the bar (~/.local/bin/music show)
 hl.window_rule({
     name = "spotify",
     match = { class = "^[Ss]potify$" },
@@ -165,7 +165,7 @@ hl.window_rule({
 })
 
 -- Obsidian (notes, vault in ~/Nextcloud/Obsidian) has its own workspace 8,
--- SUPER+J jumps there and starts it if needed (focus-or-run)
+-- SUPER+O jumps there and starts it if needed (focus-or-run)
 hl.window_rule({
     name = "obsidian",
     match = { class = "^obsidian$" },

@@ -38,7 +38,7 @@ bind(mod .. " + D", function()
     hl.dispatch(run(v.bin .. "focus-or-run discord " .. v.bin .. "discord-start"))
 end, "Discord")
 -- Obsidian: same idea, its window lives on workspace 8 (rules.lua)
-bind(mod .. " + J", function()
+bind(mod .. " + O", function()
     for _, w in ipairs(hl.get_windows()) do
         if w.class == "obsidian" and not w.workspace.special then
             hl.dispatch(hl.dsp.focus({ window = w }))
@@ -73,11 +73,12 @@ bind(mod .. " + P", menu(v.bin .. "popup-cmd power-popup toggle --center"), "Pow
 bind(mod .. " + N", menu(v.bin .. "popup-cmd wifi-popup toggle --center"), "Wi-Fi: networks, password, forget")
 bind(mod .. " + SHIFT + B", menu(v.bin .. "popup-cmd bluetooth-popup toggle --center"), "Bluetooth: devices, pairing")
 bind(mod .. " + A", menu(v.bin .. "popup-cmd sound-popup toggle --center"), "Sound: volume, outputs, apps")
-bind(mod .. " + O", run(v.bin .. "music show"), "Spotify (show / hide)")
+bind(mod .. " + M", run(v.bin .. "music show"), "Spotify (show / hide)")
 bind(mod .. " + G", hl.dsp.exec_cmd(v.bin .. "game-watch toggle"), "Game mode for this window")
 group("Session")
 bind(mod .. " + L", hl.dsp.exec_cmd("loginctl lock-session"), "Lock screen")
-bind(mod .. " + M", hl.dsp.exec_cmd("uwsm stop"), "Log out") -- uwsm stops all apps cleanly
+-- Log out behind SHIFT: one stray key would end every app
+bind(mod .. " + SHIFT + M", hl.dsp.exec_cmd("uwsm stop"), "Log out") -- uwsm stops all apps cleanly
 
 -- Windows
 group("Windows")
@@ -86,7 +87,7 @@ bind(mod .. " + X", function()
     local keep = win and v.keepAlive[string.lower(win.class or "")]
     if keep then
         -- Spotify / Discord keep their window (vars.lua): Spotify hides (back with
-        -- SUPER+O or the music icon), Discord goes back to the previous workspace
+        -- SUPER+M or the music icon), Discord goes back to the previous workspace
         hl.dispatch(keep)
     else
         hl.dispatch(hl.dsp.window.close())
