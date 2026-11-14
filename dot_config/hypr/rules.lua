@@ -271,9 +271,12 @@ hl.layer_rule({
     dim_around = true,
 })
 
--- Notifications (dunst) slide in from the right edge and out again
+-- Notification cards (~/.local/bin/notifications) animate themselves; the
+-- blur only goes behind the cards, not the see-through gaps between them
 hl.layer_rule({
     name = "notifications",
     match = { namespace = "^notifications$" },
-    animation = "slide right",
+    no_anim = true,
+    blur = true,
+    ignore_alpha = 0.5,
 })

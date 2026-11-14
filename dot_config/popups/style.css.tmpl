@@ -545,3 +545,152 @@ button.slider-icon.muted { animation: mute-shake 320ms ease-in-out 1; }
     40% { transform: translateY(-5px); }
 }
 .pet-card.selected { animation: hop 300ms ease-out 1; }
+
+/* ---------------------------------------------------------------- notifications */
+/* ~/.local/bin/notifications: cards in the top right corner below the bar.
+   Every app gets a round bubble with its glyph in a palette color (tint-*);
+   pictures (avatars, covers) get the glyph as a badge. A card swings in from
+   the screen edge, the bubble pops, the summary types itself with the orange
+   caret, a thin line counts down (pauses under the mouse), it slides out. */
+window.notifications { background: none; }
+.notif-stack { padding: {{ add .design.gaps_in 6 }}px {{ .design.gaps_out }}px 12px 14px; }
+.notif {
+    margin-bottom: 8px;
+    border-radius: {{ add .design.rounding 2 }}px;
+    border: 1px solid alpha({{ .palette.steel }}, 0.55);
+    background-color: alpha({{ .palette.bg }}, 0.94);
+    color: {{ .palette.fg }};
+    font-family: "{{ .design.font_ui }}";
+    font-size: 10.5pt;
+    transition: background-color 180ms ease, border-color 180ms ease;
+}
+.notif.hover {
+    border-color: alpha({{ .palette.accent }}, 0.7);
+    background-color: alpha({{ .palette.bg_alt }}, 0.96);
+}
+.notif.low { background-color: alpha({{ .palette.bg_dark }}, 0.92); }
+.notif.low .notif-summary { color: {{ .palette.fg_muted }}; }
+.notif-main { padding: 12px 12px 12px 14px; }
+.notif-caret { color: {{ .palette.accent }}; }
+
+/* the bubble */
+.notif-glyph {
+    min-width: 44px;
+    min-height: 44px;
+    border-radius: 99px;
+    font-family: "{{ .design.font }}";
+    font-size: 18pt;
+}
+.notif-thumb { border-radius: 12px; margin: 0 4px 4px 0; }
+.notif-badge {
+    min-width: 22px;
+    min-height: 22px;
+    border-radius: 99px;
+    font-family: "{{ .design.font }}";
+    font-size: 9pt;
+    color: {{ .palette.bg }};
+    box-shadow: 0 0 0 2px {{ .palette.bg }};
+}
+{{- $p := .palette }}
+{{- range $name := list "accent" "blue" "cyan" "green" "yellow" "magenta" "red" "slate" }}
+.notif-glyph.tint-{{ $name }} { color: {{ index $p $name }}; background-color: alpha({{ index $p $name }}, 0.16); }
+.notif-badge.tint-{{ $name }} { background-color: {{ index $p $name }}; }
+{{- end }}
+
+/* text */
+.notif-app {
+    font-size: 8.5pt;
+    color: {{ .palette.comment }};
+}
+.notif-age { font-size: 8.5pt; color: {{ .palette.comment }}; }
+.notif-summary { font-weight: 700; font-size: 11pt; }
+.notif-body { color: {{ .palette.fg_muted }}; }
+button.notif-close {
+    min-width: 0;
+    min-height: 0;
+    padding: 0 4px;
+    border: none;
+    border-radius: 6px;
+    box-shadow: none;
+    background: none;
+    font-family: "{{ .design.font }}";
+    font-size: 10pt;
+    color: {{ .palette.comment }};
+    opacity: 0;
+    transition: opacity 160ms ease, color 160ms ease;
+}
+.notif.hover button.notif-close { opacity: 1; }
+button.notif-close:hover { color: {{ .palette.red }}; }
+.notif-actions { margin-top: 8px; }
+
+/* value bar (volume, brightness, downloads) */
+.notif-progress-row { margin-top: 6px; }
+.notif-progress trough {
+    min-height: 4px;
+    border: none;
+    border-radius: 99px;
+    background-color: alpha({{ .palette.steel }}, 0.45);
+}
+.notif-progress progress {
+    min-height: 4px;
+    border: none;
+    border-radius: 99px;
+    background-color: {{ .palette.accent }};
+    transition: min-width 150ms ease;
+}
+.notif-progress-value { font-size: 9pt; color: {{ .palette.fg_muted }}; min-width: 34px; }
+
+/* countdown along the bottom edge */
+.notif-timer trough { min-height: 2px; border: none; border-radius: 0; background: none; }
+.notif-timer progress {
+    min-height: 2px;
+    border: none;
+    border-radius: 0 99px 99px 0;
+    background-color: alpha({{ .palette.accent }}, 0.75);
+}
+.notif.hover .notif-timer progress { background-color: alpha({{ .palette.comment }}, 0.6); }
+.notif.low .notif-timer progress { background-color: alpha({{ .palette.slate }}, 0.6); }
+
+/* critical: red frame and bubble, the frame pulses, no countdown */
+.notif.critical { border: 2px solid {{ .palette.red }}; }
+.notif.critical .notif-app { color: {{ .palette.red }}; }
+.notif.critical .notif-progress progress { background-color: {{ .palette.red }}; }
+@keyframes notif-alarm {
+    0%   { box-shadow: 0 0 0 0 alpha({{ .palette.red }}, 0.55); }
+    100% { box-shadow: 0 0 0 10px alpha({{ .palette.red }}, 0); }
+}
+.notif.critical:not(.entering) { animation: notif-alarm 1.4s ease-out infinite; }
+
+/* motion: swing in from the screen edge, the bubble pops and wiggles */
+@keyframes notif-in {
+    0%   { opacity: 0; transform: translateX(440px); }
+    60%  { opacity: 1; transform: translateX(-12px); }
+    80%  { transform: translateX(4px); }
+    100% { opacity: 1; transform: none; }
+}
+@keyframes notif-out {
+    0%   { opacity: 1; transform: none; }
+    30%  { opacity: 1; transform: translateX(-10px); }
+    100% { opacity: 0; transform: translateX(440px); }
+}
+@keyframes bubble-pop {
+    0%   { transform: scale(0.3); }
+    60%  { transform: scale(1.18); }
+    100% { transform: none; }
+}
+@keyframes notif-bump {
+    0%   { transform: none; }
+    40%  { transform: scale(1.015); }
+    100% { transform: none; }
+}
+.notif.entering { animation: notif-in 520ms cubic-bezier(0.2, 0.9, 0.3, 1) both; }
+.notif.entering .notif-glyph, .notif.entering .notif-thumb, .notif.entering .notif-badge {
+    animation: bubble-pop 420ms cubic-bezier(0.3, 1.4, 0.5, 1) 180ms both;
+}
+.notif.entering .notif-body, .notif.entering .notif-progress-row, .notif.entering .notif-actions {
+    animation: row-in 300ms ease-out 320ms both;
+}
+.notif.leaving { animation: notif-out 260ms ease-in both; }
+.notif.bump { animation: notif-bump 220ms ease-out 1; }
+.notif.bump .notif-glyph, .notif.bump .notif-badge { animation: icon-wiggle 380ms ease-in-out 1; }
+.notif.hover .notif-glyph, .notif.hover .notif-badge { animation: icon-wiggle 380ms ease-in-out 1; }

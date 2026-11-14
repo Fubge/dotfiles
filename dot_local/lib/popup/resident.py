@@ -171,8 +171,9 @@ def animate_in(win):
         GLib.timeout_add(16, start)
 
 
-def type_title(label):
-    """Type the label's text with a caret in its own color, blink, done."""
+def type_title(label, caret_color=None, step_ms=TYPE_MS):
+    """Type the label's text with a caret (in its own color unless given),
+    blink, done. Notifications pass the accent caret and a faster pace."""
     from gi.repository import GLib
 
     if getattr(label, "type_timer", None):
@@ -181,16 +182,17 @@ def type_title(label):
     if "\u258d" in text:         # still our markup (maybe cut short): the stored title
         text = label.full_text
     label.full_text = text
-    color = label.get_color()
-    caret_color = "#%02x%02x%02x" % tuple(round(c * 255) for c in
-                                          (color.red, color.green, color.blue))
+    if caret_color is None:
+        color = label.get_color()
+        caret_color = "#%02x%02x%02x" % tuple(round(c * 255) for c in
+                                              (color.red, color.green, color.blue))
     start = GLib.get_monotonic_time()
     esc = GLib.markup_escape_text
 
     def tick():
         ms = (GLib.get_monotonic_time() - start) // 1000
-        typed = min(len(text), ms // TYPE_MS)
-        after = ms - len(text) * TYPE_MS
+        typed = min(len(text), ms // step_ms)
+        after = ms - len(text) * step_ms
         done = after > BLINKS * 2 * BLINK_MS
         on = not done and (after < 0 or (after // BLINK_MS) % 2 == 0)
         # the untyped rest is drawn invisibly: the centered title does not move

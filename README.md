@@ -190,7 +190,7 @@ Then run `chezmoi apply`.
 .chezmoidata/        palette + design tokens shared by every template
 .chezmoiscripts/     install packages, enable services, build themes, reload
 .chezmoi.toml.tmpl   the install questions (machine settings)
-dot_config/          ~/.config: hypr, waybar, rofi, kitty, nvim, dunst, gtk, qt ...
+dot_config/          ~/.config: hypr, waybar, rofi, kitty, nvim, popups, gtk, qt ...
 dot_local/bin/       ~/.local/bin: bar modules, popups and helper scripts
 dot_local/lib/       shared Python: typewriter effect, resident popups, bar pet
 packages/            package lists (+ machine/ for CPU and GPU drivers)

@@ -1,0 +1,552 @@
+#!/usr/bin/env python3
+"""Notification daemon in the style of the bar popups (replaces dunst).
+
+    notifications          run it (login autostart; a new one replaces the old)
+    notifications demo     send a few sample notifications
+    notifications quit     stop the running daemon
+
+Owns org.freedesktop.Notifications on the session bus, so notify-send and
+every app land here. The cards live in one layer-shell surface (namespace
+"notifications", hypr/rules.lua) in the top right corner, below the bar.
+
+Look (style: ~/.config/popups/style.css, section "notifications"):
+- every app gets a round bubble with its Nerd Font glyph in a palette color
+  (APPS below) instead of the app's own icon, so all cards match the bar;
+  pictures the app sends along (avatars, covers) show as a rounded thumbnail
+  with the app glyph as a small badge
+- a card swings in from the screen edge, its bubble pops, the summary types
+  itself with the orange caret (resident.type_title), like the popup titles
+- a thin line along the bottom counts down; it pauses under the mouse
+- leaving: slides out, the cards below glide up (Gtk.Revealer)
+- critical: red frame that pulses, no timeout
+
+Mouse: left click runs the default action (or focuses the app's window),
+right click dismisses, middle click dismisses all. Volume-style updates
+(same id, or the same x-canonical-private-synchronous / x-dunst-stack-tag)
+change the card in place.
+"""
+import html
+import json
+import os
+import re
+import subprocess
+import sys
+
+LAYER_SHELL = "/usr/lib/libgtk4-layer-shell.so"
+# gtk4-layer-shell must be loaded before libwayland: restart with it preloaded
+if (len(sys.argv) == 1 and os.path.exists(LAYER_SHELL)
+        and LAYER_SHELL not in os.environ.get("LD_PRELOAD", "")):
+    os.environ["LD_PRELOAD"] = (LAYER_SHELL + " " + os.environ.get("LD_PRELOAD", "")).strip()
+    os.execv(sys.executable, [sys.executable] + sys.argv)
+
+sys.path.insert(0, os.path.expanduser("~/.local/lib/popup"))
+import resident  # noqa: E402
+
+NAME = "org.freedesktop.Notifications"
+PATH = "/org/freedesktop/Notifications"
+CSS = os.path.expanduser("~/.config/popups/style.css")
+WIDTH = 380            # card width
+MAX_SHOWN = 5          # more wait in a queue
+TIMEOUT = {0: 4000, 1: 6000, 2: 0}      # by urgency (low, normal, critical), ms; 0 = stays
+TYPE_TOTAL_MS = 650    # the summary types itself in about this time
+EXPIRED, DISMISSED, CLOSED = 1, 2, 3    # NotificationClosed reasons
+
+# Nerd Font glyphs (Material Design), written as escapes: editors drop them
+G = {
+    "discord": "\U000F066F", "spotify": "\U000F04C7", "steam": "\U000F04D3",
+    "gamepad": "\U000F0297", "robot": "\U000F06A9", "wifi": "\U000F05A9",
+    "bluetooth": "\U000F00AF", "images": "\U000F02F9", "web": "\U000F059F",
+    "youtube": "\U000F05C3", "volume": "\U000F057E", "brightness": "\U000F00DF",
+    "battery": "\U000F0079", "mail": "\U000F01EE", "download": "\U000F01DA",
+    "console": "\U000F018D", "package": "\U000F03D6", "message": "\U000F0369",
+    "camera": "\U000F0100", "usb": "\U000F0553", "calendar": "\U000F00ED",
+    "clock": "\U000F0954", "update": "\U000F06B0", "music": "\U000F075A",
+    "lock": "\U000F033E", "keyboard": "\U000F030C", "cog": "\U000F0493",
+    "bell": "\U000F009A", "alert": "\U000F0026", "close": "\U000F0156",
+    "check": "\U000F05E0",
+}
+# (words in app name / desktop entry / icon name, glyph, palette color); first match wins
+APPS = [
+    (("discord", "vesktop", "webcord"), "discord", "blue"),
+    (("spotify",), "spotify", "green"),
+    (("steam",), "steam", "cyan"),
+    (("gamemode", "game", "lutris", "heroic"), "gamepad", "magenta"),
+    (("claude",), "robot", "accent"),
+    (("wi-fi", "wifi", "wireless", "network", "nm-applet"), "wifi", "blue"),
+    (("bluetooth", "blueman"), "bluetooth", "cyan"),
+    (("wallpaper",), "images", "yellow"),
+    (("youtube",), "youtube", "red"),
+    (("vivaldi", "firefox", "chrom", "browser", "web"), "web", "accent"),
+    (("volume", "audio", "sound", "pipewire", "pulse"), "volume", "accent"),
+    (("bright", "backlight"), "brightness", "yellow"),
+    (("battery", "upower", "power"), "battery", "green"),
+    (("mail", "thunderbird"), "mail", "blue"),
+    (("download", "transmission", "qbittorrent"), "download", "green"),
+    (("update", "pacman", "package"), "package", "magenta"),
+    (("screenshot", "grim", "camera", "screen"), "camera", "cyan"),
+    (("usb", "udisk", "drive", "mount"), "usb", "cyan"),
+    (("calendar",), "calendar", "blue"),
+    (("timer", "clock", "alarm"), "clock", "yellow"),
+    (("lock",), "lock", "slate"),
+    (("music", "mpd", "player"), "music", "green"),
+    (("terminal", "kitty", "console", "shell"), "console", "slate"),
+    (("message", "chat", "telegram", "signal", "element"), "message", "blue"),
+    (("settings", "config"), "cog", "slate"),
+]
+
+XML = """<node><interface name="org.freedesktop.Notifications">
+  <method name="Notify">
+    <arg type="s" direction="in"/><arg type="u" direction="in"/>
+    <arg type="s" direction="in"/><arg type="s" direction="in"/>
+    <arg type="s" direction="in"/><arg type="as" direction="in"/>
+    <arg type="a{sv}" direction="in"/><arg type="i" direction="in"/>
+    <arg type="u" direction="out"/>
+  </method>
+  <method name="CloseNotification"><arg type="u" direction="in"/></method>
+  <method name="GetCapabilities"><arg type="as" direction="out"/></method>
+  <method name="GetServerInformation">
+    <arg type="s" direction="out"/><arg type="s" direction="out"/>
+    <arg type="s" direction="out"/><arg type="s" direction="out"/>
+  </method>
+  <method name="Quit"/>
+  <signal name="NotificationClosed"><arg type="u"/><arg type="u"/></signal>
+  <signal name="ActionInvoked"><arg type="u"/><arg type="s"/></signal>
+</interface></node>"""
+
+
+def pick(*names):
+    """Glyph and color for an app: by app name, desktop entry, icon name."""
+    text = " ".join(n.lower() for n in names if n)
+    for words, glyph, color in APPS:
+        if any(w in text for w in words):
+            return G[glyph], color
+    return G["bell"], "accent"
+
+
+def body_markup(text):
+    """The spec's small markup subset for Pango: keep <b> <i> <u>, links
+    become their text, other tags go, everything else is escaped."""
+    out = []
+    for part in re.split(r"(<[^>]*>)", text):
+        if re.fullmatch(r"</?[biu]>", part):
+            out.append(part)
+        elif not (part.startswith("<") and part.endswith(">")):
+            out.append(html.escape(html.unescape(part), quote=False))
+    return "".join(out).strip()
+
+
+def age_text(seconds):
+    m = int(seconds // 60)
+    if m < 1:
+        return ""
+    return f"{m} min" if m < 60 else f"{m // 60} h"
+
+
+def cli(args):
+    if args == ["demo"]:
+        send = [
+            ["-a", "Claude", "-i", "utilities-terminal", "Claude is done",
+             "Refactored the bar popups and ran the tests."],
+            ["-a", "discord", "T4RI0 | Marcel (#allgemein)", "gleich ne runde?"],
+            ["-a", "Wi-Fi", "-t", "3000", "Wi-Fi", "Connected to Home"],
+            ["-a", "GameMode", "-u", "low", "GameMode on", "Power profile: performance"],
+            ["-a", "Volume", "-h", "int:value:62", "-h", "string:x-dunst-stack-tag:vol",
+             "Volume", "62 %"],
+            ["-a", "Battery", "-u", "critical", "Battery low", "8 % left, plug in soon"],
+        ]
+        for a in send:
+            subprocess.run(["notify-send", *a])
+    elif args == ["quit"]:
+        subprocess.run(["gdbus", "call", "--session", "--dest", NAME, "--object-path", PATH,
+                        "--method", NAME + ".Quit"], stdout=subprocess.DEVNULL)
+    else:
+        sys.exit(__doc__.split("\n\n")[1])
+
+
+def main():
+    import gi
+
+    gi.require_version("Gtk", "4.0")
+    gi.require_version("Gdk", "4.0")
+    gi.require_version("Gtk4LayerShell", "1.0")
+    from gi.repository import Gdk, Gio, GLib, Gtk, Pango
+    from gi.repository import Gtk4LayerShell as Layer
+
+    GLib.set_prgname("notifications")
+    Gtk.init()
+    provider = Gtk.CssProvider()
+    provider.load_from_path(CSS)
+    Gtk.StyleContext.add_provider_for_display(
+        Gdk.Display.get_default(), provider, Gtk.STYLE_PROVIDER_PRIORITY_USER)
+
+    win = Gtk.Window(css_classes=["notifications"], resizable=False)
+    Layer.init_for_window(win)
+    Layer.set_namespace(win, "notifications")
+    Layer.set_layer(win, Layer.Layer.OVERLAY)
+    Layer.set_anchor(win, Layer.Edge.TOP, True)
+    Layer.set_anchor(win, Layer.Edge.RIGHT, True)
+    Layer.set_keyboard_mode(win, Layer.KeyboardMode.NONE)
+    stack = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, css_classes=["notif-stack"])
+    win.set_child(stack)
+
+    loop = GLib.MainLoop()
+    bus = [None]
+    live = {}           # id -> Card
+    queue = []          # Cards waiting for a free spot
+    next_id = [1]
+    accent = [None]
+
+    def emit(signal, args):
+        if bus[0]:
+            bus[0].emit_signal(None, PATH, NAME, signal, args)
+
+    def caret():
+        if accent[0] is None:
+            probe = Gtk.Label(css_classes=["notif-caret"])
+            stack.append(probe)
+            c = probe.get_color()
+            stack.remove(probe)
+            accent[0] = "#%02x%02x%02x" % tuple(round(v * 255) for v in (c.red, c.green, c.blue))
+        return accent[0]
+
+    def texture(hints, app_icon):
+        """A picture sent along: image-data, image-path, or a file as icon."""
+        data = hints.get("image-data") or hints.get("image_data") or hints.get("icon_data")
+        if data is not None:
+            try:
+                w, h, stride, alpha = (data.get_child_value(i).unpack() for i in (0, 1, 2, 3))
+                raw = data.get_child_value(6).get_data_as_bytes()
+                fmt = Gdk.MemoryFormat.R8G8B8A8 if alpha else Gdk.MemoryFormat.R8G8B8
+                return Gdk.MemoryTexture.new(w, h, fmt, raw, stride)
+            except (GLib.Error, TypeError, ValueError):
+                pass
+        for path in (hints.get("image-path"), hints.get("image_path"), app_icon):
+            path = path.unpack() if isinstance(path, GLib.Variant) else path
+            if path and path.startswith("file://"):
+                path = GLib.filename_from_uri(path)[0]
+            if path and path.startswith("/") and os.path.isfile(path):
+                try:
+                    return Gdk.Texture.new_from_filename(path)
+                except GLib.Error:
+                    pass
+        return None
+
+    def focus_app(names):
+        """Clicked without a default action: jump to the app's window."""
+        try:
+            clients = json.loads(resident.hypr("j/clients"))
+        except ValueError:
+            return
+        wanted = [n.lower() for n in names if n]
+        for c in clients:
+            cls = c.get("class", "").lower()
+            if cls and any(w == cls or w in cls for w in wanted):
+                resident.hypr('dispatch hl.dsp.focus({ window = "address:%s" })' % c["address"])
+                return
+
+    class Card(Gtk.Revealer):
+        def __init__(self, nid):
+            super().__init__(transition_type=Gtk.RevealerTransitionType.SLIDE_DOWN,
+                             transition_duration=260)
+            self.nid = nid
+            self.leaving = False
+            self.hovered = False
+            self.timeout = 0
+            self.left = 0
+            self.last = None
+            self.created = GLib.get_monotonic_time()
+            self.actions = {}
+
+            self.card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL,
+                                css_classes=["notif"], overflow=Gtk.Overflow.HIDDEN)
+            self.card.set_size_request(WIDTH, -1)
+            self.set_child(self.card)
+
+            main = Gtk.Box(spacing=14, css_classes=["notif-main"])
+            self.bubble = Gtk.Overlay(valign=Gtk.Align.START, css_classes=["notif-bubble"])
+            main.append(self.bubble)
+
+            text = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2, hexpand=True)
+            head = Gtk.Box(spacing=6)
+            self.app = Gtk.Label(xalign=0, hexpand=True, css_classes=["notif-app"],
+                                 ellipsize=Pango.EllipsizeMode.END)
+            self.age = Gtk.Label(css_classes=["notif-age"])
+            close = Gtk.Button(label=G["close"], css_classes=["notif-close", "flat"],
+                               valign=Gtk.Align.CENTER)
+            close.connect("clicked", lambda _b: self.dismiss(DISMISSED))
+            for w in (self.app, self.age, close):
+                head.append(w)
+            self.summary = Gtk.Label(xalign=0, wrap=True, css_classes=["notif-summary"],
+                                     wrap_mode=Pango.WrapMode.WORD_CHAR, max_width_chars=30,
+                                     lines=3, ellipsize=Pango.EllipsizeMode.END)
+            self.body = Gtk.Label(xalign=0, wrap=True, css_classes=["notif-body"],
+                                  wrap_mode=Pango.WrapMode.WORD_CHAR, max_width_chars=30,
+                                  lines=5, ellipsize=Pango.EllipsizeMode.END)
+            self.progress_row = Gtk.Box(spacing=10, css_classes=["notif-progress-row"])
+            self.progress = Gtk.ProgressBar(hexpand=True, valign=Gtk.Align.CENTER,
+                                            css_classes=["notif-progress"])
+            self.progress_value = Gtk.Label(css_classes=["notif-progress-value"])
+            self.progress_row.append(self.progress)
+            self.progress_row.append(self.progress_value)
+            self.action_box = Gtk.Box(spacing=6, homogeneous=True, css_classes=["notif-actions"])
+            for w in (head, self.summary, self.body, self.progress_row, self.action_box):
+                text.append(w)
+            main.append(text)
+            self.card.append(main)
+
+            self.timer = Gtk.ProgressBar(css_classes=["notif-timer"], fraction=1)
+            self.card.append(self.timer)
+
+            click = Gtk.GestureClick(button=0)
+            click.connect("released", self.on_click)
+            self.card.add_controller(click)
+            motion = Gtk.EventControllerMotion()
+            motion.connect("enter", lambda *_a: self.set_hover(True))
+            motion.connect("leave", lambda *_a: self.set_hover(False))
+            self.card.add_controller(motion)
+
+        def fill(self, app, icon, summary, body, actions, hints, timeout, replacing):
+            urgency = hints.get("urgency")
+            urgency = urgency.unpack() if urgency is not None else 1
+            entry = hints.get("desktop-entry")
+            entry = entry.unpack() if entry is not None else ""
+            self.names = (app, entry)
+            glyph, color = pick(app, entry, icon if not icon.startswith("/") else "")
+            if urgency == 2:
+                color = "red"
+                if glyph == G["bell"]:
+                    glyph = G["alert"]
+            for c in ("low", "normal", "critical"):
+                self.card.remove_css_class(c)
+            self.card.add_css_class(("low", "normal", "critical")[min(urgency, 2)])
+
+            # bubble: the app glyph, or the picture with the glyph as a badge
+            pic = texture(hints, icon)
+            old = self.bubble.get_child()
+            for w in list(getattr(self, "badges", [])):
+                self.bubble.remove_overlay(w)
+            self.badges = []
+            if pic:
+                frame = Gtk.Picture(paintable=pic, content_fit=Gtk.ContentFit.COVER,
+                                    css_classes=["notif-thumb"], overflow=Gtk.Overflow.HIDDEN)
+                frame.set_size_request(48, 48)
+                self.bubble.set_child(frame)
+                badge = Gtk.Label(label=glyph, halign=Gtk.Align.END, valign=Gtk.Align.END,
+                                  css_classes=["notif-badge", "tint-" + color])
+                self.bubble.add_overlay(badge)
+                self.badges.append(badge)
+            else:
+                self.bubble.set_child(Gtk.Label(label=glyph,
+                                                css_classes=["notif-glyph", "tint-" + color]))
+            del old
+
+            self.app.set_text(app or "Notification")
+            if getattr(self.summary, "type_timer", None):
+                GLib.source_remove(self.summary.type_timer)
+                self.summary.type_timer = None
+            self.summary.set_text(summary)
+            self.summary.full_text = summary
+            markup = body_markup(body)
+            try:
+                Pango.parse_markup(markup, -1, "\0")
+                self.body.set_markup(markup)
+            except GLib.Error:
+                self.body.set_text(body)
+            self.body.set_visible(bool(body.strip()))
+
+            value = hints.get("value")
+            self.progress_row.set_visible(value is not None)
+            if value is not None:
+                v = max(0, min(100, int(value.unpack())))
+                self.progress.set_fraction(v / 100)
+                self.progress_value.set_text(f"{v}%")
+
+            while (child := self.action_box.get_first_child()):
+                self.action_box.remove(child)
+            self.actions = dict(zip(actions[::2], actions[1::2]))
+            for key, label in self.actions.items():
+                if key == "default":
+                    continue
+                b = Gtk.Button(label=label or key, css_classes=["item-action", "flat"])
+                b.connect("clicked", lambda _b, k=key: self.invoke(k))
+                self.action_box.append(b)
+            self.action_box.set_visible(self.action_box.get_first_child() is not None)
+
+            if timeout < 0:
+                timeout = TIMEOUT[min(urgency, 2)]
+            self.timeout = self.left = timeout
+            self.last = None
+            self.timer.set_visible(timeout > 0)
+            self.timer.set_fraction(1)
+            if replacing:          # same card, new content: a little bump, no typing
+                self.card.remove_css_class("bump")
+                GLib.timeout_add(16, lambda: self.card.add_css_class("bump") and False)
+
+        def show_in(self):
+            self.card.add_css_class("entering")
+            self.set_reveal_child(True)
+            GLib.timeout_add(900, lambda: self.card.remove_css_class("entering") and False)
+            text = self.summary.get_text()
+            if text:
+                step = max(12, min(45, TYPE_TOTAL_MS // max(1, len(text))))
+                GLib.timeout_add(140, lambda: resident.type_title(
+                    self.summary, caret(), step) and False)
+            self.add_tick_callback(self.tick)
+
+        def tick(self, _w, clock):
+            if self.leaving:
+                return False
+            now = clock.get_frame_time()
+            if self.timeout > 0 and not self.hovered and self.last is not None:
+                self.left -= (now - self.last) / 1000
+                self.timer.set_fraction(max(0, self.left / self.timeout))
+                if self.left <= 0:
+                    self.dismiss(EXPIRED)
+                    return False
+            self.last = now
+            return True
+
+        def set_hover(self, on):
+            self.hovered = on
+            (self.card.add_css_class if on else self.card.remove_css_class)("hover")
+
+        def refresh_age(self):
+            self.age.set_text(age_text((GLib.get_monotonic_time() - self.created) / 1e6))
+
+        def on_click(self, gesture, _n, _x, _y):
+            button = gesture.get_current_button()
+            if button == 1:
+                if "default" in self.actions:
+                    self.invoke("default")
+                    return
+                focus_app(self.names)
+                self.dismiss(DISMISSED)
+            elif button == 3:
+                self.dismiss(DISMISSED)
+            elif button == 2:
+                for card in list(live.values()) + list(queue):
+                    card.dismiss(DISMISSED)
+
+        def invoke(self, key):
+            emit("ActionInvoked", GLib.Variant("(us)", (self.nid, key)))
+            self.dismiss(DISMISSED)
+
+        def dismiss(self, reason):
+            if self.leaving:
+                return
+            self.leaving = True
+            emit("NotificationClosed", GLib.Variant("(uu)", (self.nid, reason)))
+            live.pop(self.nid, None)
+            if self in queue:
+                queue.remove(self)
+                return
+            self.card.add_css_class("leaving")
+            GLib.timeout_add(240, self.collapse)
+
+        def collapse(self):
+            self.connect("notify::child-revealed", self.gone)
+            self.set_reveal_child(False)
+            return False
+
+        def gone(self, *_a):
+            if self.get_child_revealed():
+                return
+            stack.remove(self)
+            shown = [c for c in iter_children(stack)]
+            if queue and len(shown) < MAX_SHOWN:
+                place(queue.pop(0))
+            elif not shown:
+                win.set_visible(False)
+            win.set_default_size(-1, -1)
+
+    def iter_children(box):
+        c = box.get_first_child()
+        while c is not None:
+            yield c
+            c = c.get_next_sibling()
+
+    def place(card):
+        stack.prepend(card)                 # newest on top
+        win.set_visible(True)
+        card.show_in()
+
+    def find_stack_tag(app, hints):
+        for key in ("x-canonical-private-synchronous", "x-dunst-stack-tag", "synchronous"):
+            if key in hints:
+                tag = (app, str(hints[key].unpack()))
+                for card in live.values():
+                    if getattr(card, "tag", None) == tag and not card.leaving:
+                        return card, tag
+                return None, tag
+        return None, None
+
+    def notify(params):
+        app, replaces, icon, summary, body, actions, _hints, timeout = params.unpack()
+        raw = params.get_child_value(6)
+        hints = {raw.get_child_value(i).get_child_value(0).get_string():
+                 raw.get_child_value(i).get_child_value(1).get_variant()
+                 for i in range(raw.n_children())}
+        card = live.get(replaces) if replaces else None
+        tag_card, tag = find_stack_tag(app, hints)
+        card = card or tag_card
+        if card and not card.leaving:
+            card.fill(app, icon, summary, body, actions, hints, timeout, replacing=True)
+            card.tag = tag
+            return card.nid
+        nid = next_id[0]
+        next_id[0] += 1
+        card = Card(nid)
+        card.tag = tag
+        card.fill(app, icon, summary, body, actions, hints, timeout, replacing=False)
+        live[nid] = card
+        if sum(1 for _ in iter_children(stack)) >= MAX_SHOWN:
+            queue.append(card)
+        else:
+            place(card)
+        return nid
+
+    def method_call(_conn, _sender, _path, _iface, method, params, invocation):
+        if method == "Notify":
+            invocation.return_value(GLib.Variant("(u)", (notify(params),)))
+        elif method == "CloseNotification":
+            (nid,) = params.unpack()
+            card = live.get(nid)
+            if card:
+                card.dismiss(CLOSED)
+            invocation.return_value(None)
+        elif method == "GetCapabilities":
+            invocation.return_value(GLib.Variant("(as)", (
+                ["actions", "body", "body-markup", "icon-static", "persistence",
+                 "x-canonical-private-synchronous", "x-dunst-stack-tag"],)))
+        elif method == "GetServerInformation":
+            invocation.return_value(GLib.Variant("(ssss)", ("notifications", "dotfiles",
+                                                            "1.0", "1.2")))
+        elif method == "Quit":
+            invocation.return_value(None)
+            loop.quit()
+
+    def acquired(conn, _name):
+        bus[0] = conn
+        node = Gio.DBusNodeInfo.new_for_xml(XML)
+        conn.register_object(PATH, node.interfaces[0], method_call, None, None)
+
+    def lost(_conn, _name):
+        loop.quit()                     # another daemon took over (or no bus)
+
+    Gio.bus_own_name(Gio.BusType.SESSION, NAME,
+                     Gio.BusNameOwnerFlags.ALLOW_REPLACEMENT | Gio.BusNameOwnerFlags.REPLACE,
+                     acquired, None, lost)
+
+    def ages():
+        for card in live.values():
+            card.refresh_age()
+        return True
+    GLib.timeout_add_seconds(20, ages)
+    loop.run()
+
+
+if __name__ == "__main__":
+    if sys.argv[1:]:
+        cli(sys.argv[1:])
+    else:
+        main()

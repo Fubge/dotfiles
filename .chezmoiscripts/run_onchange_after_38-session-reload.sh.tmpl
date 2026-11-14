@@ -2,6 +2,7 @@
 # Push changes into the running session:
 # - Resident popups (~/.local/lib/popup/resident.py) keep their old code until
 #   restarted: stop them and start them hidden again.
+# - The notification daemon (~/.local/bin/notifications) restarts the same way.
 # - A change in a module that hyprland.lua requires (vars.lua, rules.lua...) did
 #   not always reach the running Hyprland (new popup class stayed open): reload.
 # {{ include "dot_local/lib/popup/resident.py" | sha256sum }}
@@ -15,6 +16,7 @@
 # {{ include "dot_local/bin/executable_pet-picker" | sha256sum }}
 # {{ include "dot_local/bin/executable_keybinds" | sha256sum }}
 # {{ include "dot_config/popups/style.css.tmpl" | sha256sum }}
+# {{ include "dot_local/bin/executable_notifications" | sha256sum }}
 {{ range (glob (joinPath .chezmoi.sourceDir "dot_config/hypr/*.lua*")) -}}
 # {{ include . | sha256sum }}
 {{ end -}}
@@ -29,5 +31,10 @@ sleep 0.3
 for p in "${popups[@]}"; do
     setsid -f "$HOME/.local/bin/$p" --hidden >/dev/null 2>&1
 done
+
+# Notification daemon: a new one takes over the bus name from the old one.
+# dunst (until it is uninstalled) does not let go of it: stop it first
+systemctl --user stop dunst.service 2>/dev/null
+setsid -f "$HOME/.local/bin/notifications" >/dev/null 2>&1
 
 hyprctl reload >/dev/null

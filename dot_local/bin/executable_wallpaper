@@ -33,14 +33,14 @@ set_fixed() {
 }
 
 set_login() {   # cropped to the panel size as JPEG, so SDDM never chokes on webp etc.
-    [[ -w $login_dir ]] || { notify-send "Wallpapers" "$login_dir missing (chezmoi apply)"; return 1; }
+    [[ -w $login_dir ]] || { notify-send -a Wallpapers "Wallpapers" "$login_dir missing (chezmoi apply)"; return 1; }
     local tmp="$login_dir/.new.jpg" size
     size=$(hyprctl monitors -j 2>/dev/null | jq -r 'max_by(.width) | "\(.width)x\(.height)"' 2>/dev/null)
     [[ $size == *x* ]] || size=1920x1080
     magick "$1[0]" -resize "$size^" -gravity center -extent "$size" -quality 92 "$tmp" &&
         mv -f "$tmp" "$login_dir/background.jpg" &&
         ln -sfn "$1" "$state/login" &&
-        { [[ ${2:-} == quiet ]] || notify-send -t 2000 "Wallpapers" "Login screen: $(basename "${1%.*}")"; }
+        { [[ ${2:-} == quiet ]] || notify-send -a Wallpapers -t 2000 "Wallpapers" "Login screen: $(basename "${1%.*}")"; }
 }
 
 random_image() {
@@ -59,7 +59,7 @@ thumbnail() {   # cached 480x300 preview for the menu
 pick() {
     mapfile -t images < <(list_images)
     if ((${#images[@]} > 0)) && [[ -n $(for i in "${images[@]}"; do t="$thumbs/$(printf '%s' "$i" | md5sum | cut -c1-16).jpg"; [[ -f $t ]] || echo x; done | head -1) ]]; then
-        notify-send -t 2000 "Wallpapers" "Creating previews..."
+        notify-send -a Wallpapers -t 2000 "Wallpapers" "Creating previews..."
     fi
 
     local mode idx rc; mode=$(cat "$state/mode" 2>/dev/null || echo fixed)

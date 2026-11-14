@@ -22,7 +22,7 @@ power-profiles-daemon
 # Desktop components
 waybar
 rofi
-dunst
+gtk4-layer-shell         # notification cards (~/.local/bin/notifications)
 hyprpaper
 hypridle
 hyprlock

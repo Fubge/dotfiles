@@ -1,0 +1,6 @@
+# D-Bus starts the notification cards (~/.local/bin/notifications) if a
+# notification comes in while they are not running. Found before the system's
+# service files, so no other daemon (dunst) gets started instead.
+[D-BUS Service]
+Name=org.freedesktop.Notifications
+Exec={{ .chezmoi.homeDir }}/.local/bin/notifications

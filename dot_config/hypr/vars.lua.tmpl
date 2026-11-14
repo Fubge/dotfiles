@@ -40,9 +40,10 @@ M.hidden = {
     { cmd = "spotify-launcher", class = "spotify", hide = M.bin .. "music hide" },
 }
 M.background = {
-    "discord",                           -- opens on workspace 5 without switching (rules.lua)
+    M.bin .. "notifications",             -- notification cards (replaces dunst)
+    M.bin .. "discord-start",             -- workspace 5 without switching (rules.lua), bar-style tray icons
     "wl-paste --watch cliphist store",   -- clipboard history
-    M.bin .. "game-watch",                -- GameMode + normal Alt key for every game
+    M.bin .. "game-watch",                -- GameMode for every game
     M.bin .. "youtube-autostart",         -- YouTube app window on workspace 4 (rules.lua)
     M.bin .. "claude-pad start",          -- Claude session waits hidden on special:claude
     M.bin .. "pet-picker --hidden",       -- pet picker waits hidden, opens instantly

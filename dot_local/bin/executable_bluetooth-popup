@@ -64,7 +64,7 @@ AGENT_XML = """
 
 
 def notify(text, urgent=False):
-    subprocess.Popen(["notify-send", "-t", "3000", "-i", "bluetooth",
+    subprocess.Popen(["notify-send", "-a", "Bluetooth", "-t", "3000", "-i", "bluetooth",
                       *(["-u", "critical"] if urgent else []), "Bluetooth", text])
 
 

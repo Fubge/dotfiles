@@ -54,7 +54,7 @@ I_MORE, I_LESS = "\U000F0140", "\U000F0143"     # chevron down / up
 
 
 def notify(text, urgent=False):
-    subprocess.Popen(["notify-send", "-t", "3000", "-i", "network-wireless",
+    subprocess.Popen(["notify-send", "-a", "Wi-Fi", "-t", "3000", "-i", "network-wireless",
                       *(["-u", "critical"] if urgent else []), "Wi-Fi", text])
 
 
