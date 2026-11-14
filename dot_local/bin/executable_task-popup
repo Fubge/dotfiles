@@ -15,7 +15,8 @@ a capital first letter. An empty task shakes its head; a saved one
 says so in green and the popup closes.
 
 Keys: Enter saves, Alt+B / Alt+V / Alt+I pick the tag, Tab moves between the
-fields, Escape closes (what you typed stays until it is saved).
+fields, Escape closes (what you typed stays until it is saved). Tag
+preselected: verbesserung.
 """
 import os
 import sys
@@ -36,7 +37,7 @@ TAGS = [
     ("verbesserung", "v", "\U000F0068", "Geht noch besser"),
     ("idee", "i", "\U000F0335", "Etwas ganz Neues"),
 ]
-DEFAULT_TAG = "idee"
+DEFAULT_TAG = "verbesserung"   # chosen again after every saved task
 
 
 def capital(text):
@@ -164,6 +165,7 @@ def build():
                 return
             self.entry.set_text("")
             self.details.set_text("")
+            self.tag = DEFAULT_TAG        # the next task starts from the default again
             self.add_css_class("saved")
             self.hello.set_text("Notiert ✓")
             resident.type_title(self.hello)       # stops the greeting still typing
