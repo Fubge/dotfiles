@@ -20,8 +20,19 @@ bindkey '^[[1;5D' backward-word   # Ctrl+Left
 bindkey '^[[3~'   delete-char     # Delete
 
 # --- Completion -----------------------------------------------------------
+# The security check of all completion dirs (compaudit) costs ~25 ms: run the
+# full compinit only once a day, otherwise trust the cached dump (-C).
 autoload -Uz compinit
-compinit -d ~/.cache/zcompdump
+_fresh=(~/.cache/zcompdump(N.mh-24))   # dump younger than 24 h?
+if (( $#_fresh )); then
+    compinit -C -d ~/.cache/zcompdump
+else
+    compinit -d ~/.cache/zcompdump
+    touch ~/.cache/zcompdump   # compinit only rewrites the dump when something changed
+fi
+unset _fresh
+# byte-compiled dump loads faster; rebuilt whenever the dump changes
+[[ ~/.cache/zcompdump.zwc -nt ~/.cache/zcompdump ]] || zcompile ~/.cache/zcompdump
 zstyle ':completion:*' menu select                          # arrow-key menu
 zstyle ':completion:*' matcher-list 'm:{a-zA-Z}={A-Za-z}'   # case-insensitive
 zstyle ':completion:*' list-colors "${(s.:.)LS_COLORS}"
@@ -29,9 +40,20 @@ zstyle ':completion:*:descriptions' format '%F{208}-- %d --%f'
 zstyle ':completion:*' group-name ''
 
 # --- Tools ----------------------------------------------------------------
-source <(fzf --zsh)               # Ctrl+R history search, Ctrl+T files, Alt+C dirs
-eval "$(zoxide init zsh)"         # z <part of a path> jumps to frecent dirs
-eval "$(starship init zsh)"
+# Each tool prints its shell code; running three programs on every new shell
+# costs ~15 ms, so the output is cached and only regenerated when the tool's
+# binary is newer than the cache (= after a package update).
+_cached_init() {   # _cached_init NAME COMMAND...
+    local cache=~/.cache/zsh/$1.zsh bin=${commands[$2]}
+    if [[ ! -s $cache || $bin -nt $cache ]]; then
+        mkdir -p ${cache:h} && "${@:2}" >| $cache
+    fi
+    source $cache
+}
+_cached_init fzf fzf --zsh            # Ctrl+R history search, Ctrl+T files, Alt+C dirs
+_cached_init zoxide zoxide init zsh   # z <part of a path> jumps to frecent dirs
+_cached_init starship starship init zsh
+unfunction _cached_init
 
 # --- Aliases --------------------------------------------------------------
 alias ls='eza --icons --group-directories-first'

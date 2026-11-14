@@ -12,9 +12,11 @@ only fstab and the GRUB tweaks come from the base install and the GRUB theme scr
 | `/usr/local/bin/power-profile-auto` | performance on AC, power-saver on battery |
 | `/etc/udev/rules.d/99-power-profile.rules` | runs it when the charger is plugged in/out |
 | `/etc/systemd/system/power-profile-auto.service` | runs it at boot |
+| `/etc/sysctl.d/99-performance.conf` | zram-friendly swapping (`swappiness 180`, `page-cluster 0`), no NMI watchdog, no split-lock penalty for games |
+| `/etc/systemd/journald.conf.d/size.conf` | journal capped at 200 MB |
 | `/usr/share/sddm/themes/slate/` | login screen theme (`theme.conf` + `background.jpg` generated from the palette) |
 | `/etc/sddm.conf.d/10-theme.conf` | selects the theme, cursor, greeter DPI = 96 x `machine.monitor_scale` |
-| `/etc/kernel/cmdline` | *boot only*: `machine.cmdline`, the kernel command line baked into the UKI: LUKS root, `quiet loglevel=3` (no kernel messages over the LUKS prompt); changing it rebuilds the UKI |
+| `/etc/kernel/cmdline` | *boot only*: `machine.cmdline`, the kernel command line baked into the UKI: LUKS root (`allow-discards,no-read-workqueue,no-write-workqueue`: TRIM and lower NVMe latency, dm-crypt works inline instead of queueing), `quiet loglevel=3` (no kernel messages over the LUKS prompt), `cfg80211.ieee80211_regdom=DE` (global Wi-Fi country for adapters without their own; Intel cards take it from their firmware); changing it rebuilds the UKI |
 | `/etc/default/grub` | *boot only*: native gfxmode (`machine.grub_resolution`), theme, hides the firmware's BootNext entries |
 | `/etc/grub.d/40_custom` | *boot only*: the only menu entries: Arch Linux (chainloads the UKI) and optionally Windows |
 | `/boot/grub/themes/slate/` | *boot only*: GRUB theme, generated from the palette by `.chezmoiscripts/run_onchange_after_42-grub-theme.sh.tmpl` |
@@ -34,6 +36,8 @@ log in, run `sudo rm /etc/sddm.conf.d/10-theme.conf` and reboot.
 | `reflector.timer`, `paccache.timer` | enabled | Fresh mirrors, trimmed package cache |
 | `/etc/snapper/configs/root` | no timeline, `NUMBER_LIMIT=10`, `SPACE_LIMIT=0.2`, `FREE_LIMIT=0.3` | Lean pre/post-pacman snapshots of `/` only |
 | `/etc/fstab` | `@snapshots` subvolume mounted at `/.snapshots` | Snapshots survive a rollback of `@` |
+| `/etc/fstab` | btrfs mounts with `noatime,compress=zstd:1` | No metadata write on every file read; fast transparent compression (fewer bytes through dm-crypt) |
+| `NetworkManager-wait-online.service` | disabled (by the system-files script) | Nothing waits for the network at boot |
 | `fstrim.timer` | enabled | Weekly TRIM |
 | `/etc/grub.d/15_uki` | removed (by the GRUB theme script) | Replaced by the explicit entry in `40_custom` |
 | `/etc/grub.d/30_uefi-firmware` | `chmod -x` (by the GRUB theme script) | Hides "UEFI Firmware Settings"; a `grub` update restores it until the script runs again |

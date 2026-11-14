@@ -6,6 +6,8 @@
 {{- if .machine.gaming }}{{ $lists = append $lists "gaming" }}{{ end }}
 {{- $lists = append $lists (printf "machine/cpu-%s" .machine.cpu) }}
 {{- $lists = append $lists (printf "machine/gpu-%s" .machine.gpu) }}
+{{- $firmware := dig "machine" "firmware" "linux-firmware" . }}
+# Firmware (machine.firmware): {{ $firmware }}
 # chezmoi re-runs this script whenever one of them changes:
 {{ range $lists -}}
 # {{ . }}: {{ include (printf "packages/%s.txt" .) | sha256sum }}
@@ -14,7 +16,7 @@ set -euo pipefail
 
 src="{{ .chezmoi.sourceDir }}/packages"
 lists=({{ range $lists }}"$src/{{ . }}.txt" {{ end }})
-mapfile -t pkgs < <(sed 's/#.*//; s/[[:space:]]//g; /^$/d' "${lists[@]}" | sort -u)
+mapfile -t pkgs < <({ sed 's/#.*//; s/[[:space:]]//g; /^$/d' "${lists[@]}"; printf '%s\n' {{ $firmware }}; } | sort -u)
 
 missing=()
 for p in "${pkgs[@]}"; do

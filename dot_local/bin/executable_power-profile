@@ -1,24 +1,41 @@
 #!/usr/bin/env bash
 # Power profile icon for the bar.
-#   power-profile status       -> JSON for the waybar custom module (icon, tooltip, class)
-# Switching happens in the power popup (~/.local/bin/power-popup). The bar module
-# refreshes on signal 8 (sent after a change) and every few seconds
-# (the charger udev rule and gamemode also switch profiles).
+#   power-profile status   -> one JSON line for the waybar custom module (icon, tooltip, class)
+#   power-profile watch    -> the same, then a new line on every profile change
+# Switching happens in the power popup (~/.local/bin/power-popup); the charger
+# udev rule and gamemode switch profiles too. `watch` follows all of them through
+# power-profiles-daemon's D-Bus signal, so nothing polls (powerprofilesctl is
+# Python and cost ~50 ms CPU per call every 5 s).
 set -uo pipefail
 profiles=(performance balanced power-saver)
 names=("Performance" "Balanced" "Power saver")
 icons=($'\U000F04C5' $'\U000F0F85' $'\U000F032A')
+bus=org.freedesktop.UPower.PowerProfiles
+path=/org/freedesktop/UPower/PowerProfiles
 
-current=$(powerprofilesctl get 2>/dev/null) || current=""
-cur_idx=""
-for i in "${!profiles[@]}"; do
-    [[ ${profiles[i]} == "$current" ]] && cur_idx=$i
-done
+status() {
+    local current cur_idx="" i
+    current=$(busctl get-property "$bus" "$path" "$bus" ActiveProfile 2>/dev/null) || current=""
+    current=${current#s \"}; current=${current%\"}
+    for i in "${!profiles[@]}"; do
+        [[ ${profiles[i]} == "$current" ]] && cur_idx=$i
+    done
+    if [[ -z $cur_idx ]]; then
+        echo '{"text": "", "class": "unavailable"}'
+    else
+        printf '{"text": "%s", "tooltip": "Power profile: %s", "class": "%s"}\n' \
+            "${icons[cur_idx]}" "${names[cur_idx]}" "$current"
+    fi
+}
 
 case ${1-status} in
-status)
-    [[ -z $cur_idx ]] && { echo '{"text": "", "class": "unavailable"}'; exit 0; }
-    printf '{"text": "%s", "tooltip": "Power profile: %s", "class": "%s"}\n' \
-        "${icons[cur_idx]}" "${names[cur_idx]}" "$current"
+status) status ;;
+watch)
+    status
+    # gdbus keeps following the name across daemon restarts
+    gdbus monitor --system --dest "$bus" --object-path "$path" 2>/dev/null |
+        while read -r line; do
+            [[ $line == *ActiveProfile* ]] && status
+        done
     ;;
 esac

@@ -31,6 +31,7 @@ reboot
 | Display mode / scale | `preferred` / `auto` | internal panel, SDDM DPI |
 | Gaming stack | yes | Steam, GameMode, MangoHud, gamescope, Modrinth App |
 | Personal apps | yes | Vivaldi, Discord, Bitwarden, Spotify |
+| Firmware | `linux-firmware` | all firmware; or only your hardware's split packages, e.g. `linux-firmware-intel linux-firmware-realtek` (check `journalctl -k \| grep -i firmware`), then `sudo pacman -Rns linux-firmware` |
 | Manage the boot chain | **no** | only for layout B, see below |
 
 Answer **no** to the boot question unless your system matches layout B: it
@@ -70,25 +71,25 @@ mkfs.btrfs /dev/mapper/root
 mount /dev/mapper/root /mnt
 btrfs subvolume create /mnt/{@,@home,@snapshots}
 umount /mnt
-o=noatime,compress=zstd
+o=noatime,compress=zstd:1
 mount -o $o,subvol=@ /dev/mapper/root /mnt
 mount --mkdir -o $o,subvol=@home /dev/mapper/root /mnt/home
 mount --mkdir -o $o,subvol=@snapshots /dev/mapper/root /mnt/.snapshots
 mount --mkdir /dev/nvme0n1p1 /mnt/boot
 
 # AMD CPU: amd-ucode instead of intel-ucode
-pacstrap -K /mnt base linux linux-firmware intel-ucode btrfs-progs mkinitcpio grub efibootmgr networkmanager sudo git vim
+pacstrap -K /mnt base linux linux-firmware intel-ucode btrfs-progs mkinitcpio grub efibootmgr networkmanager sudo git neovim
 genfstab -U /mnt >> /mnt/etc/fstab
 arch-chroot /mnt
 ```
 
 Inside the chroot: timezone, locale, hostname, root password, your user in
-`wheel` (`EDITOR=vim visudo`), then the UKI:
+`wheel` (`EDITOR=nvim visudo`), then the UKI:
 
 ```sh
 # HOOKS in /etc/mkinitcpio.conf:
 #   base udev autodetect microcode modconf kms keyboard keymap consolefont block encrypt filesystems
-echo "cryptdevice=PARTUUID=$(blkid -s PARTUUID -o value /dev/nvme0n1p2):root:allow-discards root=/dev/mapper/root rootflags=subvol=@ rw quiet" > /etc/kernel/cmdline
+echo "cryptdevice=PARTUUID=$(blkid -s PARTUUID -o value /dev/nvme0n1p2):root:allow-discards,no-read-workqueue,no-write-workqueue root=/dev/mapper/root rootflags=subvol=@ rw quiet" > /etc/kernel/cmdline
 # /etc/mkinitcpio.d/linux.preset: comment the *_image lines, uncomment
 #   default_uki="/boot/EFI/Linux/arch-linux.efi"
 mkdir -p /boot/EFI/Linux && mkinitcpio -P

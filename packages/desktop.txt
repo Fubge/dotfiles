@@ -4,7 +4,6 @@ uwsm
 sddm
 xdg-desktop-portal-hyprland
 xdg-utils
-qt5-wayland
 qt6-wayland
 
 # Audio (PipeWire)
@@ -13,6 +12,7 @@ pipewire-alsa
 pipewire-jack
 pipewire-pulse
 wireplumber
+rtkit           # gives PipeWire realtime priority (no crackling under load)
 gst-plugin-pipewire
 libpulse
 

@@ -101,7 +101,17 @@ def hypr_json(what):
 
 
 def window_alive():
-    """True if the pad window exists; also True when hyprctl gives no answer."""
+    """True if the pad window exists; also True when hyprctl gives no answer.
+    Asks the pad's kitty socket first: a connect costs nothing, while hyprctl
+    every 3 s was a process spawn plus a JSON dump of all windows."""
+    with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as s:
+        try:
+            s.connect(SOCK)
+            return True
+        except FileNotFoundError:
+            return False
+        except OSError:
+            pass   # stale socket file (kitty killed) or odd state: ask Hyprland
     out = subprocess.run(["hyprctl", "clients", "-j"], capture_output=True, text=True).stdout
     try:
         clients = json.loads(out)

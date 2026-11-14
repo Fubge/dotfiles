@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Install root-owned files into / (copied, not symlinked):
-#   system/       every machine (SDDM theme, power profile switching, iwd Wi-Fi backend)
+#   system/       every machine (SDDM theme, power profile switching, iwd Wi-Fi backend,
+#                 sysctl + journald tuning)
 #   system-boot/  only with machine.boot = true (GRUB, kernel cmdline, console)
 # *.tmpl files are rendered with the chezmoi data first.
 # Re-runs when any of them (or their rendered output) changes:
@@ -19,7 +20,9 @@ dirs=({{ range $dirs }}{{ . }} {{ end }})
 
 # Console font and kernel command line are baked into the UKI: rebuild it when they change
 rebuild_uki=false
-restart_nm=false
+network_changed=false
+reload_sysctl=false
+restart_journald=false
 installed=()
 
 for d in "${dirs[@]}"; do
@@ -36,7 +39,13 @@ for d in "${dirs[@]}"; do
             rebuild_uki=true
         fi
         if [[ $dest == /etc/NetworkManager/* || $dest == /etc/iwd/* ]] && ! cmp -s "$tmp" "$dest"; then
-            restart_nm=true
+            network_changed=true
+        fi
+        if [[ $dest == /etc/sysctl.d/* ]] && ! cmp -s "$tmp" "$dest"; then
+            reload_sysctl=true
+        fi
+        if [[ $dest == /etc/systemd/journald.conf.d/* ]] && ! cmp -s "$tmp" "$dest"; then
+            restart_journald=true
         fi
         mode=0644
         [[ $dest == */bin/* || $dest == /etc/grub.d/* ]] && mode=0755
@@ -52,6 +61,13 @@ if $rebuild_uki; then
     sudo mkinitcpio -P
 fi
 
+if $reload_sysctl; then
+    sudo sysctl --system >/dev/null
+fi
+if $restart_journald; then
+    sudo systemctl restart systemd-journald.service
+fi
+
 sudo udevadm control --reload
 sudo systemctl daemon-reload
 sudo systemctl enable --now power-profile-auto.service
@@ -59,7 +75,10 @@ sudo systemctl enable --now power-profile-auto.service
 # Wi-Fi backend: iwd instead of wpa_supplicant (system/etc/NetworkManager/conf.d/wifi-backend.conf)
 sudo systemctl disable --now wpa_supplicant.service 2>/dev/null || true
 sudo systemctl enable --now iwd.service
-if $restart_nm; then
-    echo "system: Wi-Fi config changed, restarting NetworkManager (Wi-Fi drops for a few seconds)"
-    sudo systemctl restart iwd.service NetworkManager.service
+# Nothing here needs the network before login; waiting for it only delays boot
+sudo systemctl disable NetworkManager-wait-online.service 2>/dev/null || true
+# Never restart the network from here: it cuts every running session (SSH,
+# Claude, downloads) and Wi-Fi does not always come back. Takes effect at reboot.
+if $network_changed; then
+    echo "system: Wi-Fi config changed, active after the next reboot"
 fi

@@ -3,9 +3,7 @@
 # Fingerprint reader (fprintd-enroll; harmless without one)
 fprintd
 
-# Diagnostics
-libva-utils
-vulkan-tools
+# Diagnostics (lsusb, lspci)
 usbutils
 pciutils
 python-gobject   # required by powerprofilesctl

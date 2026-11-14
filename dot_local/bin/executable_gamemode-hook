@@ -11,4 +11,3 @@ case "$1" in
         notify-send -a GameMode -i applications-games "GameMode off" "Power profile: $(powerprofilesctl get)"
         ;;
 esac
-pkill -RTMIN+8 -x waybar   # refresh the power profile icon

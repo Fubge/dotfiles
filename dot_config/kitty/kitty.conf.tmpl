@@ -10,6 +10,11 @@ enable_audio_bell no
 cursor_shape beam
 shell_integration enabled
 
+# Latency: draw input right away (defaults: input_delay 3 ms, repaint_delay 10 ms).
+# Still synced to the 120 Hz display, so no tearing and only a little more CPU.
+input_delay   0
+repaint_delay 5
+
 # Remote control off: nothing needs it any more (the old /tmp socket was world-readable)
 allow_remote_control no
 

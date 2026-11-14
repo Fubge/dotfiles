@@ -167,10 +167,8 @@
     // Icon from ~/.local/bin/power-profile; click opens the power popup (battery,
     // the three profiles: ~/.local/bin/power-popup)
     "custom/power-profile": {
-        "exec": "~/.local/bin/power-profile status",
+        "exec": "~/.local/bin/power-profile watch",   // follows D-Bus, no polling
         "return-type": "json",
-        "interval": 5,
-        "signal": 8,
         "on-click": "~/.local/bin/popup-cmd power-popup toggle"
     },
     // Perceived brightness (same numbers as the slider and the brightness keys);

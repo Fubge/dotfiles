@@ -177,7 +177,6 @@ def build():
                 p.call_finish(res)
             except GLib.Error:
                 return
-            subprocess.Popen(["pkill", "-RTMIN+8", "-x", "waybar"])   # bar icon follows at once
 
         def open_session(self):
             self.close()

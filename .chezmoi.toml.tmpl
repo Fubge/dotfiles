@@ -15,6 +15,7 @@
 {{- $scale := promptStringOnce . "machine.monitor_scale" "Internal display scale (auto, 1, 1.5, 2, ...)" "auto" -}}
 {{- $gaming := promptBoolOnce . "machine.gaming" "Install the gaming stack (Steam, GameMode, MangoHud, Minecraft launcher)" true -}}
 {{- $apps := promptBoolOnce . "machine.apps" "Install personal apps (Vivaldi, Discord, Bitwarden, Spotify)" true -}}
+{{- $firmware := promptStringOnce . "machine.firmware" "Firmware packages: linux-firmware (all) or only your hardware's split packages, e.g. linux-firmware-intel linux-firmware-realtek" "linux-firmware" -}}
 {{- $boot := promptBoolOnce . "machine.boot" "Manage the boot chain (GRUB theme + entries, kernel cmdline, console font)? Only say yes for the documented UKI + GRUB layout, see docs/install.md" false -}}
 
 [data.machine]
@@ -27,6 +28,7 @@ monitor_mode = {{ $mode | quote }}
 monitor_scale = {{ $scale | quote }}
 gaming = {{ $gaming }}
 apps = {{ $apps }}
+firmware = {{ $firmware | quote }}
 boot = {{ $boot }}
 # First login-screen background, relative to ~/Pictures/Wallpapers
 # ("" = the current desktop wallpaper)

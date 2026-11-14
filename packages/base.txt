@@ -2,7 +2,7 @@
 base
 base-devel
 linux
-linux-firmware
+# firmware: machine.firmware in chezmoi.toml (default: all of linux-firmware)
 terminus-font
 sof-firmware
 mkinitcpio
@@ -23,10 +23,10 @@ iwd             # Wi-Fi backend for NetworkManager (band preference, faster roam
 bluez
 bluez-utils
 ufw
+wireless-regdb  # Wi-Fi rules per country for adapters that do not bring their own (USB sticks)
 
 # Maintenance
 fwupd
-smartmontools
 reflector
 pacman-contrib
 
@@ -34,8 +34,5 @@ pacman-contrib
 git
 github-cli
 chezmoi
-vim
-nano
 htop
-wget
 jq
