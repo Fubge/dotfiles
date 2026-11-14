@@ -13,11 +13,17 @@ optional indented sub-bullets with details. Done items move to `## Erledigt`.
 ## Steps
 
 1. Read the file. Skip the example line (starts with "Beispiel:"). If nothing is open, say so and stop.
-2. List the open tasks to the user in one short block with a one-line plan each, and say
-   which ones you would do now. Ideas (`#idee`) and anything invasive need an OK first.
-3. Work through them one by one, following the repo conventions and memory rules
-   (no kernel changes, no live network restarts, spell out invasive steps first).
-   One commit per task, message in English.
+2. The user runs this unattended (before sleeping / while away). Do NOT ask for
+   confirmation and do not wait for answers: work through every open task on your own,
+   including `#idee`. When something is unclear, pick the sensible default and note it.
+3. Work through them one by one, following the repo conventions and memory rules.
+   One commit per task, message in English. Do not push.
+   Hard limits, even unattended (leave a `❓` sub-bullet instead of doing it):
+   - no kernel changes, no live restarts of NetworkManager/iwd/Wi-Fi, no reboot or logout
+   - nothing destructive or hard to undo (deleting user data, repartitioning, bootloader)
+   - anything that needs sudo/a password: prepare the change in the repo, commit it,
+     and note the exact command the user has to run in the sub-bullet
+   - do not kill or restart the running Hyprland session or apps the user may have open
 4. Update the note after each task:
    - Done: change `- [ ]` to `- [x]`, append ` ✅ YYYY-MM-DD` (Tasks plugin format),
      add an indented sub-bullet `- Claude: <what was changed, commit hash>` in German,
