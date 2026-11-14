@@ -33,7 +33,8 @@ Look (style: ~/.config/popups/style.css, section "notifications"):
 
 Mouse: left click runs the default action (or focuses the app's window); that
 and the action buttons take it out of the center's history too (and off the
-bell's unread count), right click dismisses, middle click dismisses all. Volume-style updates
+bell's unread count). The X and right click dismiss, middle click dismisses
+all; closed by hand they leave the center too, only timed out cards stay. Volume-style updates
 (same id, or the same x-canonical-private-synchronous / x-dunst-stack-tag)
 change the card in place.
 """
@@ -321,7 +322,7 @@ def main():
             self.age = Gtk.Label(xalign=0, css_classes=["notif-age"])
             close = Gtk.Button(label=G["close"], css_classes=["notif-close", "flat"],
                                valign=Gtk.Align.CENTER)
-            close.connect("clicked", lambda _b: self.dismiss(DISMISSED))
+            close.connect("clicked", lambda _b: self.discard())
             names = Gtk.Box(spacing=5, hexpand=True)
             names.append(self.app)
             names.append(self.age)
@@ -477,9 +478,13 @@ def main():
                 focus_app(self.names)
                 self.dismiss(DISMISSED)
             elif button == 3:
-                self.dismiss(DISMISSED)
+                self.discard()
             elif button == 2:
-                for card in list(live.values()) + list(queue):
+                cards = list(live.values()) + list(queue)
+                for card in cards:
+                    forget(card.nid)
+                changed()
+                for card in cards:
                     card.dismiss(DISMISSED)
 
         def invoke(self, key):
@@ -493,6 +498,12 @@ def main():
             """Dealt with: off the center's list, the bell's dot goes with it."""
             forget(self.nid)
             changed()
+
+        def discard(self):
+            """Closed by hand (X, right click): seen, so off the list as well.
+            Only cards that time out stay in the center."""
+            self.opened()
+            self.dismiss(DISMISSED)
 
         def dismiss(self, reason):
             if self.leaving:
