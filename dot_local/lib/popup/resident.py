@@ -58,7 +58,7 @@ BLINKS = 3          # caret blinks after typing, then it goes away
 # widgets that slide in on their own (their children move with them)
 ROW_CLASSES = ("sound-row", "slider-row", "item-card", "section", "note", "app-name",
                "segment", "battery", "more", "pet-card", "sound-sep", "menu-search",
-               "menu-info", "card")
+               "menu-info", "card", "center-entry", "center-empty")
 
 
 def sock_path(app_id):

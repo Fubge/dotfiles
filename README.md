@@ -162,6 +162,7 @@ walks through a full LUKS + btrfs + UKI setup.
 | `SUPER+V` | Clipboard history | `SUPER+B` | Browser |
 | `SUPER+A` | Sound | `SUPER+SHIFT+B` | Bluetooth |
 | `SUPER+N` | Wi-Fi | `SUPER+P` | Power (profile, battery) |
+| `SUPER+I` | Notification center | Right click bell | Do not disturb |
 | `SUPER+X` | Close (hides Spotify) | `SUPER+S` | Minimize / restore |
 | `SUPER+F` | Float / tile | `SUPER+SHIFT+F` | Fullscreen |
 | `SUPER+1..0` | Workspace | `SUPER+SHIFT+1..0` | Send window |

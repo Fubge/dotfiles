@@ -56,6 +56,7 @@ M.background = {
     M.bin .. "session-popup --hidden",    -- lock / reboot / shut down, same
     M.bin .. "keybinds --hidden",         -- shortcut overview (SUPER+H), same
     M.bin .. "clipboard-popup --hidden",  -- clipboard history (SUPER+V), same
+    M.bin .. "notification-center --hidden", -- notification history (SUPER+I), same
 }
 
 -- Look -----------------------------------------------------------------------
@@ -107,6 +108,7 @@ M.popup = {
         "popup.session", -- lock, reboot, shut down; centered (~/.local/bin/session-popup)
         "popup.brightness", -- screen + keyboard backlight (~/.local/bin/brightness-popup)
         "popup.clipboard",  -- clipboard history; centered (~/.local/bin/clipboard-popup)
+        "popup.notifications", -- notification history (~/.local/bin/notification-center)
     },
     top = 46,   -- bar margin (8) + bar height (30) + gap (8), also in resident.py
 }

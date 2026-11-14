@@ -3,18 +3,29 @@
 
     notifications          run it (login autostart; a new one replaces the old)
     notifications demo     send a few sample notifications
+    notifications dnd      do not disturb on / off (bar bell: right click)
     notifications quit     stop the running daemon
 
 Owns org.freedesktop.Notifications on the session bus, so notify-send and
 every app land here. The cards live in one layer-shell surface (namespace
 "notifications", hypr/rules.lua) in the top right corner, below the bar.
 
+History: every notification (not the volume / brightness bars) also goes into
+~/.local/state/notifications/history.json, which the notification center
+(~/.local/bin/notification-center, bar bell, SUPER+I) shows. The center talks
+to this daemon over its own interface on the same object (notif.CENTER_XML):
+remove, clear, do not disturb, mark read; signal Changed. The bar bell reads
+$XDG_RUNTIME_DIR/notifications.status (a waybar JSON line) on every Changed.
+Do not disturb: only critical cards show, the rest goes quietly to the center.
+
 Look (style: ~/.config/popups/style.css, section "notifications"):
-- every app gets a round bubble with its Nerd Font glyph in a palette color
-  (APPS below) instead of the app's own icon, so all cards match the bar;
-  pictures the app sends along (avatars, covers) show as a rounded thumbnail
-  with the app glyph as a small badge
-- a card swings in from the screen edge, its bubble pops, the summary types
+- a small header: the app's real icon (icon theme, ~/.local/lib/popup/notif.py),
+  or for system messages a Nerd Font glyph on a rounded square in a palette
+  color, then the app name and the age; pictures the app sends along (avatars,
+  covers) sit as a rounded square on the right of the text
+- no echoes: a summary equal to the app name is dropped, a value card
+  (volume, brightness) is just the header and its bar
+- a card swings in from the screen edge, its icon pops, the summary types
   itself with the orange caret (resident.type_title), like the popup titles
 - a thin line along the bottom counts down; it pauses under the mouse
 - leaving: slides out, the cards below glide up (Gtk.Revealer)
@@ -25,12 +36,12 @@ right click dismisses, middle click dismisses all. Volume-style updates
 (same id, or the same x-canonical-private-synchronous / x-dunst-stack-tag)
 change the card in place.
 """
-import html
 import json
 import os
 import re
 import subprocess
 import sys
+import time
 
 LAYER_SHELL = "/usr/lib/libgtk4-layer-shell.so"
 # gtk4-layer-shell must be loaded before libwayland: restart with it preloaded
@@ -41,58 +52,21 @@ if (len(sys.argv) == 1 and os.path.exists(LAYER_SHELL)
 
 sys.path.insert(0, os.path.expanduser("~/.local/lib/popup"))
 import resident  # noqa: E402
+import notif  # noqa: E402
+from notif import G, NAME, PATH  # noqa: E402
 
-NAME = "org.freedesktop.Notifications"
-PATH = "/org/freedesktop/Notifications"
 CSS = os.path.expanduser("~/.config/popups/style.css")
-WIDTH = 380            # card width
+WIDTH = 360            # card width
+THUMB = 48             # picture next to the text (avatars, covers)
 MAX_SHOWN = 5          # more wait in a queue
 TIMEOUT = {0: 4000, 1: 6000, 2: 0}      # by urgency (low, normal, critical), ms; 0 = stays
 TYPE_TOTAL_MS = 650    # the summary types itself in about this time
 EXPIRED, DISMISSED, CLOSED = 1, 2, 3    # NotificationClosed reasons
-
-# Nerd Font glyphs (Material Design), written as escapes: editors drop them
-G = {
-    "discord": "\U000F066F", "spotify": "\U000F04C7", "steam": "\U000F04D3",
-    "gamepad": "\U000F0297", "robot": "\U000F06A9", "wifi": "\U000F05A9",
-    "bluetooth": "\U000F00AF", "images": "\U000F02F9", "web": "\U000F059F",
-    "youtube": "\U000F05C3", "volume": "\U000F057E", "brightness": "\U000F00DF",
-    "battery": "\U000F0079", "mail": "\U000F01EE", "download": "\U000F01DA",
-    "console": "\U000F018D", "package": "\U000F03D6", "message": "\U000F0369",
-    "camera": "\U000F0100", "usb": "\U000F0553", "calendar": "\U000F00ED",
-    "clock": "\U000F0954", "update": "\U000F06B0", "music": "\U000F075A",
-    "lock": "\U000F033E", "keyboard": "\U000F030C", "cog": "\U000F0493",
-    "bell": "\U000F009A", "alert": "\U000F0026", "close": "\U000F0156",
-    "check": "\U000F05E0",
-}
-# (words in app name / desktop entry / icon name, glyph, palette color); first match wins
-APPS = [
-    (("discord", "vesktop", "webcord"), "discord", "blue"),
-    (("spotify",), "spotify", "green"),
-    (("steam",), "steam", "cyan"),
-    (("gamemode", "game", "lutris", "heroic"), "gamepad", "magenta"),
-    (("claude",), "robot", "accent"),
-    (("wi-fi", "wifi", "wireless", "network", "nm-applet"), "wifi", "blue"),
-    (("bluetooth", "blueman"), "bluetooth", "cyan"),
-    (("wallpaper",), "images", "yellow"),
-    (("youtube",), "youtube", "red"),
-    (("vivaldi", "firefox", "chrom", "browser", "web"), "web", "accent"),
-    (("volume", "audio", "sound", "pipewire", "pulse"), "volume", "accent"),
-    (("bright", "backlight"), "brightness", "yellow"),
-    (("battery", "upower", "power"), "battery", "green"),
-    (("mail", "thunderbird"), "mail", "blue"),
-    (("download", "transmission", "qbittorrent"), "download", "green"),
-    (("update", "pacman", "package"), "package", "magenta"),
-    (("screenshot", "grim", "camera", "screen"), "camera", "cyan"),
-    (("usb", "udisk", "drive", "mount"), "usb", "cyan"),
-    (("calendar",), "calendar", "blue"),
-    (("timer", "clock", "alarm"), "clock", "yellow"),
-    (("lock",), "lock", "slate"),
-    (("music", "mpd", "player"), "music", "green"),
-    (("terminal", "kitty", "console", "shell"), "console", "slate"),
-    (("message", "chat", "telegram", "signal", "element"), "message", "blue"),
-    (("settings", "config"), "cog", "slate"),
-]
+HISTORY_MAX = 60       # the center keeps the newest this many
+# Bar bell with new ones: the dot into bell-badge's cut out corner, measured
+# for JetBrainsMono Nerd Font at the bar's 14 px (10.5 pt): letter spacing
+# after the bell (1/1024 pt), dot size, dot rise (1/1024 pt)
+BADGE_DOT = (-3060, "7pt", 5643)
 
 XML = """<node><interface name="org.freedesktop.Notifications">
   <method name="Notify">
@@ -114,32 +88,17 @@ XML = """<node><interface name="org.freedesktop.Notifications">
 </interface></node>"""
 
 
-def pick(*names):
-    """Glyph and color for an app: by app name, desktop entry, icon name."""
-    text = " ".join(n.lower() for n in names if n)
-    for words, glyph, color in APPS:
-        if any(w in text for w in words):
-            return G[glyph], color
-    return G["bell"], "accent"
-
-
-def body_markup(text):
-    """The spec's small markup subset for Pango: keep <b> <i> <u>, links
-    become their text, other tags go, everything else is escaped."""
-    out = []
-    for part in re.split(r"(<[^>]*>)", text):
-        if re.fullmatch(r"</?[biu]>", part):
-            out.append(part)
-        elif not (part.startswith("<") and part.endswith(">")):
-            out.append(html.escape(html.unescape(part), quote=False))
-    return "".join(out).strip()
-
-
-def age_text(seconds):
-    m = int(seconds // 60)
-    if m < 1:
-        return ""
-    return f"{m} min" if m < 60 else f"{m // 60} h"
+def tidy(app, summary, body, has_value):
+    """No echoes: "Volume / Volume / 62 %" becomes the header plus the bar."""
+    app_name = app or "Notification"
+    if app_name.islower():                  # "discord" -> "Discord"
+        app_name = app_name[0].upper() + app_name[1:]
+    lines = [t for t in (summary.strip(), body.strip()) if t]
+    if lines and lines[0].lower() == app_name.lower():
+        lines.pop(0)
+    if has_value:
+        lines = [t for t in lines if not re.fullmatch(r"\d+\s*%?", t)]
+    return app_name, (lines[0] if lines else ""), (lines[1] if len(lines) > 1 else "")
 
 
 def cli(args):
@@ -156,6 +115,9 @@ def cli(args):
         ]
         for a in send:
             subprocess.run(["notify-send", *a])
+    elif args == ["dnd"]:
+        subprocess.run(["gdbus", "call", "--session", "--dest", NAME, "--object-path", PATH,
+                        "--method", notif.CENTER_IFACE + ".ToggleDnd"], stdout=subprocess.DEVNULL)
     elif args == ["quit"]:
         subprocess.run(["gdbus", "call", "--session", "--dest", NAME, "--object-path", PATH,
                         "--method", NAME + ".Quit"], stdout=subprocess.DEVNULL)
@@ -169,7 +131,8 @@ def main():
     gi.require_version("Gtk", "4.0")
     gi.require_version("Gdk", "4.0")
     gi.require_version("Gtk4LayerShell", "1.0")
-    from gi.repository import Gdk, Gio, GLib, Gtk, Pango
+    gi.require_version("GdkPixbuf", "2.0")
+    from gi.repository import Gdk, GdkPixbuf, Gio, GLib, Gtk, Pango
     from gi.repository import Gtk4LayerShell as Layer
 
     GLib.set_prgname("notifications")
@@ -196,6 +159,72 @@ def main():
     next_id = [1]
     accent = [None]
 
+    # history for the center: loaded once, saved on every change
+    state = {"dnd": False, "read_at": 0, "items": []}
+    try:
+        with open(notif.HISTORY) as f:
+            state.update(json.load(f))
+    except (OSError, ValueError):
+        pass
+    os.makedirs(notif.IMAGES, exist_ok=True)
+    next_id[0] = max([i["id"] for i in state["items"]] + [0]) + 1
+
+    def changed():
+        """Save, tell the bar and the center."""
+        tmp = notif.HISTORY + ".tmp"
+        with open(tmp, "w") as f:
+            json.dump(state, f)
+        os.replace(tmp, notif.HISTORY)
+        unread = sum(1 for i in state["items"] if i["time"] > state["read_at"])
+        if state["dnd"]:
+            text, cls = G["bell-sleep"], "dnd"
+            tip = "Do not disturb\nClick: notifications, right click: off"
+        elif unread:
+            # the bell with a cut out corner, an orange dot laid into the cut
+            # (one label, so nothing covers anything): BADGE_DOT says where
+            text = ('<span letter_spacing="%d">%s</span><span size="%s" rise="%d" '
+                    'foreground="%s">●</span>' % (*BADGE_DOT[:1], G["bell-badge"],
+                                                      *BADGE_DOT[1:], caret()))
+            cls = "unread"
+            tip = f"{unread} new\nClick: notifications, right click: do not disturb"
+        else:
+            text, cls = G["bell"], "empty" if not state["items"] else "read"
+            tip = "Notifications\nClick: open, right click: do not disturb"
+        with open(notif.BAR_STATUS + ".tmp", "w") as f:
+            f.write(json.dumps({"text": text, "class": cls, "tooltip": tip}) + "\n")
+        os.replace(notif.BAR_STATUS + ".tmp", notif.BAR_STATUS)
+        if bus[0]:
+            bus[0].emit_signal(None, PATH, notif.CENTER_IFACE, "Changed", None)
+
+    def drop_image(item):
+        if item.get("image"):
+            try:
+                os.unlink(item["image"])
+            except OSError:
+                pass
+
+    def remember(nid, app, entry, icon, summary, body, urgency, pix, has_default):
+        items = state["items"]
+        old = next((i for i in items if i["id"] == nid), None)
+        if old:
+            items.remove(old)
+            drop_image(old)
+        image = None
+        if pix is not None:
+            image = os.path.join(notif.IMAGES, f"{nid}.png")
+            try:
+                pix.savev(image, "png", [], [])
+            except GLib.Error:
+                image = None
+        items.insert(0, {"id": nid, "app": app, "entry": entry,
+                         "icon": icon if not icon.startswith(("/", "file://")) else "",
+                         "summary": summary, "body": body, "urgency": urgency,
+                         "time": time.time(), "image": image, "default": has_default})
+        for gone in items[HISTORY_MAX:]:
+            drop_image(gone)
+        del items[HISTORY_MAX:]
+        changed()
+
     def emit(signal, args):
         if bus[0]:
             bus[0].emit_signal(None, PATH, NAME, signal, args)
@@ -210,26 +239,38 @@ def main():
         return accent[0]
 
     def texture(hints, app_icon):
-        """A picture sent along: image-data, image-path, or a file as icon."""
+        """A picture sent along (image-data, image-path, or a file as icon),
+        cropped to a square and scaled to THUMB at 2x: (texture, pixbuf)."""
+        pix = None
         data = hints.get("image-data") or hints.get("image_data") or hints.get("icon_data")
         if data is not None:
             try:
                 w, h, stride, alpha = (data.get_child_value(i).unpack() for i in (0, 1, 2, 3))
                 raw = data.get_child_value(6).get_data_as_bytes()
-                fmt = Gdk.MemoryFormat.R8G8B8A8 if alpha else Gdk.MemoryFormat.R8G8B8
-                return Gdk.MemoryTexture.new(w, h, fmt, raw, stride)
+                pix = GdkPixbuf.Pixbuf.new_from_bytes(raw, GdkPixbuf.Colorspace.RGB,
+                                                      alpha, 8, w, h, stride)
             except (GLib.Error, TypeError, ValueError):
-                pass
-        for path in (hints.get("image-path"), hints.get("image_path"), app_icon):
-            path = path.unpack() if isinstance(path, GLib.Variant) else path
-            if path and path.startswith("file://"):
-                path = GLib.filename_from_uri(path)[0]
-            if path and path.startswith("/") and os.path.isfile(path):
-                try:
-                    return Gdk.Texture.new_from_filename(path)
-                except GLib.Error:
-                    pass
-        return None
+                pix = None
+        if pix is None:
+            for path in (hints.get("image-path"), hints.get("image_path"), app_icon):
+                path = path.unpack() if isinstance(path, GLib.Variant) else path
+                if path and path.startswith("file://"):
+                    path = GLib.filename_from_uri(path)[0]
+                if path and path.startswith("/") and os.path.isfile(path):
+                    try:
+                        pix = GdkPixbuf.Pixbuf.new_from_file_at_scale(path, 512, 512, True)
+                        break
+                    except GLib.Error:
+                        pass
+        if pix is None:
+            return None, None
+        w, h = pix.get_width(), pix.get_height()
+        side = min(w, h)
+        pix = pix.new_subpixbuf((w - side) // 2, (h - side) // 2, side, side)
+        pix = pix.scale_simple(THUMB * 2, THUMB * 2, GdkPixbuf.InterpType.BILINEAR)
+        fmt = Gdk.MemoryFormat.R8G8B8A8 if pix.get_has_alpha() else Gdk.MemoryFormat.R8G8B8
+        return Gdk.MemoryTexture.new(pix.get_width(), pix.get_height(), fmt,
+                                     pix.read_pixel_bytes(), pix.get_rowstride()), pix
 
     def focus_app(names):
         """Clicked without a default action: jump to the app's window."""
@@ -254,45 +295,62 @@ def main():
             self.timeout = 0
             self.left = 0
             self.last = None
-            self.created = GLib.get_monotonic_time()
+            self.created = time.time()
             self.actions = {}
 
             self.card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL,
                                 css_classes=["notif"], overflow=Gtk.Overflow.HIDDEN)
             self.card.set_size_request(WIDTH, -1)
             self.set_child(self.card)
+            inner = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, css_classes=["notif-inner"])
+            self.card.append(inner)
 
-            main = Gtk.Box(spacing=14, css_classes=["notif-main"])
-            self.bubble = Gtk.Overlay(valign=Gtk.Align.START, css_classes=["notif-bubble"])
-            main.append(self.bubble)
-
-            text = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2, hexpand=True)
-            head = Gtk.Box(spacing=6)
-            self.app = Gtk.Label(xalign=0, hexpand=True, css_classes=["notif-app"],
+            # header: app icon, app name, age, close
+            head = Gtk.Box(spacing=8, css_classes=["notif-head"])
+            self.icon = Gtk.Box(css_classes=["notif-icon-slot"], valign=Gtk.Align.CENTER)
+            self.app = Gtk.Label(xalign=0, css_classes=["notif-app"],
                                  ellipsize=Pango.EllipsizeMode.END)
-            self.age = Gtk.Label(css_classes=["notif-age"])
+            self.age = Gtk.Label(xalign=0, css_classes=["notif-age"])
             close = Gtk.Button(label=G["close"], css_classes=["notif-close", "flat"],
                                valign=Gtk.Align.CENTER)
             close.connect("clicked", lambda _b: self.dismiss(DISMISSED))
-            for w in (self.app, self.age, close):
+            names = Gtk.Box(spacing=5, hexpand=True)
+            names.append(self.app)
+            names.append(self.age)
+            for w in (self.icon, names, close):
                 head.append(w)
+            inner.append(head)
+
+            # content: text, picture on the right
+            content = Gtk.Box(spacing=12, css_classes=["notif-content"])
+            text = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2, hexpand=True,
+                           valign=Gtk.Align.CENTER)
             self.summary = Gtk.Label(xalign=0, wrap=True, css_classes=["notif-summary"],
                                      wrap_mode=Pango.WrapMode.WORD_CHAR, max_width_chars=30,
-                                     lines=3, ellipsize=Pango.EllipsizeMode.END)
+                                     lines=2, ellipsize=Pango.EllipsizeMode.END)
             self.body = Gtk.Label(xalign=0, wrap=True, css_classes=["notif-body"],
                                   wrap_mode=Pango.WrapMode.WORD_CHAR, max_width_chars=30,
-                                  lines=5, ellipsize=Pango.EllipsizeMode.END)
+                                  lines=4, ellipsize=Pango.EllipsizeMode.END)
+            text.append(self.summary)
+            text.append(self.body)
+            content.append(text)
+            self.thumb = Gtk.Box(css_classes=["notif-thumb"], overflow=Gtk.Overflow.HIDDEN,
+                                 valign=Gtk.Align.START)
+            self.thumb_image = Gtk.Image(pixel_size=THUMB)
+            self.thumb.append(self.thumb_image)
+            content.append(self.thumb)
+            self.content = content
+            inner.append(content)
+
             self.progress_row = Gtk.Box(spacing=10, css_classes=["notif-progress-row"])
             self.progress = Gtk.ProgressBar(hexpand=True, valign=Gtk.Align.CENTER,
                                             css_classes=["notif-progress"])
-            self.progress_value = Gtk.Label(css_classes=["notif-progress-value"])
+            self.progress_value = Gtk.Label(xalign=1, css_classes=["notif-progress-value"])
             self.progress_row.append(self.progress)
             self.progress_row.append(self.progress_value)
+            inner.append(self.progress_row)
             self.action_box = Gtk.Box(spacing=6, homogeneous=True, css_classes=["notif-actions"])
-            for w in (head, self.summary, self.body, self.progress_row, self.action_box):
-                text.append(w)
-            main.append(text)
-            self.card.append(main)
+            inner.append(self.action_box)
 
             self.timer = Gtk.ProgressBar(css_classes=["notif-timer"], fraction=1)
             self.card.append(self.timer)
@@ -311,50 +369,38 @@ def main():
             entry = hints.get("desktop-entry")
             entry = entry.unpack() if entry is not None else ""
             self.names = (app, entry)
-            glyph, color = pick(app, entry, icon if not icon.startswith("/") else "")
-            if urgency == 2:
-                color = "red"
-                if glyph == G["bell"]:
-                    glyph = G["alert"]
             for c in ("low", "normal", "critical"):
                 self.card.remove_css_class(c)
             self.card.add_css_class(("low", "normal", "critical")[min(urgency, 2)])
 
-            # bubble: the app glyph, or the picture with the glyph as a badge
-            pic = texture(hints, icon)
-            old = self.bubble.get_child()
-            for w in list(getattr(self, "badges", [])):
-                self.bubble.remove_overlay(w)
-            self.badges = []
-            if pic:
-                frame = Gtk.Picture(paintable=pic, content_fit=Gtk.ContentFit.COVER,
-                                    css_classes=["notif-thumb"], overflow=Gtk.Overflow.HIDDEN)
-                frame.set_size_request(48, 48)
-                self.bubble.set_child(frame)
-                badge = Gtk.Label(label=glyph, halign=Gtk.Align.END, valign=Gtk.Align.END,
-                                  css_classes=["notif-badge", "tint-" + color])
-                self.bubble.add_overlay(badge)
-                self.badges.append(badge)
-            else:
-                self.bubble.set_child(Gtk.Label(label=glyph,
-                                                css_classes=["notif-glyph", "tint-" + color]))
-            del old
+            while (child := self.icon.get_first_child()):
+                self.icon.remove(child)
+            self.icon.append(notif.icon_widget(app, entry, icon, urgency))
+            pic, self.pixbuf = texture(hints, icon)
+            self.thumb_image.set_from_paintable(pic)
+            self.thumb.set_visible(pic is not None)
 
-            self.app.set_text(app or "Notification")
+            value = hints.get("value")
+            app_name, summary, body = tidy(app, summary, body, value is not None)
+
+            self.app.set_text(app_name)
+            self.refresh_age()
             if getattr(self.summary, "type_timer", None):
                 GLib.source_remove(self.summary.type_timer)
                 self.summary.type_timer = None
             self.summary.set_text(summary)
             self.summary.full_text = summary
-            markup = body_markup(body)
+            self.summary.set_visible(bool(summary))
+            self.clean = (app_name, entry, icon, summary, body, min(urgency, 2))
+            markup = notif.body_markup(body)
             try:
                 Pango.parse_markup(markup, -1, "\0")
                 self.body.set_markup(markup)
             except GLib.Error:
                 self.body.set_text(body)
-            self.body.set_visible(bool(body.strip()))
+            self.body.set_visible(bool(body))
+            self.content.set_visible(bool(summary or body or pic))
 
-            value = hints.get("value")
             self.progress_row.set_visible(value is not None)
             if value is not None:
                 v = max(0, min(100, int(value.unpack())))
@@ -411,7 +457,7 @@ def main():
             (self.card.add_css_class if on else self.card.remove_css_class)("hover")
 
         def refresh_age(self):
-            self.age.set_text(age_text((GLib.get_monotonic_time() - self.created) / 1e6))
+            self.age.set_text("· " + notif.age_text(self.created))
 
         def on_click(self, gesture, _n, _x, _y):
             button = gesture.get_current_button()
@@ -486,18 +532,36 @@ def main():
         hints = {raw.get_child_value(i).get_child_value(0).get_string():
                  raw.get_child_value(i).get_child_value(1).get_variant()
                  for i in range(raw.n_children())}
+        urgency = hints["urgency"].unpack() if "urgency" in hints else 1
+        entry = hints["desktop-entry"].unpack() if "desktop-entry" in hints else ""
+        transient = "transient" in hints and bool(hints["transient"].unpack())
+        keep = "value" not in hints and not transient      # bars do not go to the center
+        has_default = "default" in actions[::2]
+
+        def record(nid, pix):
+            if keep:
+                name, s, b = tidy(app, summary, body, False)
+                remember(nid, name, entry, icon, s, b, min(urgency, 2), pix, has_default)
+
         card = live.get(replaces) if replaces else None
         tag_card, tag = find_stack_tag(app, hints)
         card = card or tag_card
         if card and not card.leaving:
             card.fill(app, icon, summary, body, actions, hints, timeout, replacing=True)
             card.tag = tag
+            record(card.nid, card.pixbuf)
             return card.nid
-        nid = next_id[0]
-        next_id[0] += 1
+        nid = replaces if replaces and any(i["id"] == replaces for i in state["items"]) \
+            else next_id[0]
+        if nid == next_id[0]:
+            next_id[0] += 1
+        if state["dnd"] and urgency < 2:          # quietly into the center
+            record(nid, texture(hints, icon)[1])
+            return nid
         card = Card(nid)
         card.tag = tag
         card.fill(app, icon, summary, body, actions, hints, timeout, replacing=False)
+        record(nid, card.pixbuf)
         live[nid] = card
         if sum(1 for _ in iter_children(stack)) >= MAX_SHOWN:
             queue.append(card)
@@ -525,10 +589,51 @@ def main():
             invocation.return_value(None)
             loop.quit()
 
+    def center_call(_conn, _sender, _path, _iface, method, params, invocation):
+        items = state["items"]
+        if method == "Get":
+            invocation.return_value(GLib.Variant("(s)", (json.dumps(state),)))
+            return
+        if method == "Remove":
+            (nid,) = params.unpack()
+            for item in [i for i in items if i["id"] == nid]:
+                items.remove(item)
+                drop_image(item)
+            if nid in live:
+                live[nid].dismiss(DISMISSED)
+        elif method == "Clear":
+            for item in items:
+                drop_image(item)
+            items.clear()
+            for card in list(live.values()) + list(queue):
+                card.dismiss(DISMISSED)
+        elif method in ("SetDnd", "ToggleDnd"):
+            state["dnd"] = params.unpack()[0] if method == "SetDnd" else not state["dnd"]
+            if state["dnd"]:
+                for card in list(live.values()) + list(queue):
+                    if not card.card.has_css_class("critical"):
+                        card.dismiss(DISMISSED)
+        elif method == "MarkRead":
+            state["read_at"] = time.time()
+        elif method == "Invoke":
+            (nid,) = params.unpack()
+            item = next((i for i in items if i["id"] == nid), None)
+            if item and item.get("default"):
+                emit("ActionInvoked", GLib.Variant("(us)", (nid, "default")))
+            elif item:
+                focus_app((item["app"], item["entry"]))
+            if nid in live:
+                live[nid].dismiss(DISMISSED)
+        invocation.return_value(None)
+        changed()
+
     def acquired(conn, _name):
         bus[0] = conn
         node = Gio.DBusNodeInfo.new_for_xml(XML)
         conn.register_object(PATH, node.interfaces[0], method_call, None, None)
+        center = Gio.DBusNodeInfo.new_for_xml(notif.CENTER_XML)
+        conn.register_object(PATH, center.interfaces[0], center_call, None, None)
+        changed()
 
     def lost(_conn, _name):
         loop.quit()                     # another daemon took over (or no bus)

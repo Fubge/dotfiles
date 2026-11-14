@@ -108,6 +108,7 @@ tooltip {
     padding: 0 6px 0 3px;
     animation: soft-blink 0.9s steps(6) infinite alternate;
 }
+
 /* steps(6), not ease: a smooth infinite animation makes GTK redraw (and
    Hyprland composite) every frame, ~20% CPU idle; steps redraw 12x a second */
 @keyframes soft-blink {
@@ -168,12 +169,25 @@ tooltip {
 }
 #custom-wifi-name { padding: 0 6px 0 0; margin-left: -6px; }
 
-#custom-power {
+#session {
     background: @dark;
+    border-radius: 15px;
+}
+#custom-power {
     color: @accent;
     border-radius: 15px;
     padding: 0 14px 0 12px;
 }
+/* Notification bell (~/.local/bin/notification-bell) left of the power button:
+   a calm light grey bell; with new ones it turns white and an orange dot sits
+   in its cut out top right corner (drawn by the daemon, Pango markup); a
+   sleeping bell (z) while do not disturb is on. Click opens the center */
+#custom-notifications {
+    padding: 0 8px 0 14px;
+    color: {{ .palette.fg_muted }};
+}
+#custom-notifications.unread { color: @fg; }
+#custom-notifications.dnd    { color: {{ .palette.cyan_bright }}; }   /* sleeping: night color, as the clock prompt */
 
 /* ---------------------------------------------------------------- states */
 #idle_inhibitor.activated           { color: @accent; }
@@ -209,7 +223,7 @@ tooltip {
 #workspaces button, #custom-window, #clock.date, #custom-music,
 #cpu, #temperature, #memory,
 #idle_inhibitor, #custom-power-profile, #custom-brightness, #custom-battery,
-#wireplumber, #network, #bluetooth, #custom-power {
+#wireplumber, #network, #bluetooth, #custom-notifications, #custom-power {
     transition: all 250ms ease;
     border-radius: 12px;
 }
@@ -217,7 +231,7 @@ tooltip {
 #clock.date:hover, #custom-music:hover,
 #cpu:hover, #temperature:hover, #memory:hover,
 #idle_inhibitor:hover, #custom-power-profile:hover, #custom-brightness:hover, #custom-battery:hover,
-#wireplumber:hover, #network:hover, #bluetooth:hover {
+#wireplumber:hover, #network:hover, #bluetooth:hover, #custom-notifications:hover {
     color: @accent;
     background: alpha(@dark, 0.3);
 }

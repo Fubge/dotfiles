@@ -1,0 +1,246 @@
+#!/usr/bin/env python3
+"""Notification center (bell in the bar, SUPER+I): everything that came in,
+newest first, grouped by Today / Yesterday / Earlier.
+
+    notification-center toggle [--center]  bar click: show it, or hide it when open
+    notification-center --hidden           login autostart: waits hidden
+    notification-center quit               stop it (it reloads on the next click)
+
+Resident like the other bar popups (~/.local/lib/popup/resident.py). The
+history belongs to the notification daemon (~/.local/bin/notifications); this
+popup asks it for the list over D-Bus (notif.CENTER_XML) and follows its
+Changed signal while open. What is new since the last look gets an orange dot;
+opening marks everything read (the bell's count goes away).
+
+An entry: left click runs the app's default action or jumps to its window,
+the x (on hover) removes it. Head: do not disturb (bell button), "Clear all"
+at the bottom. Escape closes.
+"""
+import json
+import os
+import sys
+import time
+
+sys.path.insert(0, os.path.expanduser("~/.local/lib/popup"))
+import resident  # noqa: E402
+import notif  # noqa: E402
+from notif import G  # noqa: E402
+
+APP = "popup.notifications"
+WIDTH = 380
+MAX_HEIGHT = 560        # the list scrolls beyond this
+CSS = os.path.expanduser("~/.config/popups/style.css")
+
+
+def build():
+    import gi
+
+    gi.require_version("Gtk", "4.0")
+    gi.require_version("Gdk", "4.0")
+    from gi.repository import Gdk, Gio, GLib, Gtk, Pango
+
+    class Popup(Gtk.Window):
+        popup_width = WIDTH       # resident.place() puts it under the mouse
+
+        def __init__(self):
+            super().__init__(title="Notifications")
+            for c in ("popup", "menu", "center"):
+                self.add_css_class(c)
+            self.set_decorated(False)
+            self.set_default_size(WIDTH, 1)
+            self.state = {"dnd": False, "read_at": 0, "items": []}
+            self.seen_at = 0          # read_at before this opening: newer = dot
+
+            box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2,
+                          css_classes=["menu-box"])
+            head = Gtk.CenterBox(css_classes=["head"])
+            head.set_center_widget(Gtk.Label(label="Notifications", css_classes=["menu-title"]))
+            self.dnd = Gtk.Button(css_classes=["more", "dnd"], valign=Gtk.Align.CENTER)
+            self.dnd.connect("clicked", lambda _b: self.call("SetDnd", GLib.Variant(
+                "(b)", (not self.state["dnd"],))))
+            head.set_end_widget(self.dnd)
+            box.append(head)
+            self.dnd_note = Gtk.Label(label="Do not disturb: only critical ones pop up",
+                                      css_classes=["note", "dnd-note"])
+            box.append(self.dnd_note)
+
+            self.list = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+            self.scroll = Gtk.ScrolledWindow(child=self.list, css_classes=["found"],
+                                             hscrollbar_policy=Gtk.PolicyType.NEVER)
+            box.append(self.scroll)
+
+            self.clear = Gtk.Button(label="Clear all", css_classes=["item-action", "clear-all"])
+            self.clear.connect("clicked", lambda _b: self.call("Clear"))
+            box.append(self.clear)
+            self.set_child(box)
+
+            keys = Gtk.EventControllerKey()
+            keys.connect("key-pressed", self.on_key)
+            self.add_controller(keys)
+
+            self.bus = Gio.bus_get_sync(Gio.BusType.SESSION, None)
+            self.bus.signal_subscribe(notif.NAME, notif.CENTER_IFACE, "Changed", notif.PATH,
+                                      None, Gio.DBusSignalFlags.NONE, self.on_changed)
+            self.load()
+            self.render()
+
+        # ---------------------------------------------------------------- daemon
+        def call(self, method, args=None, reply=None):
+            self.bus.call(notif.NAME, notif.PATH, notif.CENTER_IFACE, method, args, reply,
+                          Gio.DBusCallFlags.NONE, 500, None, None, None)
+
+        def load(self):
+            try:
+                res = self.bus.call_sync(notif.NAME, notif.PATH, notif.CENTER_IFACE, "Get",
+                                         None, GLib.VariantType("(s)"),
+                                         Gio.DBusCallFlags.NONE, 500, None)
+                self.state = json.loads(res.unpack()[0])
+            except (GLib.Error, ValueError):
+                try:
+                    with open(notif.HISTORY) as f:
+                        self.state = json.load(f)
+                except (OSError, ValueError):
+                    pass
+
+        def on_changed(self, *_a):
+            if not self.get_visible():
+                return
+            before = (self.state.get("dnd"), self.state.get("items"))
+            self.load()
+            if (self.state.get("dnd"), self.state.get("items")) != before:
+                self.render()        # not for "read": the rows keep their entrance
+
+        # ---------------------------------------------------------------- view
+        def render(self):
+            while (child := self.list.get_first_child()):
+                self.list.remove(child)
+            dnd = self.state.get("dnd")
+            self.dnd.set_label(G["bell-sleep"] if dnd else G["bell-outline"])
+            self.dnd.set_tooltip_text("Do not disturb: on" if dnd else "Do not disturb: off")
+            (self.dnd.add_css_class if dnd else self.dnd.remove_css_class)("on")
+            self.dnd_note.set_visible(bool(dnd))
+
+            items = self.state.get("items", [])
+            self.clear.set_visible(bool(items))
+            if not items:
+                empty = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6,
+                                css_classes=["center-empty", "note"])
+                empty.append(Gtk.Label(label=G["bell-sleep-outline"], css_classes=["center-empty-icon"]))
+                empty.append(Gtk.Label(label="All caught up"))
+                self.list.append(empty)
+                self.fit()
+                return
+            now = time.time()
+            last = None
+            for item in items:
+                day = notif.day_label(item["time"], now)
+                if day != last:
+                    self.list.append(Gtk.Label(label=day, xalign=0, css_classes=["section"]))
+                    last = day
+                self.list.append(self.entry(item, now))
+            self.fit()
+
+        def fit(self):
+            """The list as high as its content, up to MAX_HEIGHT (a scrolled
+            window alone only asks for its minimum)."""
+            height = self.list.measure(Gtk.Orientation.VERTICAL, WIDTH - 24)[1]
+            self.scroll.set_max_content_height(-1)
+            self.scroll.set_min_content_height(min(height, MAX_HEIGHT))
+            self.scroll.set_max_content_height(MAX_HEIGHT)
+
+        def entry(self, item, now):
+            card = Gtk.Box(css_classes=["center-entry", "section-row"], spacing=12)
+            if item.get("urgency") == 2:
+                card.add_css_class("critical")
+            if item["time"] > self.seen_at:
+                card.add_css_class("new")
+
+            text = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2, hexpand=True)
+            head = Gtk.Box(spacing=8, css_classes=["notif-head"])
+            icon = Gtk.Box(css_classes=["notif-icon-slot"], valign=Gtk.Align.CENTER)
+            icon.append(notif.icon_widget(item["app"], item.get("entry", ""),
+                                          item.get("icon", ""), item.get("urgency", 1)))
+            head.append(icon)
+            names = Gtk.Box(spacing=5, hexpand=True)
+            names.append(Gtk.Label(label=item["app"], css_classes=["notif-app"],
+                                   ellipsize=Pango.EllipsizeMode.END))
+            names.append(Gtk.Label(label="· " + notif.age_text(item["time"], now),
+                                   css_classes=["notif-age"]))
+            names.append(Gtk.Label(label="●", css_classes=["center-dot"]))
+            head.append(names)
+            close = Gtk.Button(label=G["close"], css_classes=["notif-close", "flat"],
+                               valign=Gtk.Align.CENTER)
+            close.connect("clicked", lambda _b: self.remove(card, item["id"]))
+            head.append(close)
+            text.append(head)
+
+            content = Gtk.Box(spacing=12, css_classes=["notif-content"])
+            lines = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2, hexpand=True,
+                            valign=Gtk.Align.CENTER)
+            if item.get("summary"):
+                lines.append(Gtk.Label(label=item["summary"], xalign=0, wrap=True,
+                                       wrap_mode=Pango.WrapMode.WORD_CHAR, lines=2,
+                                       max_width_chars=30, ellipsize=Pango.EllipsizeMode.END,
+                                       css_classes=["notif-summary"]))
+            if item.get("body"):
+                body = Gtk.Label(xalign=0, wrap=True, wrap_mode=Pango.WrapMode.WORD_CHAR,
+                                 lines=3, max_width_chars=30,
+                                 ellipsize=Pango.EllipsizeMode.END, css_classes=["notif-body"])
+                markup = notif.body_markup(item["body"])
+                try:
+                    Pango.parse_markup(markup, -1, "\0")
+                    body.set_markup(markup)
+                except GLib.Error:
+                    body.set_text(notif.plain(item["body"]))
+                lines.append(body)
+            content.append(lines)
+            if item.get("image") and os.path.isfile(item["image"]):
+                thumb = Gtk.Box(css_classes=["notif-thumb"], overflow=Gtk.Overflow.HIDDEN,
+                                valign=Gtk.Align.START)
+                thumb.append(Gtk.Image(file=item["image"], pixel_size=40))
+                content.append(thumb)
+            if lines.get_first_child() or content.get_last_child() is not lines:
+                text.append(content)
+            card.append(text)
+
+            click = Gtk.GestureClick(button=1)
+            click.connect("released", lambda *_a: self.open_item(item["id"]))
+            card.add_controller(click)
+            motion = Gtk.EventControllerMotion()
+            motion.connect("enter", lambda *_a: card.add_css_class("hover"))
+            motion.connect("leave", lambda *_a: card.remove_css_class("hover"))
+            card.add_controller(motion)
+            return card
+
+        def remove(self, card, nid):
+            card.add_css_class("leaving")
+            GLib.timeout_add(200, lambda: self.call("Remove", GLib.Variant("(u)", (nid,)))
+                             and False)
+
+        def open_item(self, nid):
+            self.call("Invoke", GLib.Variant("(u)", (nid,)))
+            self.close()
+
+        def show_up(self):
+            self.load()
+            self.seen_at = self.state.get("read_at", 0)
+            self.render()
+            self.set_default_size(WIDTH, 1)
+            self.present()
+            self.call("MarkRead")
+
+        def on_key(self, _ctrl, keyval, _code, _state):
+            if keyval == Gdk.KEY_Escape:
+                self.close()
+                return True
+            return False
+
+    provider = Gtk.CssProvider()
+    provider.load_from_path(CSS)
+    Gtk.StyleContext.add_provider_for_display(
+        Gdk.Display.get_default(), provider, Gtk.STYLE_PROVIDER_PRIORITY_USER)
+    return Popup()
+
+
+if __name__ == "__main__":
+    resident.main(APP, build, __doc__)

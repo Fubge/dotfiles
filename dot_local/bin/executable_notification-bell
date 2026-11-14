@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+# Bell in the bar (waybar custom/notifications): count of new notifications,
+# a sleeping bell while do not disturb is on. The daemon (~/.local/bin/notifications)
+# writes the waybar JSON line to $XDG_RUNTIME_DIR/notifications.status and
+# sends the D-Bus signal Changed; this prints the file now and on every signal.
+set -uo pipefail
+status=${XDG_RUNTIME_DIR:-/tmp}/notifications.status
+show() { [[ -r $status ]] && cat "$status"; }
+
+show
+while true; do
+    # gdbus monitor follows the name, also across a daemon restart
+    gdbus monitor --session --dest org.freedesktop.Notifications \
+        --object-path /org/freedesktop/Notifications 2>/dev/null |
+        while read -r line; do
+            [[ $line == *dotfiles.Notifications.Center.Changed* ]] && show
+        done
+    sleep 1
+done

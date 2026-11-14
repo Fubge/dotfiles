@@ -58,6 +58,7 @@ bind(mod .. " + SHIFT + C", hl.dsp.exec_cmd(v.bin .. "claude-pad ask"), "Quick q
 -- Menus (the same menus open under the mouse when clicked in the bar)
 group("Menus")
 bind(mod .. " + Escape", menu(v.bin .. "popup-cmd session-popup toggle --center"), "Lock, suspend, log out, reboot, shut down")
+bind(mod .. " + I", menu(v.bin .. "popup-cmd notification-center toggle"), "Notification center")
 bind(mod .. " + P", menu(v.bin .. "popup-cmd power-popup toggle --center"), "Power profile, battery")
 bind(mod .. " + N", menu(v.bin .. "popup-cmd wifi-popup toggle --center"), "Wi-Fi: networks, password, forget")
 bind(mod .. " + SHIFT + B", menu(v.bin .. "popup-cmd bluetooth-popup toggle --center"), "Bluetooth: devices, pairing")

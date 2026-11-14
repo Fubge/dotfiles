@@ -14,7 +14,7 @@
 
     "modules-left":   ["hyprland/workspaces", "custom/claude", "custom/window"],
     "modules-center": ["custom/prompt", "clock#hours", "custom/colon", "clock#minutes", "clock#date", "custom/caret", "group/music"],
-    "modules-right":  ["group/hardware", "group/system", "group/connect", "custom/power"],
+    "modules-right":  ["group/hardware", "group/system", "group/connect", "group/session"],
 
     // ---------------------------------------------------------------- groups
     // Hardware is a drawer: only the CPU shows, hover reveals temp + RAM
@@ -240,6 +240,18 @@
         // ~/.local/bin/music can click its menu over D-Bus.
         "ignore-list": ["spotify"],
         "spacing": 12
+    },
+
+    // Far right, one dark pill: notification bell and power
+    "group/session": {
+        "orientation": "horizontal",
+        "modules": ["custom/notifications", "custom/power"]
+    },
+    "custom/notifications": {
+        "exec": "~/.local/bin/notification-bell",     // follows the daemon's D-Bus signal, no polling
+        "return-type": "json",
+        "on-click": "~/.local/bin/popup-cmd notification-center toggle",
+        "on-click-right": "~/.local/bin/notifications dnd"
     },
 
     "custom/power": {
