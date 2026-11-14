@@ -238,6 +238,13 @@ hl.window_rule({
     scroll_touchpad = 0.15,
 })
 
+-- Obsidian (Electron) as well
+hl.window_rule({
+    name = "obsidian-scroll",
+    match = { class = "^obsidian$" },
+    scroll_touchpad = 0.15,
+})
+
 -- Terminals (kitty windows) scroll a bit faster than the global 0.5
 hl.window_rule({
     name = "terminal-scroll",

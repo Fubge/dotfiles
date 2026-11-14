@@ -6,3 +6,4 @@ discord
 # Music: official launcher from [extra], downloads and updates the Spotify client
 spotify-launcher
 nextcloud-client   # file sync with the Hetzner Storage Share (~/Nextcloud)
+obsidian           # Markdown notes, vault lives in ~/Nextcloud/Obsidian
