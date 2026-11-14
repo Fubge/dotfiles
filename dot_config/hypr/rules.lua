@@ -167,14 +167,34 @@ hl.window_rule({
     no_focus = true,
 })
 
--- Games: Steam games (steam_app_*) and gamescope open on workspace 6,
--- may tear (lower latency) and skip animations.
+-- Games: Steam games (steam_app_*) and gamescope open fullscreen on
+-- workspace 6 (never tiled next to the launcher, no bar), may tear (lower
+-- latency) and skip animations.
 hl.window_rule({
     name = "games",
     match = { class = "^(steam_app_.*|gamescope)$" },
     workspace = "6",
+    fullscreen = true,
     immediate = true,
     no_anim = true,
+})
+
+-- Minecraft (native Wayland via SDL) goes there too, fullscreen, but without tearing:
+-- in fullscreen with "immediate" it stops taking keyboard and mouse input
+hl.window_rule({
+    name = "minecraft",
+    match = { class = "^com\\.mojang\\.minecraft$" },
+    workspace = "6",
+    fullscreen = true,
+    no_anim = true,
+})
+
+-- Launchers (Steam client, Modrinth App) live on the games workspace 6 too
+-- (all their windows, dialogs included) and switch there when started
+hl.window_rule({
+    name = "steam",
+    match = { class = "^(steam|modrinth-app)$" },
+    workspace = "6",
 })
 
 -- Steam (CEF) scrolls far more per touchpad swipe than other apps: slow it down

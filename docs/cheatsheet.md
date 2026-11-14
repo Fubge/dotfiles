@@ -145,6 +145,10 @@ Files ending in `.tmpl` are generated from these values.
 
 ## Gaming
 
+- **Install all games into `~/Games`.** It is its own btrfs subvolume (`@games`),
+  so games never end up in snapshots or backups. Steam: Settings > Storage > add
+  `~/Games/Steam` as a library and make it the default. Heroic and Lutris use
+  `~/Games` out of the box. `~/.cache` is a subvolume for the same reason.
 - **Nothing to set up per game.** `game-watch` (started with Hyprland) spots games by
   how they run, not by name: started by a launcher (Steam, Modrinth App,
   `umu-run`, gamescope, ...), running under Wine/Proton, or Minecraft. It turns on

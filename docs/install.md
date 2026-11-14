@@ -65,7 +65,8 @@ cryptsetup luksFormat /dev/nvme0n1p2
 cryptsetup open /dev/nvme0n1p2 root
 mkfs.btrfs /dev/mapper/root
 
-# Subvolumes: @ (root), @home, @snapshots (outside @, survives a rollback)
+# Subvolumes: @ (root), @home, @snapshots (outside @, survives a rollback).
+# @games (~/Games) and a ~/.cache subvolume are added on the first chezmoi apply.
 mount /dev/mapper/root /mnt
 btrfs subvolume create /mnt/{@,@home,@snapshots}
 umount /mnt

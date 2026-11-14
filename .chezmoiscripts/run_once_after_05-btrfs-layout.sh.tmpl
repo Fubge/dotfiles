@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+# btrfs layout for backups: everything that should never be backed up lives in
+# its own subvolume, because snapshots, btrfs send and restic/borg with
+# --one-file-system all stop at subvolume boundaries.
+#   @games   -> ~/Games   top-level subvolume in fstab, for all games (Steam,
+#                         Heroic and Lutris; the last two default to ~/Games)
+#   ~/.cache -> nested subvolume inside @home
+# Does nothing when / is not btrfs. Safe to run again.
+set -euo pipefail
+home="{{ .chezmoi.homeDir }}"
+games="$home/Games"
+
+[[ $(findmnt -no FSTYPE /) == btrfs ]] || { echo "btrfs-layout: / is not btrfs, skipped"; exit 0; }
+uuid=$(findmnt -no UUID /)
+
+# Games: top-level subvolume @games, mounted on ~/Games
+mkdir -p "$games"   # must exist for the fstab check
+if ! grep -qE '^[^#]*subvol=/?@games([,[:space:]]|$)' /etc/fstab; then
+    top=$(mktemp -d)
+    sudo mount -o subvolid=5 "UUID=$uuid" "$top"
+    [[ -d $top/@games ]] || sudo btrfs subvolume create "$top/@games"
+    sudo umount "$top" && rmdir "$top"
+
+    # Same options as /home, only the subvolume differs
+    opts=$(findmnt -sno OPTIONS /home | sed -E 's/(^|,)subvol(id)?=[^,]*//g; s/^,//')
+    sudo cp /etc/fstab /etc/fstab.bak-btrfs-layout
+    printf '\n# Games, own subvolume so they stay out of snapshots and backups\nUUID=%s\t%s\tbtrfs\t%s,subvol=/@games\t0 0\n' \
+        "$uuid" "$games" "$opts" | sudo tee -a /etc/fstab >/dev/null
+    sudo findmnt --verify --tab-file /etc/fstab >/dev/null || {
+        sudo cp /etc/fstab.bak-btrfs-layout /etc/fstab
+        echo "btrfs-layout: fstab check failed, restored backup" >&2; exit 1; }
+    sudo systemctl daemon-reload
+    echo "btrfs-layout: @games added to /etc/fstab (backup: /etc/fstab.bak-btrfs-layout)"
+fi
+mountpoint -q "$games" || sudo mount "$games"
+[[ -O $games ]] || sudo chown "$(id -u):$(id -g)" "$games"
+
+# Cache: nested subvolume. Copy with reflinks (no extra space), then swap.
+cache="$home/.cache"
+if [[ $(stat -c %i "$cache" 2>/dev/null) != 256 ]]; then
+    btrfs subvolume create "$cache.new" >/dev/null
+    [[ -d $cache ]] && cp -a --reflink=always "$cache/." "$cache.new/" && mv "$cache" "$cache.old"
+    mv "$cache.new" "$cache"
+    rm -rf "$cache.old"
+    echo "btrfs-layout: ~/.cache is now a subvolume"
+fi
