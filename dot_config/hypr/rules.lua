@@ -189,7 +189,21 @@ hl.window_rule({
 hl.window_rule({
     name = "vivaldi-scroll",
     match = { class = "^vivaldi-.*$" },
-    scroll_touchpad = 0.22,
+    scroll_touchpad = 0.15,
+})
+
+-- Discord (Electron, Chromium inside) overshoots the same way
+hl.window_rule({
+    name = "discord-scroll",
+    match = { class = "^discord$" },
+    scroll_touchpad = 0.15,
+})
+
+-- Terminals (kitty windows) scroll a bit faster than the global 0.5
+hl.window_rule({
+    name = "terminal-scroll",
+    match = { class = "^(kitty|" .. v.dropdown.class .. "|" .. v.claude.class .. ")$" },
+    scroll_touchpad = 0.6,
 })
 
 -- Steam client: small dialogs float

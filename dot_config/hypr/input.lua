@@ -10,9 +10,9 @@ hl.config({
         accel_profile = "flat", -- no pointer acceleration (mouse and touchpad)
         touchpad = {
             natural_scroll = true,
-            scroll_factor = 0.5, -- 1.0 and 0.8 too fast, 0.3 too slow in the terminal (Steam: rules.lua)
+            scroll_factor = 0.5, -- 1.0 and 0.8 too fast, 0.3 too slow (per app: rules.lua)
             disable_while_typing = true,
-            clickfinger_behavior = false, -- click zones like Windows: bottom right = right click (2-finger tap = right still)
+            clickfinger_behavior = true, -- press with 2 fingers anywhere = right click, 3 = middle (2-finger tap = right too)
         },
     },
     cursor = {
