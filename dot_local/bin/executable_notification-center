@@ -12,9 +12,9 @@ popup asks it for the list over D-Bus (notif.CENTER_XML) and follows its
 Changed signal while open. What is new since the last look gets an orange dot;
 opening marks everything read (the bell's count goes away).
 
-An entry: left click runs the app's default action or jumps to its window,
-the x (on hover) removes it. Head: do not disturb (bell button), "Clear all"
-at the bottom. Escape closes.
+An entry: left click runs the app's default action or jumps to its window
+(and takes it off the list), the x (on hover) removes it. Head: do not disturb
+(bell button), "Clear all" at the bottom (also closes the popup). Escape closes.
 """
 import json
 import os
@@ -70,7 +70,7 @@ def build():
             box.append(self.scroll)
 
             self.clear = Gtk.Button(label="Clear all", css_classes=["item-action", "clear-all"])
-            self.clear.connect("clicked", lambda _b: self.call("Clear"))
+            self.clear.connect("clicked", self.clear_all)
             box.append(self.clear)
             self.set_child(box)
 
@@ -216,6 +216,11 @@ def build():
             card.add_css_class("leaving")
             GLib.timeout_add(200, lambda: self.call("Remove", GLib.Variant("(u)", (nid,)))
                              and False)
+
+        def clear_all(self, _b):
+            # nothing left to look at: close right away
+            self.call("Clear")
+            self.close()
 
         def open_item(self, nid):
             self.call("Invoke", GLib.Variant("(u)", (nid,)))

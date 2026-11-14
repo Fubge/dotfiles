@@ -31,8 +31,8 @@ Look (style: ~/.config/popups/style.css, section "notifications"):
 - leaving: slides out, the cards below glide up (Gtk.Revealer)
 - critical: red frame that pulses, no timeout
 
-Mouse: left click runs the default action (or focuses the app's window),
-right click dismisses, middle click dismisses all. Volume-style updates
+Mouse: left click runs the default action (or focuses the app's window) and
+takes it out of the center's history too, right click dismisses, middle click dismisses all. Volume-style updates
 (same id, or the same x-canonical-private-synchronous / x-dunst-stack-tag)
 change the card in place.
 """
@@ -224,6 +224,13 @@ def main():
             drop_image(gone)
         del items[HISTORY_MAX:]
         changed()
+
+    def forget(nid):
+        """Opened (clicked): it is dealt with, so it leaves the center too."""
+        items = state["items"]
+        for item in [i for i in items if i["id"] == nid]:
+            items.remove(item)
+            drop_image(item)
 
     def emit(signal, args):
         if bus[0]:
@@ -462,6 +469,8 @@ def main():
         def on_click(self, gesture, _n, _x, _y):
             button = gesture.get_current_button()
             if button == 1:
+                forget(self.nid)
+                changed()
                 if "default" in self.actions:
                     self.invoke("default")
                     return
@@ -596,9 +605,7 @@ def main():
             return
         if method == "Remove":
             (nid,) = params.unpack()
-            for item in [i for i in items if i["id"] == nid]:
-                items.remove(item)
-                drop_image(item)
+            forget(nid)
             if nid in live:
                 live[nid].dismiss(DISMISSED)
         elif method == "Clear":
@@ -622,6 +629,7 @@ def main():
                 emit("ActionInvoked", GLib.Variant("(us)", (nid, "default")))
             elif item:
                 focus_app((item["app"], item["entry"]))
+            forget(nid)
             if nid in live:
                 live[nid].dismiss(DISMISSED)
         invocation.return_value(None)
