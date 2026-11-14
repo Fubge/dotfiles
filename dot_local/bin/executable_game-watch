@@ -12,8 +12,7 @@ need no setup:
 
 For each game process the daemon asks GameMode to start (`gamemoded -r PID`);
 GameMode ends by itself when that process exits (gamemode-hook switches the
-power profile). While a game window has focus, the left Alt <-> Super swap from
-vars.lua is dropped so the game gets a normal Alt key.
+power profile).
 """
 import json
 import os
@@ -31,7 +30,6 @@ LAUNCHERS = {
 # Windows of the launchers themselves are never games
 NOT_GAMES = {"steam", "steamwebhelper", "modrinth-app", "lutris", "net.lutris.lutris"}
 INTERPRETERS = {"python", "python3", "env", "sh", "bash"}
-SWAP = "altwin:swap_lalt_lwin"
 
 RUNTIME = os.environ.get("XDG_RUNTIME_DIR", "/tmp")
 FIFO = os.path.join(RUNTIME, "game-watch.fifo")
@@ -114,21 +112,6 @@ class Watcher:
         self.lock = threading.Lock()
         self.games = {}    # window address -> pid
         self.ours = set()  # pids we registered (others came via gamemoderun / Lutris)
-        self.active = ""
-        self.base_opts = ""
-        self.read_base_opts()
-
-    # Keyboard: normal Alt while a game has focus
-    def read_base_opts(self):
-        opt = hypr_json("getoption", "input:kb_options") or {}
-        self.base_opts = opt.get("str", "")
-        self.game_opts = ",".join(o for o in self.base_opts.split(",") if o and o != SWAP)
-
-    def apply_keys(self):
-        want = self.game_opts if self.active in self.games else self.base_opts
-        cur = (hypr_json("getoption", "input:kb_options") or {}).get("str", "")
-        if cur != want:
-            hyprctl("eval", f'hl.config({{ input = {{ kb_options = "{want}" }} }})')
 
     # Windows
     def add(self, addr, pid):
@@ -148,9 +131,6 @@ class Watcher:
         for c in hypr_json("clients") or []:
             if is_game(c.get("pid", 0), c.get("class", "")):
                 self.add(c["address"], c["pid"])
-        act = hypr_json("activewindow") or {}
-        self.active = act.get("address", "")
-        self.apply_keys()
 
     def on_event(self, name, data):
         with self.lock:
@@ -159,16 +139,8 @@ class Watcher:
                 for c in hypr_json("clients") or []:
                     if c["address"] == addr and is_game(c.get("pid", 0), c.get("class", "")):
                         self.add(addr, c["pid"])
-                self.apply_keys()
             elif name == "closewindow":
                 self.remove("0x" + data)
-                self.apply_keys()
-            elif name == "activewindowv2":
-                self.active = "0x" + data if data else ""
-                self.apply_keys()
-            elif name == "configreloaded":
-                self.read_base_opts()  # the reload brought the swap back
-                self.apply_keys()
 
     def toggle(self, addr):
         with self.lock:
@@ -181,7 +153,6 @@ class Watcher:
                     return
                 self.add(addr, c["pid"])
                 note = f"Game mode for {c.get('class') or 'this window'}"
-            self.apply_keys()
         subprocess.run(["notify-send", "-a", "GameMode", "-i", "applications-games", note])
 
     # Loops
@@ -207,7 +178,7 @@ class Watcher:
             *lines, buf = buf.split(b"\n")
             for line in lines:
                 name, _, data = line.decode(errors="replace").partition(">>")
-                if name in ("openwindow", "closewindow", "activewindowv2", "configreloaded"):
+                if name in ("openwindow", "closewindow"):
                     self.on_event(name, data)
 
 

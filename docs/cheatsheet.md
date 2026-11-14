@@ -82,9 +82,7 @@ Files ending in `.tmpl` are generated from these values.
 
 ## Shortcuts and menus
 
-- **SUPER** is the Windows key, unless `machine.kb_options` contains
-  `altwin:swap_lalt_lwin`: then the left Alt key (next to the space bar) is SUPER and
-  apps get Alt from the Windows key. While a game has focus the swap is undone (see Gaming).
+- **SUPER** is the Windows key, everywhere, games included (no Alt/Super swap).
 - **`SUPER+H`** lists every shortcut (built live from the descriptions in `hypr/binds.lua`).
 - The popups below open in the middle of the screen from their shortcut and under
   the mouse from their bar icon; a second click on the icon closes them, Escape too.
@@ -151,7 +149,7 @@ Files ending in `.tmpl` are generated from these values.
   how they run, not by name: started by a launcher (Steam, Modrinth App,
   `umu-run`, gamescope, ...), running under Wine/Proton, or Minecraft. It turns on
   GameMode for them: performance power profile, ends when the game exits
-  (`gamemode-hook`). While a game window has focus, left Alt is a normal Alt key.
+  (`gamemode-hook`).
 - **`SUPER+G`** marks / unmarks the focused window as a game, for anything not caught.
 - Steam launch option: just `mangohud %command%` (no `gamemoderun`).
 - Newest GE-Proton for Steam: run `update-proton-ge`, restart Steam, then pick it under

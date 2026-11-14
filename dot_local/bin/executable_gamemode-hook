@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 # Called by GameMode when the first game starts / the last one ends.
-# Games are registered automatically by game-watch (no `gamemoderun` needed);
-# game-watch also gives games a normal Alt key while they have focus.
+# Games are registered automatically by game-watch (no `gamemoderun` needed).
 case "$1" in
     start)
         powerprofilesctl set performance

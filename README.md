@@ -110,7 +110,7 @@ it's listed. It can't go stale.
 
 | | |
 |---|---|
-| 🎮 **Gaming** | `game-watch` spots games by *how* they run (Steam, Proton/Wine, Modrinth, gamescope, ...) and switches on GameMode, the performance profile and a normal Alt key. No per-game setup. |
+| 🎮 **Gaming** | `game-watch` spots games by *how* they run (Steam, Proton/Wine, Modrinth, gamescope, ...) and switches on GameMode and the performance profile. No per-game setup. |
 | 🔋 **Power** | Performance on AC, power-saver on battery, switched by udev. The battery icon fills with bolts while charging. |
 | ✏️ **Neovim** | Built from scratch on `vim.pack` + `mini.nvim`, native LSP, `conform` formatting, same palette. |
 | 🔐 **Login & boot** | A custom SDDM theme and an optional GRUB theme, both generated from the palette. hyprlock greets you with a typewriter line. |

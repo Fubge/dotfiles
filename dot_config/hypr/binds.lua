@@ -1,5 +1,5 @@
 local v = require("vars")
-local mod = "SUPER" -- the physical left Alt key (Alt and Super are swapped, see vars.lua)
+local mod = "SUPER" -- the Windows key
 local run = function(cmd)
     return hl.dsp.exec_cmd(v.launch .. cmd)
 end

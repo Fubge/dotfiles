@@ -112,9 +112,8 @@ M.overlay = {
 
 -- Input ----------------------------------------------------------------------
 -- caps:swapescape       Caps Lock <-> Escape (great for Neovim)
--- altwin:swap_lalt_lwin  left Alt <-> left Super: the key next to the space bar is
---                        the Hyprland modifier, apps get Alt from the Windows key.
---                        game-watch drops this swap while a game has focus.
+-- altwin:swap_lalt_lwin  (optional) left Alt <-> left Super. Not used here: SUPER
+--                        stays the Windows key, so games always get a normal Alt.
 M.keyboard = { layout = "{{ .machine.kb_layout }}", options = "{{ .machine.kb_options }}" }
 M.touchpad = "gxtp5400:00-27c6:0f96-touchpad"
 
