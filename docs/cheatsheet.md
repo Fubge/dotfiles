@@ -126,6 +126,10 @@ Files ending in `.tmpl` are generated from these values.
 - **`SUPER+C`** shows / hides one long-running Claude Code session (kitty on
   `special:claude`, started hidden at login). `SUPER+X` only hides it, `SUPER+SHIFT+X`
   ends it. **`SUPER+SHIFT+C`** = small prompt pill, the question goes into that session.
+- **`SUPER+T`** = new task for Claude: a small centered popup (`~/.local/bin/task-popup`),
+  task text, optional details, tag bug / verbesserung / idee (click or Alt+B/V/I), Enter.
+  It goes to the end of "## Offen" in the Obsidian note `02 - Linux/Arch Setup/Aufgaben.md`;
+  `/todo` in Claude Code works through that list.
 - A little pixel pet left of the window title shows its state: sleeps while Claude
   is off, potters about when ready (dozes at night), mines / types / thinks while
   working, jumps with a "!" when it needs you, cheers and shows a gem when it finished

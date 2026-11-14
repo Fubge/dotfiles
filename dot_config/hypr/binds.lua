@@ -69,6 +69,7 @@ bind(mod .. " + W", menu(v.bin .. "wallpaper pick"), "Wallpaper picker")
 bind(mod .. " + H", menu(v.bin .. "popup-cmd keybinds toggle"), "This overview")
 bind(mod .. " + C", hl.dsp.exec_cmd(v.bin .. "claude-pad toggle"), "Claude (show / hide)")
 bind(mod .. " + SHIFT + C", hl.dsp.exec_cmd(v.bin .. "claude-pad ask"), "Quick question to Claude")
+bind(mod .. " + T", menu(v.bin .. "popup-cmd task-popup toggle --center"), "New task for Claude (/todo list)")
 
 -- Menus (the same menus open under the mouse when clicked in the bar)
 group("Menus")

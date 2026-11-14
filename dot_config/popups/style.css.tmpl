@@ -442,6 +442,80 @@ button.session-button.confirm .session-label { color: {{ .palette.red }}; }
     color: {{ .palette.comment }};
 }
 
+/* ---------------------------------------------------------------- task */
+/* ~/.local/bin/task-popup (SUPER+T): a task for Claude, centered like the
+   session popup; round tag buttons in their own color, the chosen one wiggles */
+.task-box { padding: 24px 28px 18px 28px; }
+.task-hello { font-size: 16pt; }
+.task-sub {
+    font-size: 9pt;
+    color: {{ .palette.comment }};
+    margin-bottom: 12px;
+}
+.task-entry { font-size: 12pt; padding: 11px 16px; margin-bottom: 4px; }
+.task-details { font-size: 10pt; padding: 7px 16px; }
+.task-entry, .task-details {
+    transition: box-shadow 160ms ease, background-color 160ms ease;
+}
+.task-entry:focus-within, .task-details:focus-within {
+    box-shadow: inset 0 0 0 1px alpha({{ .palette.accent }}, 0.6);
+}
+.task-entry.shake {
+    animation: shake 380ms ease-in-out 1;
+    box-shadow: inset 0 0 0 1px alpha({{ .palette.red }}, 0.8);
+}
+.task-row { margin-top: 16px; }
+button.task-tag {
+    min-height: 0;
+    min-width: 0;
+    padding: 0;
+    border: none;
+    box-shadow: none;
+    background: none;
+    outline: none;
+}
+.task-circle {
+    min-width: 58px;
+    min-height: 58px;
+    border-radius: 99px;
+    font-size: 19pt;
+    background-color: alpha({{ .palette.steel }}, 0.3);
+    transition: background-color 160ms ease, color 160ms ease, transform 200ms ease,
+                box-shadow 200ms ease;
+}
+.task-label {
+    font-size: 10pt;
+    color: {{ .palette.fg_muted }};
+    transition: color 160ms ease;
+}
+.task-key { font-size: 7pt; padding: 0 5px; opacity: 0.7; }
+{{- range $tag, $color := dict "bug" .palette.red "verbesserung" .palette.blue "idee" .palette.yellow }}
+button.task-tag.{{ $tag }} .task-circle { color: {{ $color }}; }
+button.task-tag.{{ $tag }}:hover .task-circle { background-color: alpha({{ $color }}, 0.2); }
+button.task-tag.{{ $tag }}.chosen .task-circle {
+    background-color: {{ $color }};
+    color: {{ $.palette.bg }};
+    transform: scale(1.1);
+    box-shadow: 0 0 18px alpha({{ $color }}, 0.45);
+    animation: session-wiggle 420ms ease-in-out 1;
+}
+button.task-tag.{{ $tag }}.chosen .task-label { color: {{ $color }}; }
+{{- end }}
+button.task-tag.enter { animation: session-pop 380ms ease-out both; }
+.task-row button.task-tag.enter:nth-child(2) { animation-delay: 60ms; }
+.task-row button.task-tag.enter:nth-child(3) { animation-delay: 120ms; }
+/* the chosen one keeps its wiggle when it pops in */
+button.task-tag.enter.chosen .task-circle { animation-delay: 380ms; }
+.task-caption {
+    margin-top: 12px;
+    font-size: 10pt;
+    color: {{ .palette.comment }};
+}
+.task-caption.error { color: {{ .palette.red }}; }
+/* saved: the title turns green and hops, the chosen tag hops along */
+window.task.saved .task-hello { color: {{ .palette.green }}; animation: hop 420ms ease-out 1; }
+window.task.saved button.task-tag.chosen .task-circle { animation: hop 420ms ease-out 1; }
+
 /* ---------------------------------------------------------------- motion */
 /* The same small motions in every popup. Entrance (~/.local/lib/popup/resident.py
    animate_in): the window gets class "enter" for a moment and its rows are

@@ -1,0 +1,211 @@
+#!/usr/bin/env python3
+"""Task popup (SUPER+T): jot down a task for Claude in a small window in the
+middle of the screen. It lands in the Obsidian task list (TASKS below, section
+"## Offen"), which `/todo` in Claude Code works through.
+
+    task-popup toggle [--center]  show it, or hide it when open
+    task-popup --hidden           login autostart: waits hidden, opens instantly
+    task-popup quit               stop it (it reloads on the next press)
+
+Resident like the other popups (~/.local/lib/popup/resident.py), always
+centered, in the style of the session popup: the title types itself, three
+round tag buttons (bug, verbesserung, idee) pop in one after the other and the
+chosen one wiggles in its own color. An empty task shakes its head; a saved one
+says so in green and the popup closes.
+
+Keys: Enter saves, Alt+B / Alt+V / Alt+I pick the tag, Tab moves between the
+fields, Escape closes (what you typed stays until it is saved).
+"""
+import os
+import sys
+
+sys.path.insert(0, os.path.expanduser("~/.local/lib/popup"))
+import resident  # noqa: E402
+
+APP = "popup.task"
+WIDTH = 520
+CSS = os.path.expanduser("~/.config/popups/style.css")
+TASKS = os.path.expanduser("~/Nextcloud/Obsidian/02 - Linux/Arch Setup/Aufgaben.md")
+SECTION = "## Offen"
+CLOSE_MS = 900        # the "saved" look stays this long
+
+# tag, alt key, icon, caption
+TAGS = [
+    ("bug", "b", "\U000F00E4", "etwas ist kaputt"),
+    ("verbesserung", "v", "\U000F0068", "geht noch besser"),
+    ("idee", "i", "\U000F0335", "etwas ganz neues"),
+]
+DEFAULT_TAG = "idee"
+
+
+def add_task(text, tag, details):
+    """Append the task at the end of the open section, keeping the blank lines
+    before the next heading. No section (or no file): append at the end."""
+    line = f"- [ ] {text} #{tag}\n"
+    if details:
+        line += f"\t- {details}\n"
+    try:
+        with open(TASKS) as f:
+            lines = f.readlines()
+    except FileNotFoundError:
+        lines = []
+    start = next((i for i, l in enumerate(lines) if l.strip() == SECTION), None)
+    if start is None:
+        if lines and not lines[-1].endswith("\n"):
+            lines[-1] += "\n"
+        lines.append(line)
+    else:
+        end = next((i for i in range(start + 1, len(lines)) if lines[i].startswith("## ")),
+                   len(lines))
+        at = end
+        while at > start + 1 and not lines[at - 1].strip():
+            at -= 1
+        if at > 0 and not lines[at - 1].endswith("\n"):
+            lines[at - 1] += "\n"
+        lines.insert(at, line)
+    os.makedirs(os.path.dirname(TASKS) or ".", exist_ok=True)
+    # written in place (not replaced): Nextcloud and Obsidian see a plain change
+    with open(TASKS, "w") as f:
+        f.writelines(lines)
+
+
+def build():
+    import gi
+
+    gi.require_version("Gtk", "4.0")
+    gi.require_version("Gdk", "4.0")
+    from gi.repository import Gdk, GLib, Gtk
+
+    class Popup(Gtk.Window):
+        popup_width = WIDTH       # resident.place(center=True) on every show
+
+        def __init__(self):
+            super().__init__(title="New task")
+            for c in ("popup", "menu", "task"):
+                self.add_css_class(c)
+            self.set_decorated(False)
+            self.set_default_size(WIDTH, 1)
+            self.tag = DEFAULT_TAG
+            self.close_timer = None
+
+            box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4,
+                          css_classes=["task-box"])
+            self.hello = Gtk.Label(label="neue aufgabe für claude",
+                                   css_classes=["menu-title", "task-hello"])
+            self.sub = Gtk.Label(css_classes=["task-sub"])
+            box.append(self.hello)
+            box.append(self.sub)
+
+            self.entry = Gtk.Entry(placeholder_text="was soll ich mir anschauen?",
+                                   css_classes=["menu-search", "task-entry"])
+            self.details = Gtk.Entry(placeholder_text="details (optional)",
+                                     css_classes=["menu-search", "task-details"])
+            for e in (self.entry, self.details):
+                e.connect("activate", lambda _e: self.save())
+                e.connect("changed", lambda _e: self.entry.remove_css_class("shake"))
+                box.append(e)
+
+            row = Gtk.Box(spacing=26, halign=Gtk.Align.CENTER, css_classes=["task-row"])
+            self.buttons = {}
+            for tag, letter, icon, _cap in TAGS:
+                b = Gtk.Button(css_classes=["task-tag", tag, "flat"], focusable=False)
+                inner = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=5)
+                inner.append(Gtk.Label(label=icon, css_classes=["task-circle"],
+                                       halign=Gtk.Align.CENTER))
+                inner.append(Gtk.Label(label="#" + tag, css_classes=["task-label"]))
+                keys = Gtk.Box(spacing=3, halign=Gtk.Align.CENTER)
+                keys.append(Gtk.Label(label="alt", css_classes=["key", "mod", "task-key"]))
+                keys.append(Gtk.Label(label=letter.upper(), css_classes=["key", "task-key"]))
+                inner.append(keys)
+                b.set_child(inner)
+                b.connect("clicked", lambda _b, t=tag: self.pick(t))
+                self.buttons[tag] = b
+                row.append(b)
+            box.append(row)
+            self.caption = Gtk.Label(css_classes=["task-caption"])
+            box.append(self.caption)
+            self.set_child(box)
+
+            keys = Gtk.EventControllerKey()
+            keys.set_propagation_phase(Gtk.PropagationPhase.CAPTURE)
+            keys.connect("key-pressed", self.on_key)
+            self.add_controller(keys)
+
+        # ------------------------------------------------------------ actions
+        def pick(self, tag):
+            self.tag = tag
+            for t, b in self.buttons.items():
+                (b.add_css_class if t == tag else b.remove_css_class)("chosen")
+            self.caption.set_text(next(a[3] for a in TAGS if a[0] == tag)
+                                  + "  ·  enter speichert")
+
+        def save(self):
+            if self.close_timer:
+                return
+            text = " ".join(self.entry.get_text().split())
+            if not text:
+                # shake its head (restart the animation)
+                self.entry.remove_css_class("shake")
+                GLib.timeout_add(16, lambda: self.entry.add_css_class("shake") and False)
+                self.entry.grab_focus()
+                return
+            details = " ".join(self.details.get_text().split())
+            try:
+                add_task(text, self.tag, details)
+            except OSError as e:
+                self.caption.set_text(f"konnte nicht speichern: {e.strerror}")
+                self.caption.add_css_class("error")
+                return
+            self.entry.set_text("")
+            self.details.set_text("")
+            self.add_css_class("saved")
+            self.hello.set_text("notiert ✓")
+            resident.type_title(self.hello)       # stops the greeting still typing
+            self.caption.set_text("/todo arbeitet sie ab")
+            self.close_timer = GLib.timeout_add(CLOSE_MS, self.done)
+
+        def done(self):
+            self.close_timer = None
+            self.close()
+            return False
+
+        # ------------------------------------------------------------ window
+        def show_up(self):
+            if self.close_timer:
+                GLib.source_remove(self.close_timer)
+                self.close_timer = None
+            self.remove_css_class("saved")
+            self.caption.remove_css_class("error")
+            self.hello.set_text("neue aufgabe für claude")
+            self.sub.set_text("landet in Aufgaben.md")
+            self.pick(self.tag)
+            # restart the pop-in of the tag buttons: drop the class, add it once shown
+            for b in self.buttons.values():
+                b.remove_css_class("enter")
+            GLib.timeout_add(30, lambda: [b.add_css_class("enter")
+                                          for b in self.buttons.values()] and False)
+            self.set_default_size(WIDTH, 1)
+            self.present()
+            self.entry.grab_focus()
+
+        def on_key(self, _ctrl, keyval, _code, state):
+            if keyval == Gdk.KEY_Escape:
+                self.close()
+                return True
+            if state & Gdk.ModifierType.ALT_MASK:
+                ch = chr(Gdk.keyval_to_unicode(keyval) or 0).lower()
+                for tag, letter, *_rest in TAGS:
+                    if ch == letter:
+                        self.pick(tag)
+                        return True
+            return False
+
+    provider = Gtk.CssProvider()
+    provider.load_from_path(CSS)
+    Gtk.StyleContext.add_provider_for_display(
+        Gdk.Display.get_default(), provider, Gtk.STYLE_PROVIDER_PRIORITY_USER)
+    return Popup()
+
+
+if __name__ == "__main__":
+    resident.main(APP, build, __doc__)
