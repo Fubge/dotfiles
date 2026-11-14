@@ -7,3 +7,4 @@ assets/
 system/
 system-boot/
 **/__pycache__
+.claude/
