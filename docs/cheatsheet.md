@@ -107,6 +107,9 @@ Files ending in `.tmpl` are generated from these values.
   disconnects; the arrow next to it opens "Pair again" and "Forget"). "Add a device"
   searches right in the popup, new devices show up live, a click pairs, trusts and
   connects; a passkey to type on a keyboard appears in its row.
+- **Clipboard** (`SUPER+V`): history from cliphist, newest first. Images show a
+  thumbnail, colors a swatch, links their site. Typing filters; Enter or a click
+  copies, Delete or the x removes an entry; "Clear" wipes it all (asks once more).
 - **Sound** (`SUPER+A` or a click on the speaker; right click mutes): volume and
   microphone sliders, output device, one slider per app that plays sound, "Open mixer"
   for pavucontrol. Click an icon to mute that slider, `m` mutes the output.

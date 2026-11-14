@@ -99,7 +99,7 @@ def build():
             scroll = Gtk.ScrolledWindow(child=self.flow, vexpand=True,
                                         hscrollbar_policy=Gtk.PolicyType.NEVER)
             root.append(scroll)
-            root.append(Gtk.Label(label="SUPER = Alt key next to the space bar      ·      Esc  close",
+            root.append(Gtk.Label(label="SUPER = Windows key      ·      Esc  close",
                                   css_classes=["hint"]))
             self.set_child(root)
 

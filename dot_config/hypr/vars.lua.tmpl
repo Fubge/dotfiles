@@ -55,6 +55,7 @@ M.background = {
     M.bin .. "power-popup --hidden",      -- power popup (battery, profile), same
     M.bin .. "session-popup --hidden",    -- lock / reboot / shut down, same
     M.bin .. "keybinds --hidden",         -- shortcut overview (SUPER+H), same
+    M.bin .. "clipboard-popup --hidden",  -- clipboard history (SUPER+V), same
 }
 
 -- Look -----------------------------------------------------------------------
@@ -105,11 +106,12 @@ M.popup = {
         "popup.power",   -- battery, power profile (~/.local/bin/power-popup)
         "popup.session", -- lock, reboot, shut down; centered (~/.local/bin/session-popup)
         "popup.brightness", -- screen + keyboard backlight (~/.local/bin/brightness-popup)
+        "popup.clipboard",  -- clipboard history; centered (~/.local/bin/clipboard-popup)
     },
     top = 46,   -- bar margin (8) + bar height (30) + gap (8), also in resident.py
 }
 -- Centered overlays that also close when focus leaves (shortcut overview).
--- Same frame as the rofi overlays (launcher, wallpapers, clipboard): design.toml
+-- Same frame as the rofi overlays (launcher, wallpapers): design.toml
 M.overlays = { "popup.keybinds" }
 M.overlay = {
     size     = { {{ .design.overlay_width }}, {{ .design.overlay_height }} },

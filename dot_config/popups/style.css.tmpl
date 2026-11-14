@@ -694,3 +694,34 @@ button.notif-close:hover { color: {{ .palette.red }}; }
 .notif.bump { animation: notif-bump 220ms ease-out 1; }
 .notif.bump .notif-glyph, .notif.bump .notif-badge { animation: icon-wiggle 380ms ease-in-out 1; }
 .notif.hover .notif-glyph, .notif.hover .notif-badge { animation: icon-wiggle 380ms ease-in-out 1; }
+
+/* ---------------------------------------------------------------- clipboard */
+/* ~/.local/bin/clipboard-popup (SUPER+V): list menu rows with a status line,
+   image thumbnails, color swatches; the x shows on the selected row */
+.clip-row { padding: 7px 10px 7px 4px; }
+.clip-text { color: {{ .palette.fg }}; }
+.clip-thumb {
+    border-radius: 6px;
+    background-color: alpha({{ .palette.steel }}, 0.35);
+}
+.clip-swatch { font-size: 16pt; }
+window.popup.clipboard { background-color: alpha({{ .palette.bg }}, 0.96); }
+button.clip-remove {
+    min-height: 0;
+    min-width: 0;
+    padding: 2px 6px;
+    border: none;
+    border-radius: 6px;
+    box-shadow: none;
+    background: none;
+    color: transparent;
+    transition: color 150ms ease, background-color 150ms ease;
+}
+.clip-row:selected button.clip-remove { color: {{ .palette.fg_muted }}; }
+.clip-row:selected button.clip-remove:hover { color: {{ .palette.red }}; background-color: alpha({{ .palette.bg }}, 0.35); }
+.clip-row:selected .row-status { color: {{ .palette.fg_muted }}; }
+.clip-foot { margin: 2px 0 0 0; font-size: 9pt; }
+.clip-hint { margin: 0 14px; font-size: 9pt; }
+button.clip-clear { padding: 3px 10px; font-size: 9pt; }
+.clip-empty { margin: 18px 14px; }
+button.more.danger { color: {{ .palette.red }}; animation: session-pulse 900ms ease-out infinite; }

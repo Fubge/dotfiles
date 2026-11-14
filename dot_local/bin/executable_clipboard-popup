@@ -1,0 +1,320 @@
+#!/usr/bin/env python3
+"""Clipboard history (SUPER+V): a small popup in the middle of the screen,
+like the other popups, instead of the full screen rofi overlay.
+
+    clipboard-popup toggle --center   SUPER+V: show it, or hide it when open
+    clipboard-popup --hidden          login autostart: waits hidden, opens instantly
+    clipboard-popup quit              stop it (it reloads on the next press)
+
+History: cliphist (filled by `wl-paste --watch cliphist store`, hypr/vars.lua),
+read again on every show. Rows: an accent icon by kind (text, link, path,
+color, image) and a status line under it (not for plain text); images get a thumbnail, hex colors
+a swatch. Typing filters. Enter or a click copies the entry (it moves to the
+top) and closes; Delete or the x on a row removes it; "Clear history" asks
+once more. Look: ~/.config/popups/style.css (sections "menu" and "clipboard").
+"""
+import os
+import re
+import subprocess
+import sys
+
+sys.path.insert(0, os.path.expanduser("~/.local/lib/popup"))
+import resident  # noqa: E402
+
+APP = "popup.clipboard"
+CSS = os.path.expanduser("~/.config/popups/style.css")
+WIDTH = 520
+MAX_ROWS = 7         # longer lists scroll
+LEAD = 40            # width of the icon column (thumbnails fill it)
+THUMB = (LEAD, 30)   # image preview size
+BINARY = re.compile(r"\[\[ binary data (\S+ \S+) (\w+) (\d+x\d+) \]\]")
+COLOR = re.compile(r"#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})")
+URL = re.compile(r"(?:https?|ftp)://\S+|www\.\S+")
+
+I_TEXT, I_LINK, I_PATH, I_IMAGE, I_COLOR = "\U000F09A8", "\U000F0337", "\U000F024B", "\U000F02E9", "\U000F0266"
+I_SEARCH, I_CLOSE, I_TRASH = "\U000F0349", "\U000F0156", "\U000F0A7A"
+
+
+def kind(preview):
+    """(icon, status line, search text) for a cliphist preview."""
+    if m := BINARY.match(preview):
+        size, fmt, dims = m.groups()
+        return I_IMAGE, f"{fmt.upper()} · {dims.replace('x', '×')} · {size}", f"image {fmt}"
+    text = preview.strip()
+    if COLOR.fullmatch(text):
+        return I_COLOR, "Color", text
+    if URL.fullmatch(text):
+        return I_LINK, re.sub(r"^\w+://(www\.)?|^www\.", "", text).split("/")[0], text
+    if text.startswith(("/", "~/")) and "\n" not in text and " " not in text.strip():
+        return I_PATH, "Path", text
+    return I_TEXT, "", text           # plain text: no status line, the row stays slim
+
+
+def build():
+    import gi
+
+    gi.require_version("Gtk", "4.0")
+    gi.require_version("Gdk", "4.0")
+    from gi.repository import Gdk, GLib, Gtk, Pango
+
+    def decode(line):
+        return subprocess.run(["cliphist", "decode"], input=line.encode(),
+                              capture_output=True).stdout
+
+    class Clipboard(Gtk.Window):
+        def __init__(self):
+            super().__init__(title="Clipboard")
+            for c in ("popup", "menu", "list-menu", "clipboard"):
+                self.add_css_class(c)
+            self.set_decorated(False)
+            self.popup_width = WIDTH
+            self.thumbs = {}         # cliphist id -> Gdk.Texture
+            self.confirm = False     # "Clear history" clicked once
+            self.query = ""
+
+            box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8, css_classes=["menu-box"])
+            box.append(Gtk.Label(label="Clipboard", css_classes=["menu-title"]))
+            self.entry = Gtk.Entry(css_classes=["menu-search"], xalign=0.5,
+                                   placeholder_text="Filter clipboard...")
+            self.entry.connect("changed", lambda e: self.set_query(e.get_text()))
+            box.append(self.entry)
+
+            self.list = Gtk.ListBox(css_classes=["menu-list"])
+            self.list.set_selection_mode(Gtk.SelectionMode.SINGLE)
+            self.list.set_filter_func(lambda row: all(w in row.text for w in self.query.split()))
+            self.list.connect("row-activated", lambda _l, row: self.copy(row))
+            self.scroll = Gtk.ScrolledWindow(child=self.list)
+            self.scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+            self.scroll.set_size_request(WIDTH - 24, -1)
+            box.append(self.scroll)
+
+            self.empty = Gtk.Label(css_classes=["note", "clip-empty"])
+            box.append(self.empty)
+
+            foot = Gtk.Box(spacing=8, css_classes=["clip-foot"])
+            foot.append(Gtk.Label(label="↵ copy  ·  Del remove  ·  Esc close",
+                                  css_classes=["note", "clip-hint"], hexpand=True, xalign=0))
+            self.clear = Gtk.Button(css_classes=["more", "clip-clear"])
+            self.clear.connect("clicked", self.on_clear)
+            foot.append(self.clear)
+            box.append(foot)
+            self.set_child(box)
+
+            hover = Gtk.EventControllerMotion()
+            hover.connect("motion", self.on_motion)
+            self.list.add_controller(hover)
+            keys = Gtk.EventControllerKey(propagation_phase=Gtk.PropagationPhase.CAPTURE)
+            keys.connect("key-pressed", self.on_key)
+            self.add_controller(keys)
+            self.fill()       # built while hidden: the first press is fast too
+
+        # ------------------------------------------------------------ content
+        def fill(self):
+            out = subprocess.run(["cliphist", "list"], capture_output=True, text=True).stdout
+            lines = [l for l in out.split("\n") if "\t" in l]
+            self.list.remove_all()
+            ids = set()
+            for line in lines:
+                cid, _, preview = line.partition("\t")
+                ids.add(cid)
+                self.list.append(self.make_row(line, cid, preview))
+            for cid in set(self.thumbs) - ids:      # forget removed images
+                del self.thumbs[cid]
+            self.after_change()
+
+        def make_row(self, line, cid, preview):
+            icon, status, text = kind(preview)
+            row = Gtk.ListBoxRow(css_classes=["clip-row"])
+            row.line, row.cid, row.text = line, cid, text.lower()
+            box = Gtk.Box(spacing=12)
+
+            if icon == I_IMAGE:
+                pic = Gtk.Picture(css_classes=["clip-thumb"], content_fit=Gtk.ContentFit.COVER,
+                                  can_shrink=True)
+                pic.set_size_request(*THUMB)
+                row.pic = pic
+                if cid in self.thumbs:
+                    pic.set_paintable(self.thumbs[cid])
+                box.append(pic)
+                title = "Image"
+            elif icon == I_COLOR:
+                swatch = Gtk.Label(css_classes=["clip-swatch"], valign=Gtk.Align.CENTER)
+                swatch.set_size_request(LEAD, -1)
+                swatch.set_markup(f'<span foreground="{preview.strip()}">\uf111</span>')
+                box.append(swatch)
+                title = preview.strip()
+            else:
+                lead = Gtk.Label(label=icon, css_classes=["row-icon"], valign=Gtk.Align.CENTER)
+                lead.set_size_request(LEAD, -1)
+                box.append(lead)
+                title = " ".join(preview.split())   # one line: newlines and tabs collapse
+
+            texts = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, hexpand=True, valign=Gtk.Align.CENTER)
+            texts.append(Gtk.Label(label=title, xalign=0, ellipsize=Pango.EllipsizeMode.END,
+                                   css_classes=["clip-text"]))
+            if status:
+                texts.append(Gtk.Label(label=status, xalign=0, ellipsize=Pango.EllipsizeMode.END,
+                                       css_classes=["row-status"]))
+            box.append(texts)
+
+            rm = Gtk.Button(label=I_CLOSE, css_classes=["clip-remove"], valign=Gtk.Align.CENTER,
+                            tooltip_text="Remove", focusable=False)
+            rm.connect("clicked", lambda _b: self.remove(row))
+            box.append(rm)
+            row.set_child(box)
+            return row
+
+        def load_thumbs(self):
+            """Images of the first rows, one per idle round: the window is up first."""
+            todo = [r for r in self.rows()[:MAX_ROWS * 2]
+                    if getattr(r, "pic", None) and r.cid not in self.thumbs]
+
+            def step():
+                if not todo or not self.get_visible():
+                    return False
+                row = todo.pop(0)
+                try:
+                    tex = Gdk.Texture.new_from_bytes(GLib.Bytes.new(decode(row.line)))
+                except GLib.Error:
+                    return True
+                self.thumbs[row.cid] = tex
+                row.pic.set_paintable(tex)
+                return True
+            GLib.idle_add(step)
+
+        def after_change(self):
+            """Height, empty note and the clear button after rows came or went."""
+            rows = self.rows()
+            shown = self.visible_rows()
+            height = sum(r.measure(Gtk.Orientation.VERTICAL, WIDTH - 24)[1] for r in shown[:MAX_ROWS])
+            self.scroll.set_max_content_height(-1)    # min may not exceed the old max
+            self.scroll.set_min_content_height(height)
+            self.scroll.set_max_content_height(height)
+            self.scroll.set_visible(bool(shown))
+            self.empty.set_visible(not shown)
+            self.empty.set_text("Nothing copied yet" if not rows else "No match")
+            self.entry.set_visible(bool(rows))
+            self.clear.set_visible(bool(rows))
+            self.set_confirm(False)
+            self.set_default_size(WIDTH, 1)            # shrink with the list
+            if shown and self.list.get_selected_row() not in shown:
+                self.select(shown[0])
+
+        # ------------------------------------------------------------ actions
+        def copy(self, row):
+            # wl-copy stays around to serve the data: start it on its own
+            subprocess.Popen(["sh", "-c", 'printf "%s" "$1" | cliphist decode | wl-copy', "sh", row.line],
+                             start_new_session=True)
+            self.close()
+
+        def remove(self, row):
+            nxt = self.neighbour(row)
+            subprocess.run(["cliphist", "delete"], input=row.line.encode())
+            self.thumbs.pop(row.cid, None)
+            self.list.remove(row)
+            self.after_change()
+            if nxt:
+                self.select(nxt)
+
+        def neighbour(self, row):
+            shown = self.visible_rows()
+            if row not in shown or len(shown) < 2:
+                return None
+            i = shown.index(row)
+            return shown[i + 1] if i + 1 < len(shown) else shown[i - 1]
+
+        def set_confirm(self, on):
+            self.confirm = on
+            self.clear.set_label(f"{I_TRASH} Sure?" if on else f"{I_TRASH} Clear")
+            (self.clear.add_css_class if on else self.clear.remove_css_class)("danger")
+
+        def on_clear(self, _b):
+            if not self.confirm:
+                self.set_confirm(True)
+                return
+            subprocess.run(["cliphist", "wipe"])
+            self.thumbs.clear()
+            self.fill()
+
+        # ------------------------------------------------------------ showing
+        def show_up(self):
+            self.query = ""
+            self.entry.set_text("")
+            self.fill()
+            self.scroll.get_vadjustment().set_value(0)
+            self.select(self.list.get_row_at_index(0))
+            self.present()
+            self.entry.grab_focus()
+            self.load_thumbs()
+
+        # ------------------------------------------------------------ list helpers
+        def rows(self):
+            out, row = [], self.list.get_first_child()
+            while row:
+                out.append(row)
+                row = row.get_next_sibling()
+            return out
+
+        def visible_rows(self):
+            return [r for r in self.rows() if all(w in r.text for w in self.query.split())]
+
+        def set_query(self, text):
+            self.query = text.lower()
+            self.list.invalidate_filter()
+            self.after_change()
+
+        def select(self, row):
+            if row is None:
+                return
+            self.list.select_row(row)
+            ok, bounds = row.compute_bounds(self.list)
+            if ok:      # keep it in view
+                adj = self.scroll.get_vadjustment()
+                top, bottom = bounds.get_y(), bounds.get_y() + bounds.get_height()
+                if top < adj.get_value():
+                    adj.set_value(top)
+                elif bottom > adj.get_value() + adj.get_page_size():
+                    adj.set_value(bottom - adj.get_page_size())
+
+        def move(self, step):
+            shown = self.visible_rows()
+            if not shown:
+                return
+            cur = self.list.get_selected_row()
+            i = shown.index(cur) if cur in shown else -step
+            self.select(shown[(i + step) % len(shown)])
+
+        def on_motion(self, _ctrl, _x, y):
+            row = self.list.get_row_at_y(int(y))
+            if row and row is not self.list.get_selected_row():
+                self.list.select_row(row)
+
+        def on_key(self, _ctrl, keyval, _code, state):
+            ctrl = state & Gdk.ModifierType.CONTROL_MASK
+            row = self.list.get_selected_row()
+            if keyval == Gdk.KEY_Escape:
+                self.close()
+            elif keyval in (Gdk.KEY_Down, Gdk.KEY_Tab) or (ctrl and keyval == Gdk.KEY_j):
+                self.move(1)
+            elif keyval in (Gdk.KEY_Up, Gdk.KEY_ISO_Left_Tab) or (ctrl and keyval == Gdk.KEY_k):
+                self.move(-1)
+            elif keyval in (Gdk.KEY_Return, Gdk.KEY_KP_Enter):
+                if row and row in self.visible_rows():
+                    self.copy(row)
+            elif keyval == Gdk.KEY_Delete and self.entry.get_position() >= len(self.entry.get_text()):
+                # Delete at the end of the search text (nothing to delete there): the row
+                if row and row in self.visible_rows():
+                    self.remove(row)
+            else:
+                return False
+            return True
+
+    provider = Gtk.CssProvider()
+    provider.load_from_path(CSS)
+    Gtk.StyleContext.add_provider_for_display(
+        Gdk.Display.get_default(), provider, Gtk.STYLE_PROVIDER_PRIORITY_USER)
+    return Clipboard()
+
+
+if __name__ == "__main__":
+    resident.main(APP, build, __doc__)
