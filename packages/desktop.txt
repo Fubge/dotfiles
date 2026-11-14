@@ -27,6 +27,7 @@ hyprpaper
 hypridle
 hyprlock
 hyprpolkitagent
+gnome-keyring            # password store (Secret Service) for Nextcloud and co., unlocked at login by PAM
 xdg-desktop-portal-gtk   # file chooser for GTK apps
 network-manager-applet
 pavucontrol
