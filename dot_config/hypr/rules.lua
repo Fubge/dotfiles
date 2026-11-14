@@ -172,12 +172,12 @@ hl.window_rule({
     workspace = "8 silent",
 })
 
--- YouTube runs as a Vivaldi app window (own class) on workspace 6, whether
+-- YouTube runs as a Vivaldi app window (own class) on workspace 4, whether
 -- youtube-autostart opens it or Vivaldi restores it with the last session
 hl.window_rule({
     name = "youtube",
     match = { class = "^vivaldi-www\\.youtube\\.com__.*$" },
-    workspace = "6 silent",
+    workspace = "4 silent",
 })
 
 -- Ignore maximize requests from apps
@@ -195,12 +195,12 @@ hl.window_rule({
 })
 
 -- Games: Steam games (steam_app_*) and gamescope open fullscreen on
--- workspace 4 (never tiled next to the launcher, no bar), may tear (lower
+-- workspace 5 (never tiled next to the launcher, no bar), may tear (lower
 -- latency) and skip animations.
 hl.window_rule({
     name = "games",
     match = { class = "^(steam_app_.*|gamescope)$" },
-    workspace = "4",
+    workspace = "5",
     fullscreen = true,
     immediate = true,
     no_anim = true,
@@ -211,17 +211,17 @@ hl.window_rule({
 hl.window_rule({
     name = "minecraft",
     match = { class = "^com\\.mojang\\.minecraft$" },
-    workspace = "4",
+    workspace = "5",
     fullscreen = true,
     no_anim = true,
 })
 
--- Launchers (Steam client, Modrinth App) live on the games workspace 4 too
+-- Launchers (Steam client, Modrinth App) live on the games workspace 5 too
 -- (all their windows, dialogs included) and switch there when started
 hl.window_rule({
     name = "steam",
     match = { class = "^(steam|modrinth-app)$" },
-    workspace = "4",
+    workspace = "5",
 })
 
 -- Steam (CEF) scrolls far more per touchpad swipe than other apps: slow it down

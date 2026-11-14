@@ -25,7 +25,7 @@ M.keepAlive   = {
 
 -- Workspaces: the ones switched to by number in front, the app workspaces with
 -- their own key at the end. 1 desktop (stays empty), 2 browser, 3 Neovim,
--- 4 games + Steam (rules.lua), 5 free, 6 YouTube (SUPER+Y), 7 chat (Discord,
+-- 4 YouTube (SUPER+Y), 5 games + Steam (rules.lua), 6 free, 7 chat (Discord,
 -- SUPER+D), 8 notes (Obsidian, SUPER+O). Window rules: rules.lua, icons: waybar config
 -- Vivaldi asks the settings portal for dark/light mode once at start; if the
 -- portal is not up yet it stays light. Asking the portal first starts it and
@@ -46,7 +46,7 @@ M.background = {
     M.bin .. "discord-start",             -- workspace 7 without switching (rules.lua), bar-style tray icons
     "wl-paste --watch cliphist store",   -- clipboard history
     M.bin .. "game-watch",                -- GameMode for every game
-    M.bin .. "youtube-autostart",         -- YouTube app window on workspace 6 (rules.lua)
+    M.bin .. "youtube-autostart",         -- YouTube app window on workspace 4 (rules.lua)
     M.bin .. "claude-pad start",          -- Claude session waits hidden on special:claude
     M.bin .. "pet-picker --hidden",       -- pet picker waits hidden, opens instantly
     M.bin .. "brightness-popup --hidden", -- brightness slider, same

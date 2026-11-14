@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Opens YouTube as a Vivaldi app window at login (rules.lua puts it on
-# workspace 6). Vivaldi restores its last session, which may already contain
+# workspace 4). Vivaldi restores its last session, which may already contain
 # the YouTube window: wait until the browser is up and only open one if missing.
 set -u
 APP_CLASS=vivaldi-www.youtube.com__
