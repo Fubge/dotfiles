@@ -18,7 +18,7 @@ optional indented sub-bullets with details. Done items move to `## Erledigt`.
    including `#idee`. When something is unclear, pick the sensible default and note it.
 3. Work through them one by one, following the repo conventions and memory rules.
    One commit per task, message in English. Do not push.
-   Hard limits, even unattended (leave a `❓` sub-bullet instead of doing it):
+   Hard limits, even unattended (treat it as a question for the user, see step 4):
    - no kernel changes, no live restarts of NetworkManager/iwd/Wi-Fi, no reboot or logout
    - nothing destructive or hard to undo (deleting user data, repartitioning, bootloader)
    - anything that needs sudo/a password: prepare the change in the repo, commit it,
@@ -28,8 +28,13 @@ optional indented sub-bullets with details. Done items move to `## Erledigt`.
    - Done: change `- [ ]` to `- [x]`, append ` ✅ YYYY-MM-DD` (Tasks plugin format),
      add an indented sub-bullet `- Claude: <what was changed, commit hash>` in German,
      move the item (with its sub-bullets) to `## Erledigt` (newest on top).
-   - Needs input from the user: leave it under Offen, add an indented sub-bullet `- ❓ <question>` in German.
+   - Needs input from the user: only when you really cannot decide yourself. Leave it under Offen,
+     add the tag `#rückfrage` to the task line and an indented sub-bullet
+     `- 🤖 **Claude** (YYYY-MM-DD): ❓ <question>` in German, with what you already found out.
+     Then move on to the next task; never block on a question.
+   - Next run: if the user answered below a `❓`, use the answer, remove `#rückfrage` and do the task.
    - Needs a reboot/relogin to take effect: say so in the Claude sub-bullet.
 5. Edit the note with the Edit tool only (it syncs via Nextcloud; never rewrite the whole file,
    the user may be editing it on another device).
-6. End with a short summary in German.
+6. End with a short summary in German: what was done, then all open questions listed
+   together, so the user can go through them in one go.
