@@ -23,10 +23,15 @@ M.keepAlive   = {
     claude_pad = hl.dsp.exec_cmd(M.bin .. "claude-pad hide"),
 }
 
--- Workspaces: 1 desktop (stays empty), 2 browser, 3 Neovim, 4 YouTube,
--- 5 chat (Discord, rules.lua), 6 games (rules.lua), 7 free. Icons: waybar config
+-- Workspaces: 1 desktop (stays empty), 2 browser, 3 Neovim, 4 YouTube (SUPER+Y),
+-- 5 chat (Discord, rules.lua), 6 games + Steam (rules.lua), 7 free. Icons: waybar config
+-- Vivaldi asks the settings portal for dark/light mode once at start; if the
+-- portal is not up yet it stays light. Asking the portal first starts it and
+-- waits until it answers.
+local portalReady = "busctl --user call org.freedesktop.portal.Desktop /org/freedesktop/portal/desktop "
+    .. "org.freedesktop.portal.Settings ReadOne ss org.freedesktop.appearance color-scheme >/dev/null 2>&1"
 M.startup = {
-    { workspace = 2, cmd = M.browser,  class = "vivaldi" },
+    { workspace = 2, cmd = "sh -c '" .. portalReady .. "; exec " .. M.browser .. "'", class = "vivaldi" },
     { workspace = 3, cmd = M.terminal .. " nvim", class = "kitty" },
 }
 -- Started out of sight: Spotify's window rule puts it on special:music, which

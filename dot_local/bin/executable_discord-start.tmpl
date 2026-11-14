@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+# discord-start: start Discord with tray icons that match the bar.
+# Discord's own Linux tray icons are 24 px pictures from ~2015 (a glossy green
+# ball while in a voice channel). This draws the Clyde logo from the Nerd Font
+# in the bar colors instead and copies it over Discord's files before it starts:
+#   white            idle               white + red dot     unread
+#   green            in a voice channel green + white dot   speaking
+#   green + yellow   muted              green + red dot     deafened
+# Discord updates bring the old files back, so this runs at every start
+# (autostart in vars.lua and SUPER+D). Colors: .chezmoidata/palette.toml
+set -uo pipefail
+
+font=/usr/share/fonts/TTF/SymbolsNerdFont-Regular.ttf
+glyph=$'\uf1ff'                                   # nf-fa-discord
+cache="${XDG_CACHE_HOME:-$HOME/.cache}/discord-tray"
+stamp="{{ .palette.fg }} {{ .palette.green }} {{ .palette.yellow }} {{ .palette.red }} v2"
+
+draw() {   # draw all six icons into $cache (64 px, the bar scales them down)
+    mkdir -p "$cache"
+    logo() {
+        magick -size 96x96 xc:none -font "$font" -pointsize 64 -fill "$1" \
+            -gravity center -annotate +0+0 "$glyph" -trim +repage -resize 60x60 \
+            -background none -extent 64x64 "PNG32:$cache/$2"
+    }
+    badge() {  # punch a gap into the logo, then a dot inside it (bottom right)
+        magick "$cache/$1" \
+            \( -size 64x64 xc:none -fill black -draw "circle 54,52 54,39" \) \
+            -compose Dst_Out -composite \
+            \( -size 64x64 xc:none -fill "$2" -draw "circle 54,52 54,43" \) \
+            -compose Over -composite "PNG32:$cache/$3"
+    }
+    logo "{{ .palette.fg }}" tray.png
+    logo "{{ .palette.green }}" tray-connected.png
+    badge tray.png "{{ .palette.red }}" tray-unread.png
+    badge tray-connected.png "{{ .palette.fg }}" tray-speaking.png
+    badge tray-connected.png "{{ .palette.yellow }}" tray-muted.png
+    badge tray-connected.png "{{ .palette.red }}" tray-deafened.png
+    echo "$stamp" > "$cache/stamp"
+}
+
+if command -v magick >/dev/null && [[ -f $font ]]; then
+    [[ "$(cat "$cache/stamp" 2>/dev/null)" == "$stamp" ]] || draw
+    for dir in "$HOME"/.config/discord/app-*/modules/discord_desktop_core-*/discord_desktop_core/app/images/systemtray/linux; do
+        [[ -d $dir ]] && cp -f "$cache"/tray*.png "$dir"/
+    done
+fi
+
+exec discord "$@"

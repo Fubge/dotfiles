@@ -213,6 +213,16 @@ hl.window_rule({
     float = true,
 })
 
+-- File pickers (open/save/choose folder) from the GTK portal: float and center.
+-- Tiled, they ended up under floating dialogs that opened them (Steam Settings)
+hl.window_rule({
+    name = "file-picker",
+    match = { class = "^xdg-desktop-portal-gtk$" },
+    float = true,
+    size = { 900, 600 },
+    center = true,
+})
+
 -- rofi menus: blur the translucent panel and dim the desktop behind it
 hl.layer_rule({
     name = "rofi",
