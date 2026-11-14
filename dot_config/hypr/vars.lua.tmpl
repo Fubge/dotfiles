@@ -57,6 +57,7 @@ M.background = {
     M.bin .. "keybinds --hidden",         -- shortcut overview (SUPER+H), same
     M.bin .. "clipboard-popup --hidden",  -- clipboard history (SUPER+V), same
     M.bin .. "notification-center --hidden", -- notification history (SUPER+I), same
+    "nextcloud --background",           -- file sync, tray icon only
 }
 
 -- Look -----------------------------------------------------------------------
@@ -87,6 +88,7 @@ M.claude = { class = "claude_pad" }
 M.floating = {
     ["[Bb]itwarden"] = { 1000, 780 },
     ["nm-connection-editor"] = { 900, 620 },   -- "Network settings" (Wi-Fi popup)
+    ["com\\.nextcloud\\.desktopclient\\.nextcloud"] = { 900, 700 },  -- sync client: wizard, settings
 }
 
 -- Popups opened from the bar: float under the mouse, just below the bar, and
