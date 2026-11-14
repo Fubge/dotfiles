@@ -460,6 +460,7 @@ def build():
             refocus = getattr(focused, "wkey", None) if focused else None
             if focused is not None and focused.is_ancestor(self.pw):
                 refocus = "pw"
+            pw_pos = self.pw.get_position()
             pw_parent = self.pw.get_parent()
             if pw_parent is not None:
                 pw_parent.remove(self.pw)
@@ -502,7 +503,10 @@ def build():
             if self.get_visible():
                 self.set_default_size(WIDTH, 1)    # grow / shrink with the list
                 if refocus == "pw" and self.ask:
-                    self.pw.grab_focus()
+                    # plain grab_focus() selects all text, and the next key
+                    # typed would replace the half-typed password
+                    self.pw.get_delegate().grab_focus_without_selecting()
+                    self.pw.set_position(pw_pos)
                 elif refocus:
                     self.focus_key(refocus)
             return False

@@ -125,6 +125,25 @@ hl.window_rule({
     workspace = "special:claude silent",
 })
 
+-- The Claude and dropdown specials belong to one window each. Anything else
+-- started while one of them is shown (e.g. "Network settings" from the Wi-Fi
+-- popup) would open there, hidden behind it: send it to the normal workspace
+-- below instead and close the special. Pinned popups stay where they are.
+local special_owner = { claude = v.claude.class, dropdown = v.dropdown.class }
+hl.on("window.open", function(win)
+    if not (win and win.workspace and win.workspace.special) or win.pinned or is_popup(win) then
+        return
+    end
+    local name = (win.workspace.name or ""):gsub("^special:", "")
+    local owner = special_owner[name]
+    if not owner or win.class == owner then
+        return
+    end
+    local ws = hl.get_active_workspace()
+    hl.dispatch(hl.dsp.workspace.toggle_special(name))
+    hl.dispatch(hl.dsp.window.move({ window = win, workspace = ws.id, follow = true }))
+end)
+
 -- Small tool windows float centered instead of splitting the layout
 for class, size in pairs(v.floating) do
     hl.window_rule({
