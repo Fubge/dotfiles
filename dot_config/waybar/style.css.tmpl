@@ -162,7 +162,7 @@ tooltip {
 #system   { background: @steel; border-radius: 15px; padding: 0 3px; }
 #connect  { padding: 0 3px; }
 /* bell and power: a small dark pill at the far right, the two side by side */
-#session  { background: @dark; border-radius: 15px; padding: 0 3px; }
+#session  { background: @dark; border-radius: 15px; }
 
 #cpu, #temperature, #memory { padding: 0 9px; }
 
@@ -183,7 +183,11 @@ tooltip {
 #tray { padding: 0 6px; }
 #custom-wifi-name { padding: 0 6px 0 0; margin-left: -4px; }
 
-#custom-power { color: @accent; }
+/* bell and power belong together: no fixed slots, just a small gap between
+   them and the pill's round ends around them */
+#custom-notifications, #custom-power { min-width: 0; }
+#custom-notifications { padding: 0 5px 0 11px; }
+#custom-power { padding: 0 11px 0 5px; color: @accent; }
 /* Notification bell (~/.local/bin/notification-bell) left of the power button:
    a calm light grey bell; with new ones it turns white and an orange dot sits
    in its cut out top right corner (drawn by the daemon, Pango markup); a
