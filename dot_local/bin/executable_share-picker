@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+# share-picker: wrapper around hyprland-share-picker for screen sharing
+# (Discord, browsers, OBS via xdg-desktop-portal-hyprland, see hypr/xdph.conf).
+# The picker prints the choice ("[SELECTION]/screen:DP-4") and then crashes
+# while closing its window (hyprtoolkit 0.6.0: "corrupted double-linked list",
+# SIGABRT). The portal treats the crash as "cancelled" and drops the choice,
+# so sharing never starts. This passes the choice on and reports success
+# whenever the picker printed one.
+out=$(hyprland-share-picker "$@" 2>/dev/null)
+printf '%s\n' "$out"
+[[ $out == *"[SELECTION]"* ]]
