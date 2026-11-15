@@ -16,7 +16,15 @@ optional indented sub-bullets with details. Done items move to `## Erledigt`.
 2. The user runs this unattended (before sleeping / while away). Do NOT ask for
    confirmation and do not wait for answers: work through every open task on your own,
    including `#idee`. When something is unclear, pick the sensible default and note it.
-3. Work through them one by one, following the repo conventions and memory rules.
+3. Before starting, sort the open tasks by theme and bundle them: tasks that touch the
+   same area (e.g. notifications, calendar, Obsidian, system) go under one parent item
+   `- [ ] <Thema>` (German, lowercase like the existing ones) with the tasks indented
+   below it, keeping their tags and sub-bullets. A task without a partner stays on its
+   own. Do this in the note (Edit tool, see step 5) and then work group by group, so
+   related changes are done together. When every task in a group is done, the parent
+   gets `[x]` + ` ✅ YYYY-MM-DD` and moves to `## Erledigt` as a whole (the done
+   tasks inside it keep their own Claude sub-bullets).
+   Work through them one by one, following the repo conventions and memory rules.
    One commit per task, message in English. Do not push.
    Hard limits, even unattended (treat it as a question for the user, see step 4):
    - no kernel changes, no live restarts of NetworkManager/iwd/Wi-Fi, no reboot or logout
