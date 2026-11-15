@@ -13,7 +13,7 @@
     "spacing": 0,
 
     "modules-left":   ["hyprland/workspaces", "custom/claude", "custom/window"],
-    "modules-center": ["custom/prompt", "clock#hours", "custom/colon", "clock#minutes", "clock#date", "custom/caret", "group/music"],
+    "modules-center": ["custom/prompt", "clock#hours", "custom/colon", "clock#minutes", "clock#date", "custom/agenda", "custom/caret", "group/music"],
     "modules-right":  ["group/hardware", "group/system", "group/connect", "group/session"],
 
     // ---------------------------------------------------------------- groups
@@ -79,21 +79,23 @@
     "custom/colon":  { "format": ":", "tooltip": false },
     "clock#minutes": { "format": "{0:%M}", "tooltip": false },
     "clock#date": {
-        // The date as a code comment. Hover shows the calendar, click hides the date
+        // The date as a code comment. Click: the calendar popup (both shared
+        // Nextcloud calendars, ~/.local/bin/calendar-popup), right click: new event
         "locale": "{{ .locale.clock }}",
         "format": "// {0:L%a %d. %b}",
-        "format-alt": "//",
-        "tooltip-format": "<tt><small>{calendar}</small></tt>",
-        "calendar": {
-            "mode": "month",
-            "weeks-pos": "left",
-            "format": {
-                "months":   "<span color='{{ .palette.fg }}'><b>{}</b></span>",
-                "weeks":    "<span color='{{ .palette.slate }}'>W{}</span>",
-                "weekdays": "<span color='{{ .palette.yellow }}'><b>{}</b></span>",
-                "today":    "<span color='{{ .palette.accent }}'><b><u>{}</u></b></span>"
-            }
-        }
+        "tooltip": false,
+        "on-click": "~/.local/bin/popup-cmd calendar-popup toggle",
+        "on-click-right": "~/.local/bin/popup-cmd event-popup toggle --center"
+    },
+    // The next event right after the date (~/.local/bin/calendar-bar): a dot in
+    // the owner's calendar color, time, title; blinks when it starts soon.
+    // Hover: the next seven days. Hidden when nothing is coming.
+    "custom/agenda": {
+        "exec": "~/.local/bin/calendar-bar",
+        "return-type": "json",
+        "escape": false,
+        "on-click": "~/.local/bin/popup-cmd calendar-popup toggle",
+        "on-click-right": "~/.local/bin/popup-cmd event-popup toggle --center"
     },
     "custom/caret": {
         "format": "\u258d",

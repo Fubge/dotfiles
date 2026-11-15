@@ -1,0 +1,178 @@
+#!/usr/bin/env python3
+"""Calendar reminders as notifications (~/.local/bin/notifications), started
+at login (hypr/vars.lua M.background).
+
+- every alarm the events carry (VALARM, set in Nextcloud, on the iPhone or in
+  ~/.local/bin/event-popup), from both calendars
+- the user's own timed events without one: 15 minutes before (cal.DEFAULT_ALARM)
+- once a day, the first time the laptop is on between 7:00 and 12:00:
+  "Guten Morgen" with today's events, if there are any
+
+A card: the event's title, time + place + whose calendar, two buttons:
+"Kalender" opens the calendar popup, "In 5 Min" asks again five minutes
+later. Checks every 30 s; alarms missed while the laptop slept are shown
+when it wakes, up to 30 minutes late (older ones are dropped quietly).
+What was shown is remembered in ~/.local/state/calendar-remind.json.
+"""
+import datetime as dt
+import json
+import os
+import subprocess
+import sys
+
+sys.path.insert(0, os.path.expanduser("~/.local/lib/popup"))
+import cal  # noqa: E402
+
+import gi  # noqa: E402
+
+from gi.repository import Gio, GLib  # noqa: E402
+
+STATE = os.path.join(os.environ.get("XDG_STATE_HOME", os.path.expanduser("~/.local/state")),
+                     "calendar-remind.json")
+LATE = dt.timedelta(minutes=30)
+SNOOZE = dt.timedelta(minutes=5)
+MORNING = dt.time(7, 0)
+MORNING_END = dt.time(12, 0)    # later the first start of the day says nothing
+POPUP = [os.path.expanduser("~/.local/bin/popup-cmd"), "calendar-popup", "show", "--center"]
+
+
+def load():
+    try:
+        with open(STATE) as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return {"sent": {}, "morning": ""}
+
+
+def save(state):
+    os.makedirs(os.path.dirname(STATE), exist_ok=True)
+    tmp = STATE + ".tmp"
+    with open(tmp, "w") as f:
+        json.dump(state, f)
+    os.replace(tmp, STATE)
+
+
+class Reminder:
+    def __init__(self):
+        self.state = load()
+        self.snoozed = []          # (when, occurrence)
+        self.ids = {}              # notification id -> occurrence
+        self.bus = Gio.bus_get_sync(Gio.BusType.SESSION)
+        self.bus.signal_subscribe(None, "org.freedesktop.Notifications", "ActionInvoked",
+                                  "/org/freedesktop/Notifications", None,
+                                  Gio.DBusSignalFlags.NONE, self.on_action)
+
+    def notify(self, summary, body, actions, occ=None, urgency=1):
+        try:
+            res = self.bus.call_sync(
+                "org.freedesktop.Notifications", "/org/freedesktop/Notifications",
+                "org.freedesktop.Notifications", "Notify",
+                GLib.Variant("(susssasa{sv}i)", ("Kalender", 0, "x-office-calendar",
+                                                summary, body, actions,
+                                                {"urgency": GLib.Variant("y", urgency)}, -1)),
+                GLib.VariantType("(u)"), Gio.DBusCallFlags.NONE, 2000, None)
+            if occ is not None:
+                self.ids[res.unpack()[0]] = occ
+        except GLib.Error:
+            pass
+
+    def on_action(self, _conn, _sender, _path, _iface, _signal, params):
+        nid, key = params.unpack()
+        if nid not in self.ids:
+            return
+        occ = self.ids.pop(nid)
+        if key == "snooze":
+            self.snoozed.append((cal.now() + SNOOZE, occ))
+        elif key in ("open", "default"):
+            subprocess.Popen(POPUP)
+
+    def body(self, o, t):
+        parts = []
+        if o.allday:
+            parts.append("ganztägig" if o.start == t.date() else f"{cal.day_name(o.start)} · ganztägig")
+        else:
+            s, e = o.bounds()
+            when = f"{o.start:%H:%M}" + (f" – {o.end:%H:%M}" if e > s else "")
+            if s > t:
+                when += f" · {cal.until_text(s, t)}"
+            elif s <= t < e:
+                when += " · läuft"
+            if s.date() != t.date():
+                when = f"{cal.day_name(s.date())} {when}"
+            parts.append(when)
+        if o.location:
+            parts.append("\U000F034E " + o.location)
+        parts.append(f"{o.cal.glyph} {o.cal.name}")
+        return "\n".join(parts)
+
+    def remind(self, o, t):
+        self.notify(o.summary, self.body(o, t),
+                    ["default", "Kalender", "open", "Kalender", "snooze", "In 5 Min"], o)
+
+    def check(self):
+        t = cal.now()
+        sent = self.state["sent"]
+        try:
+            occ = cal.occurrences(t - dt.timedelta(days=1), t + dt.timedelta(days=8))
+        except Exception:
+            return True
+        changed = False
+        for o in occ:
+            s = o.bounds()[0]
+            for when in o.alarm_times():
+                key = f"{o.event.uid}|{s.isoformat()}|{when.isoformat()}"
+                if key in sent or when > t:
+                    continue
+                sent[key] = t.isoformat()
+                changed = True
+                if t - when <= LATE and s + dt.timedelta(minutes=1) > when - LATE:
+                    self.remind(o, t)
+        for item in list(self.snoozed):
+            if item[0] <= t:
+                self.snoozed.remove(item)
+                self.remind(item[1], t)
+        # good morning: today's events, once a day
+        today = t.date().isoformat()
+        if t.time() >= MORNING and self.state.get("morning") != today:
+            self.state["morning"] = today
+            changed = True
+            todays = cal.day(t.date()) if t.time() < MORNING_END else []
+            if todays:
+                lines = []
+                for o in todays[:6]:
+                    when = "ganztägig" if o.allday else f"{o.start:%H:%M}"
+                    lines.append(f"{o.cal.glyph} {when}  {o.summary}")
+                if len(todays) > 6:
+                    lines.append(f"… und {len(todays) - 6} mehr")
+                n = len(todays)
+                self.notify(f"Guten Morgen! Heute {'1 Termin' if n == 1 else f'{n} Termine'}",
+                            "\n".join(lines), ["default", "Kalender", "open", "Kalender"],
+                            todays[0])
+        # forget old entries
+        cutoff = (t - dt.timedelta(days=3)).isoformat()
+        for k in [k for k, v in sent.items() if v < cutoff]:
+            del sent[k]
+            changed = True
+        if changed:
+            save(self.state)
+        return True
+
+
+def main():
+    r = Reminder()
+    if not os.path.exists(STATE):
+        # first start: alarms that are already due count as shown
+        t = cal.now()
+        for o in cal.occurrences(t - dt.timedelta(days=1), t + dt.timedelta(days=8)):
+            s = o.bounds()[0]
+            for when in o.alarm_times():
+                if when <= t - LATE:
+                    r.state["sent"][f"{o.event.uid}|{s.isoformat()}|{when.isoformat()}"] = t.isoformat()
+        save(r.state)
+    r.check()
+    GLib.timeout_add_seconds(30, r.check)
+    GLib.MainLoop().run()
+
+
+if __name__ == "__main__":
+    main()

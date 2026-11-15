@@ -130,6 +130,17 @@ Files ending in `.tmpl` are generated from these values.
   task text, optional details, tag bug / verbesserung (preselected) / idee (click or Alt+B/V/I), Enter.
   It goes to the end of "## Offen" in the Obsidian note `02 - Linux/Arch Setup/Aufgaben.md`;
   `/todo` in Claude Code works through that list.
+- **Calendar** (the two shared Nextcloud calendars, Flauschebär = own, Pia): vdirsyncer
+  syncs them every 5 min both ways into `~/.local/share/calendars` (password in the
+  keyring: `secret-tool lookup service nextcloud-caldav`).
+  - Bar: after the date the next event (dot in the calendar's color), hover = next 7 days.
+  - **`SUPER+K`** or click on date / event = calendar popup: month left (dots per event),
+    the chosen day right (cards, trash asks first), arrows / PgUp / PgDn / T, N = new event.
+  - **`SUPER+SHIFT+K`** or right click = new event in one line: "Kino morgen 20 Uhr",
+    "Zahnarzt 24.11. 14:30 für 30 min", "Fr 18-20 Grillen", "Urlaub 10.12.-14.12.";
+    Alt+F / Alt+P whose calendar, Alt+R reminder.
+  - Reminders as notifications (`calendar-remind`): alarms from the events, own timed
+    events 15 min before, a "Guten Morgen" with today's events (7-12 Uhr).
 - A little pixel pet left of the window title shows its state: sleeps while Claude
   is off, potters about when ready (dozes at night), mines / types / thinks while
   working, jumps with a "!" when it needs you, cheers and shows a gem when it finished

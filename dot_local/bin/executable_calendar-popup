@@ -1,0 +1,582 @@
+#!/usr/bin/env python3
+"""Calendar popup (click on the bar date or agenda, SUPER+K): the two shared
+Nextcloud calendars (~/.local/lib/popup/cal.py, synced by vdirsyncer).
+
+    calendar-popup toggle [--center]  show it, or hide it when open
+    calendar-popup --hidden           login autostart: waits hidden
+    calendar-popup quit               stop it (it reloads on the next press)
+
+Left a month: the title types itself, the days pop in as a diagonal wave,
+today is the orange pill, each day carries a dot per event in the owner's
+calendar color (Flauschebär blue, Pia green, the colors set in Nextcloud).
+Paging months slides the grid sideways. Right the chosen day: a date tile,
+the events as cards with a color stripe (a running one fills a progress bar,
+the next one counts down), an empty day gets a friendly line, below what
+comes after. A card's trash can asks first (it pulses red), then deletes the
+event (a series: the whole series).
+
+Keys: arrows move the day (up/down: a week), Page Up/Down a month, T today,
+N or Enter a new event on the chosen day (~/.local/bin/event-popup), double
+click a day: the same, Escape closes. Changes on disk (every sync, a new
+event) show up right away; opening it kicks off a sync.
+"""
+import calendar
+import datetime as dt
+import os
+import random
+import subprocess
+import sys
+import time
+
+sys.path.insert(0, os.path.expanduser("~/.local/lib/popup"))
+import cal  # noqa: E402
+import resident  # noqa: E402
+
+APP = "popup.calendar"
+WIDTH = 780
+CSS = os.path.expanduser("~/.config/popups/style.css")
+EVENT_POPUP = os.path.expanduser("~/.local/bin/popup-cmd")
+SYNC_EVERY = 120          # s: opening the popup syncs when the last one is older
+AFTER_DAYS = 60           # "Danach": look this far ahead
+AFTER_MAX = 3
+CARDS_MAX = 4
+
+G = {
+    "prev": "\U000F0141", "next": "\U000F0142", "today": "\U000F00F6",
+    "clock": "\U000F0150", "pin": "\U000F034E", "trash": "\U000F0A7A",
+    "plus": "\U000F0415", "coffee": "\U000F0176", "repeat": "\U000F0456",
+    "bell": "\U000F009A", "sun": "\U000F05A8",
+}
+EMPTY = [
+    (G["coffee"], "Nichts geplant", "Zeit für einen Kaffee zu zweit?"),
+    ("\U000F02D1", "Ein freier Tag", "Perfekt für Pia & Flauschebär"),
+    ("\U000F0F62", "Leer wie ein frisches Blatt", "N trägt etwas ein"),
+    ("\U000F18FB", "Kein Termin weit und breit", "Kuscheltag?"),
+    ("\U000F04DD", "Ganz entspannt", "Heute plant niemand was"),
+]
+
+
+def build():
+    import gi
+
+    gi.require_version("Gtk", "4.0")
+    gi.require_version("Gdk", "4.0")
+    from gi.repository import Gdk, Gio, GLib, Gtk
+
+    def label(text="", classes=(), **kw):
+        return Gtk.Label(label=text, css_classes=list(classes), **kw)
+
+    class Popup(Gtk.Window):
+        popup_width = WIDTH
+
+        def __init__(self):
+            super().__init__(title="Kalender")
+            for c in ("popup", "menu", "calendar"):
+                self.add_css_class(c)
+            self.set_decorated(False)
+            self.set_default_size(WIDTH, 1)
+            self.cals = []
+            self.month = dt.date.today().replace(day=1)
+            self.selected = dt.date.today()
+            self.cells = {}
+            self.grid_n = 0
+            self.armed = None          # card whose trash asks "Sicher?"
+            self.last_sync = 0
+            self.refresh_timer = None
+            self.tick_timer = None
+            self.monitors = []
+            self.color_css = Gtk.CssProvider()
+            Gtk.StyleContext.add_provider_for_display(
+                Gdk.Display.get_default(), self.color_css,
+                Gtk.STYLE_PROVIDER_PRIORITY_USER + 1)
+
+            root = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, css_classes=["cal-box"])
+
+            # header: < November 2026 >   Heute   ● Flauschebär ● Pia
+            head = Gtk.Box(spacing=6, css_classes=["cal-head"])
+            self.prev = Gtk.Button(label=G["prev"], css_classes=["cal-nav", "flat"],
+                                   focusable=False)
+            self.prev.connect("clicked", lambda _b: self.page(-1))
+            self.title = label("", ("menu-title", "cal-title"), xalign=0)
+            self.title.set_size_request(210, -1)
+            self.next = Gtk.Button(label=G["next"], css_classes=["cal-nav", "flat"],
+                                   focusable=False)
+            self.next.connect("clicked", lambda _b: self.page(1))
+            today = Gtk.Button(css_classes=["cal-today-btn", "flat"], focusable=False)
+            tb = Gtk.Box(spacing=6)
+            tb.append(label(G["today"], ("cal-today-icon",)))
+            tb.append(label("Heute"))
+            today.set_child(tb)
+            today.connect("clicked", lambda _b: self.go(dt.date.today()))
+            head.append(self.prev)
+            head.append(self.title)
+            head.append(self.next)
+            head.append(Gtk.Box(hexpand=True))
+            self.legend = Gtk.Box(spacing=14, css_classes=["cal-legend"])
+            head.append(self.legend)
+            head.append(today)
+            root.append(head)
+
+            body = Gtk.Box(spacing=22, css_classes=["cal-body"])
+            # month: weekday header + a stack that slides between months
+            left = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, css_classes=["cal-month"])
+            wd = Gtk.Grid(column_homogeneous=True, css_classes=["cal-weekdays"])
+            wd.attach(label("KW", ("cal-wd", "cal-kw-head")), 0, 0, 1, 1)
+            for i, name in enumerate(cal.DAYS_SHORT):
+                wd.attach(label(name, ("cal-wd",) + (("weekend",) if i >= 5 else ())),
+                          i + 1, 0, 1, 1)
+            left.append(wd)
+            self.stack = Gtk.Stack(transition_duration=320, vhomogeneous=False,
+                                   interpolate_size=True)
+            left.append(self.stack)
+            body.append(left)
+
+            # the chosen day
+            right = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, hexpand=True,
+                            css_classes=["cal-day-pane"])
+            tile_row = Gtk.Box(spacing=14, css_classes=["cal-day-head"])
+            tile = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, css_classes=["cal-tile"],
+                           valign=Gtk.Align.CENTER)
+            self.tile_month = label("", ("cal-tile-month",))
+            self.tile_day = label("", ("cal-tile-day",))
+            tile.append(self.tile_month)
+            tile.append(self.tile_day)
+            self.tile = tile
+            names = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, valign=Gtk.Align.CENTER)
+            self.day_title = label("", ("cal-day-title",), xalign=0)
+            self.day_sub = label("", ("cal-day-sub",), xalign=0)
+            names.append(self.day_title)
+            names.append(self.day_sub)
+            tile_row.append(tile)
+            tile_row.append(names)
+            right.append(tile_row)
+
+            # no scrolled window: it measures wrapped titles too short; a busy
+            # day shows CARDS_MAX cards and how many more there are
+            self.list = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+            right.append(self.list)
+
+            self.after_head = label("Danach", ("cal-section",), xalign=0)
+            right.append(self.after_head)
+            self.after = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
+            right.append(self.after)
+            right.append(Gtk.Box(vexpand=True))
+
+            self.add_btn = Gtk.Button(css_classes=["cal-add", "flat"], focusable=False)
+            ab = Gtk.Box(spacing=8, halign=Gtk.Align.CENTER)
+            ab.append(label(G["plus"], ("cal-add-icon",)))
+            self.add_label = label("")
+            ab.append(self.add_label)
+            ab.append(label("N", ("key", "cal-add-key")))
+            self.add_btn.set_child(ab)
+            self.add_btn.connect("clicked", lambda _b: self.new_event())
+            right.append(self.add_btn)
+            body.append(right)
+            root.append(body)
+
+            hints = Gtk.Box(spacing=16, halign=Gtk.Align.CENTER, css_classes=["cal-hints"])
+            for keys, what in ((("←", "→"), "Tag"), (("↑", "↓"), "Woche"),
+                               (("Bild↑", "Bild↓"), "Monat"), (("T",), "Heute"),
+                               (("N",), "Neu")):
+                h = Gtk.Box(spacing=3)
+                for k in keys:
+                    h.append(label(k, ("key", "cal-key")))
+                h.append(label(what, ("cal-hint",)))
+                hints.append(h)
+            root.append(hints)
+            self.set_child(root)
+
+            keys = Gtk.EventControllerKey()
+            keys.set_propagation_phase(Gtk.PropagationPhase.CAPTURE)
+            keys.connect("key-pressed", self.on_key)
+            self.add_controller(keys)
+            self.connect("notify::visible", self.on_visible)
+            self.load_calendars()
+
+        # ------------------------------------------------------------ data
+        def load_calendars(self):
+            self.cals = cal.calendars()
+            css = ""
+            for i, c in enumerate(self.cals):
+                css += (f".cal-c{i} {{ color: {c.color}; }}\n"
+                        f".cal-bg-c{i} {{ background-color: {c.color}; }}\n"
+                        f".cal-card.cal-c{i} {{ border-left-color: {c.color}; }}\n"
+                        f".cal-card.cal-c{i}:hover {{ background-color: alpha({c.color}, 0.12); }}\n"
+                        f".cal-c{i} progressbar progress {{ background-color: {c.color}; }}\n")
+            try:
+                self.color_css.load_from_string(css)
+            except AttributeError:
+                self.color_css.load_from_data(css.encode(), -1)
+            child = self.legend.get_first_child()
+            while child:
+                self.legend.remove(child)
+                child = self.legend.get_first_child()
+            for i, c in enumerate(self.cals):
+                b = Gtk.Box(spacing=6, css_classes=["cal-legend-item"])
+                b.append(label(c.glyph, (f"cal-c{i}", "cal-legend-glyph")))
+                b.append(label(c.name, ("cal-legend-name",)))
+                self.legend.append(b)
+            # watch the folders: every sync / new event refreshes right away
+            self.monitors = []
+            for c in self.cals:
+                m = Gio.File.new_for_path(c.path).monitor_directory(Gio.FileMonitorFlags.NONE, None)
+                m.connect("changed", lambda *_a: self.schedule_refresh())
+                self.monitors.append(m)
+
+        def cindex(self, c):
+            return next((i for i, x in enumerate(self.cals) if x.id == c.id), 0)
+
+        def schedule_refresh(self):
+            if self.refresh_timer:
+                GLib.source_remove(self.refresh_timer)
+            self.refresh_timer = GLib.timeout_add(350, self.refresh_now)
+
+        def refresh_now(self):
+            self.refresh_timer = None
+            if self.get_visible():
+                self.render_month(transition=None, wave=False)
+                self.render_day(animate=False)
+            return False
+
+        # ------------------------------------------------------------ month
+        def render_month(self, transition=None, wave=False):
+            first = self.month
+            grid_start = first - dt.timedelta(days=first.weekday())
+            a = dt.datetime.combine(grid_start, dt.time(), cal.TZ)
+            occ = cal.occurrences(a, a + dt.timedelta(days=42))
+            per_day = {}
+            for o in occ:
+                s, e = o.bounds()
+                d = max(s.date(), grid_start)
+                last = (e - dt.timedelta(seconds=1)).date() if e > s else s.date()
+                while d <= last and d < grid_start + dt.timedelta(days=42):
+                    per_day.setdefault(d, []).append(o)
+                    d += dt.timedelta(days=1)
+            self.per_day = per_day
+
+            today = dt.date.today()
+            grid = Gtk.Grid(column_homogeneous=True, row_homogeneous=True,
+                            css_classes=["cal-grid"] + (["wave"] if wave else []))
+            self.cells = {}
+            for r in range(6):
+                monday = grid_start + dt.timedelta(days=7 * r)
+                if r == 5 and monday.month != first.month and monday > first:
+                    break
+                grid.attach(label(str(monday.isocalendar().week), ("cal-kw",)), 0, r, 1, 1)
+                for c in range(7):
+                    d = monday + dt.timedelta(days=c)
+                    events = per_day.get(d, [])
+                    classes = ["cal-day", "flat", f"cd-{min(r + c, 11)}"]
+                    if d.month != first.month:
+                        classes.append("other")
+                    if c >= 5:
+                        classes.append("weekend")
+                    if d == today:
+                        classes.append("today")
+                    if d < today:
+                        classes.append("past")
+                    if events:
+                        classes.append("has-events")
+                    if d == self.selected:
+                        classes.append("selected")
+                    b = Gtk.Button(css_classes=classes, focusable=False)
+                    box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2,
+                                  valign=Gtk.Align.CENTER)
+                    box.append(label(str(d.day), ("cal-num",)))
+                    dots = Gtk.Box(spacing=3, halign=Gtk.Align.CENTER, css_classes=["cal-dots"])
+                    seen = []
+                    for o in events:
+                        i = self.cindex(o.cal)
+                        if len(seen) < 4:
+                            seen.append(i)
+                    for i in seen:
+                        dots.append(Gtk.Box(css_classes=["cal-dot", f"cal-bg-c{i}"],
+                                            valign=Gtk.Align.CENTER))
+                    if len(events) > 4:
+                        dots.append(label("+", ("cal-more",)))
+                    box.append(dots)
+                    b.set_child(box)
+                    b.connect("clicked", lambda _b, day=d: self.pick(day))
+                    dbl = Gtk.GestureClick()
+                    dbl.connect("pressed", lambda g, n, _x, _y, day=d:
+                                n == 2 and self.new_event(day))
+                    b.add_controller(dbl)
+                    tip = [f"{cal.day_name(d)} · {cal.date_text(d)}"] + [
+                        f"{'ganztägig' if o.allday else o.start.strftime('%H:%M')}  {o.summary}"
+                        for o in events[:6]]
+                    b.set_tooltip_text("\n".join(tip))
+                    self.cells[d] = b
+                    grid.attach(b, c + 1, r, 1, 1)
+
+            self.grid_n += 1
+            name = f"m{self.grid_n}"
+            old = self.stack.get_visible_child()
+            self.stack.add_named(grid, name)
+            if transition is None or old is None:
+                self.stack.set_visible_child_full(name, Gtk.StackTransitionType.NONE)
+            else:
+                self.stack.set_visible_child_full(name, transition)
+            if old is not None:
+                GLib.timeout_add(400, lambda: (old.get_parent() and self.stack.remove(old)) and False)
+            text = f"{cal.MONTHS[first.month - 1]} {first.year}"
+            if self.title.get_text() != text and getattr(self.title, "full_text", None) != text:
+                self.title.set_text(text)
+                resident.type_title(self.title)
+            self.prev.set_tooltip_text(cal.MONTHS[(first.month - 2) % 12])
+            self.next.set_tooltip_text(cal.MONTHS[first.month % 12])
+
+        def page(self, delta):
+            m = self.month.month - 1 + delta
+            self.month = dt.date(self.month.year + m // 12, m % 12 + 1, 1)
+            # same day number in the new month (clamped to its length)
+            last = calendar.monthrange(self.month.year, self.month.month)[1]
+            self.selected = self.month.replace(day=min(self.selected.day, last))
+            self.render_month(Gtk.StackTransitionType.SLIDE_LEFT if delta > 0
+                              else Gtk.StackTransitionType.SLIDE_RIGHT)
+            self.render_day()
+
+        def go(self, d):
+            if (d.year, d.month) != (self.month.year, self.month.month):
+                forward = d > self.month
+                self.month = d.replace(day=1)
+                self.selected = d
+                self.render_month(Gtk.StackTransitionType.SLIDE_LEFT if forward
+                                  else Gtk.StackTransitionType.SLIDE_RIGHT)
+            else:
+                self.pick(d, render=False)
+                self.selected = d
+            self.render_day()
+
+        def pick(self, d, render=True):
+            if d.month != self.month.month:
+                self.go(d)
+                return
+            old = self.cells.get(self.selected)
+            if old:
+                old.remove_css_class("selected")
+            self.selected = d
+            new = self.cells.get(d)
+            if new:
+                new.add_css_class("selected")
+                new.remove_css_class("bounce")
+                GLib.timeout_add(16, lambda: new.add_css_class("bounce") and False)
+            if render:
+                self.render_day()
+
+        # ------------------------------------------------------------ day
+        def render_day(self, animate=True):
+            d = self.selected
+            today = dt.date.today()
+            self.armed = None
+            self.tile_month.set_text(cal.MONTHS_SHORT[d.month - 1].upper())
+            self.tile_day.set_text(str(d.day))
+            (self.tile.add_css_class if d == today else self.tile.remove_css_class)("is-today")
+            if animate:
+                self.tile.remove_css_class("flip")
+                GLib.timeout_add(16, lambda: self.tile.add_css_class("flip") and False)
+            delta = (d - today).days
+            title = cal.day_name(d, today)
+            if title in cal.DAYS:
+                title = f"{title}, {d.day}. {cal.MONTHS[d.month - 1]}"
+            self.day_title.set_text(title)
+            occ = cal.day(d)
+            n = len(occ)
+            count = "keine Termine" if n == 0 else ("1 Termin" if n == 1 else f"{n} Termine")
+            when = ""
+            if abs(delta) >= 2:
+                when = (f"in {delta} Tagen · " if delta > 0 else f"vor {-delta} Tagen · ")
+            if title.startswith(("Heute", "Morgen", "Übermorgen", "Gestern")):
+                when = f"{cal.DAYS[d.weekday()]}, {d.day}. {cal.MONTHS[d.month - 1]} · "
+            self.day_sub.set_text(when + count)
+
+            child = self.list.get_first_child()
+            while child:
+                self.list.remove(child)
+                child = self.list.get_first_child()
+            self.cards = []
+            if not occ:
+                glyph, line1, line2 = EMPTY[(d.toordinal()) % len(EMPTY)]
+                e = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4,
+                            css_classes=["cal-empty"] + (["pop"] if animate else []))
+                e.append(label(glyph, ("cal-empty-icon",)))
+                e.append(label(line1, ("cal-empty-title",)))
+                e.append(label(line2, ("cal-empty-sub",)))
+                self.list.append(e)
+            for k, o in enumerate(occ[:CARDS_MAX]):
+                card = self.card(o, k if animate else None)
+                self.list.append(card)
+            if len(occ) > CARDS_MAX:
+                rest = len(occ) - CARDS_MAX
+                self.list.append(label(f"+ {rest} weitere" if rest > 1 else "+ 1 weiterer",
+                                       ("cal-more-events",), xalign=0))
+
+            # what comes after this day
+            child = self.after.get_first_child()
+            while child:
+                self.after.remove(child)
+                child = self.after.get_first_child()
+            a = dt.datetime.combine(d + dt.timedelta(days=1), dt.time(), cal.TZ)
+            nxt = [o for o in cal.occurrences(a, a + dt.timedelta(days=AFTER_DAYS))
+                   if o.bounds()[0] >= a][:AFTER_MAX]
+            self.after_head.set_visible(bool(nxt))
+            for o in nxt:
+                i = self.cindex(o.cal)
+                row = Gtk.Button(css_classes=["cal-after", "flat"], focusable=False)
+                rb = Gtk.Box(spacing=10)
+                rb.append(Gtk.Box(css_classes=["cal-dot", f"cal-bg-c{i}"], valign=Gtk.Align.CENTER))
+                od = o.start if o.allday else o.start.date()
+                rb.append(label(cal.date_text(od), ("cal-after-date",), xalign=0, width_chars=10))
+                rb.append(label("" if o.allday else o.start.strftime("%H:%M"),
+                                ("cal-after-time",), width_chars=5, xalign=0))
+                rb.append(label(o.summary, ("cal-after-title",), xalign=0, hexpand=True,
+                                ellipsize=3))
+                row.set_child(rb)
+                row.connect("clicked", lambda _b, day=od: self.go(day))
+                self.after.append(row)
+            self.add_label.set_text(f"Neuer Termin am {cal.date_text(d)}")
+            self.update_live()
+
+        def card(self, o, k):
+            i = self.cindex(o.cal)
+            classes = ["cal-card", f"cal-c{i}"]
+            if k is not None:
+                classes += ["pop", f"cp-{min(k, 7)}"]
+            card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=3, css_classes=classes)
+            top = Gtk.Box(spacing=8)
+            icon = G["sun"] if o.allday else G["clock"]
+            top.append(label(icon, ("cal-card-icon",)))
+            top.append(label(o.time_text(), ("cal-card-time",), xalign=0))
+            if o.event.rrule:
+                top.append(label(G["repeat"], ("cal-card-flag",)))
+            if o.event.alarms or (o.cal.own and not o.allday):
+                top.append(label(G["bell"], ("cal-card-flag",)))
+            top.append(Gtk.Box(hexpand=True))
+            badge = label("", ("cal-badge",))
+            top.append(badge)
+            trash = Gtk.Button(css_classes=["cal-trash", "flat"], focusable=False)
+            trash.set_child(label(G["trash"]))
+            trash.set_tooltip_text("Löschen" + (" (ganze Serie)" if o.event.rrule else ""))
+            trash.connect("clicked", lambda _b: self.ask_delete(card, trash, o))
+            top.append(trash)
+            card.append(top)
+            title = Gtk.Box(spacing=8)
+            title.append(label(o.summary, ("cal-card-title",), xalign=0, wrap=True,
+                               hexpand=True, max_width_chars=26, wrap_mode=2))
+            title.append(label(o.cal.glyph, (f"cal-c{i}", "cal-card-owner"),
+                               valign=Gtk.Align.START, tooltip_text=o.cal.name))
+            card.append(title)
+            if o.location:
+                loc = Gtk.Box(spacing=6)
+                loc.append(label(G["pin"], ("cal-card-icon",)))
+                loc.append(label(o.location, ("cal-card-loc",), xalign=0, ellipsize=3,
+                                 hexpand=True))
+                card.append(loc)
+            bar = Gtk.ProgressBar(css_classes=["cal-progress"], visible=False)
+            card.append(bar)
+            card.occ, card.badge, card.bar = o, badge, bar
+            self.cards.append(card)
+            return card
+
+        def update_live(self):
+            t = cal.now()
+            for card in getattr(self, "cards", []):
+                o = card.occ
+                s, e = o.bounds()
+                card.remove_css_class("running")
+                card.remove_css_class("done")
+                if o.allday:
+                    card.badge.set_text("")
+                    card.bar.set_visible(False)
+                elif s <= t < e:
+                    card.add_css_class("running")
+                    card.badge.set_text(cal.left_text(e, t))
+                    card.bar.set_visible(True)
+                    card.bar.set_fraction((t - s) / (e - s) if e > s else 1)
+                elif t < s and (s - t) < dt.timedelta(days=1):
+                    card.badge.set_text(cal.until_text(s, t))
+                    card.bar.set_visible(False)
+                else:
+                    card.badge.set_text("")
+                    card.bar.set_visible(False)
+                    if e <= t:
+                        card.add_css_class("done")
+                card.badge.set_visible(bool(card.badge.get_text()))
+            return True
+
+        def ask_delete(self, card, trash, o):
+            if self.armed is not card:
+                if self.armed is not None:
+                    self.armed.remove_css_class("arming")
+                    self.armed.trash_btn.get_child().set_text(G["trash"])
+                    self.armed.trash_btn.remove_css_class("danger")
+                self.armed = card
+                card.trash_btn = trash
+                card.add_css_class("arming")
+                trash.add_css_class("danger")
+                trash.get_child().set_text("Serie löschen?" if o.event.rrule else "Sicher?")
+                return
+            card.add_css_class("leaving")
+            cal.delete(o)
+            GLib.timeout_add(260, lambda: self.render_month() or self.render_day(False) or False)
+
+        # ------------------------------------------------------------ actions
+        def new_event(self, d=None):
+            d = d or self.selected
+            self.close()
+            subprocess.Popen([EVENT_POPUP, "event-popup", "show", "--center",
+                              "--date", d.isoformat()])
+
+        def on_key(self, _ctrl, keyval, _code, state):
+            k = Gdk.keyval_name(keyval) or ""
+            moves = {"Left": -1, "Right": 1, "Up": -7, "Down": 7,
+                     "h": -1, "l": 1, "k": -7, "j": 7}
+            if keyval == Gdk.KEY_Escape:
+                self.close()
+            elif k in moves:
+                self.go(self.selected + dt.timedelta(days=moves[k]))
+            elif k in ("Page_Up", "Prior"):
+                self.page(-1)
+            elif k in ("Page_Down", "Next"):
+                self.page(1)
+            elif k in ("t", "T", "Home"):
+                self.go(dt.date.today())
+            elif k in ("n", "N", "Return", "KP_Enter", "plus"):
+                self.new_event()
+            else:
+                return False
+            return True
+
+        # ------------------------------------------------------------ window
+        def on_visible(self, *_a):
+            if self.get_visible():
+                if not self.tick_timer:
+                    self.tick_timer = GLib.timeout_add_seconds(30, self.update_live)
+            elif self.tick_timer:
+                GLib.source_remove(self.tick_timer)
+                self.tick_timer = None
+
+        def show_up(self):
+            today = dt.date.today()
+            if not self.cals:
+                self.load_calendars()
+            self.selected = today
+            self.month = today.replace(day=1)
+            self.title.set_text("")          # retype the month on every show
+            self.title.full_text = ""
+            self.render_month(transition=None, wave=True)
+            self.render_day()
+            self.set_default_size(WIDTH, 1)
+            self.present()
+            if time.time() - self.last_sync > SYNC_EVERY:
+                self.last_sync = time.time()
+                cal.sync()
+
+    provider = Gtk.CssProvider()
+    provider.load_from_path(CSS)
+    Gtk.StyleContext.add_provider_for_display(
+        Gdk.Display.get_default(), provider, Gtk.STYLE_PROVIDER_PRIORITY_USER)
+    return Popup()
+
+
+if __name__ == "__main__":
+    resident.main(APP, build, __doc__)

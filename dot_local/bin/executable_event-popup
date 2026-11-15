@@ -1,0 +1,534 @@
+#!/usr/bin/env python3
+"""Quick add (SUPER+SHIFT+K, N in the calendar popup, right click on the bar
+agenda): a new event in one line, the way you would say it.
+
+    event-popup show [--center] [--date 2026-11-20]
+    event-popup --hidden / quit       like every resident popup
+
+    Kino morgen 20 Uhr                  tomorrow 20:00-21:00
+    Zahnarzt 24.11. 14:30 für 30 min    that day, 14:30-15:00
+    Fr 18-20 Grillen bei Oma            next Friday 18:00-20:00
+    Urlaub 10.12.-14.12.                all-day, five days
+    Pizza in 3 Tagen abends             19:00
+    Wäsche                              all-day on the preset day (today)
+
+The words that set date and time light up as chips under the field and drop
+out of the title; a ticket below shows what will be saved and counts down.
+Two round buttons pick the calendar (Flauschebär = own, preselected; Pia),
+the chips below the reminder. Enter saves (~/.local/lib/popup/cal.py writes
+the .ics and starts vdirsyncer), the title turns green and the popup closes.
+
+Keys: Enter saves, Alt+F / Alt+P calendar, Alt+R next reminder, Tab moves
+to the place field, Escape closes (the text stays until it is saved).
+"""
+import datetime as dt
+import os
+import re
+import sys
+
+sys.path.insert(0, os.path.expanduser("~/.local/lib/popup"))
+import cal  # noqa: E402
+import resident  # noqa: E402
+
+APP = "popup.event"
+WIDTH = 560
+CSS = os.path.expanduser("~/.config/popups/style.css")
+CLOSE_MS = 1000
+DEFAULT_LENGTH = dt.timedelta(hours=1)
+
+# reminder choices: (label, timedelta before start or None)
+TIMED_ALARMS = [("Keine", None), ("15 Min", dt.timedelta(minutes=-15)),
+                ("1 Std", dt.timedelta(hours=-1)), ("1 Tag", dt.timedelta(days=-1))]
+ALLDAY_ALARMS = [("Keine", None), ("Am Tag 9 Uhr", dt.timedelta(hours=9)),
+                 ("Vortag 18 Uhr", dt.timedelta(hours=-6)), ("2 Tage vorher", dt.timedelta(days=-2))]
+
+WEEKDAYS = {"montag": 0, "mo": 0, "dienstag": 1, "di": 1, "mittwoch": 2, "mi": 2,
+            "donnerstag": 3, "do": 3, "freitag": 4, "fr": 4, "samstag": 5, "sa": 5,
+            "sonnabend": 5, "sonntag": 6}
+DAYTIMES = {"morgens": 8, "vormittags": 10, "mittags": 12, "nachmittags": 15,
+            "abends": 19, "nachts": 22}
+MONTHS = {m.lower(): i + 1 for i, m in enumerate(cal.MONTHS)}
+MONTHS.update({m.lower().rstrip("."): i + 1 for i, m in enumerate(cal.MONTHS_SHORT)})
+MONTHS["maerz"] = 3
+FILLER = {"am", "um", "von", "bis", "ab", "für", "den", "ganztägig", "ganztags", "in"}
+
+
+class Parsed:
+    def __init__(self):
+        self.title = ""
+        self.date = None
+        self.end_date = None       # all-day ranges, inclusive
+        self.start = None          # dt.time
+        self.end = None            # dt.time
+        self.length = None         # timedelta
+        self.allday_word = False
+        self.chips = []
+
+
+def _year_for(day, month, today):
+    try:
+        d = dt.date(today.year, month, day)
+    except ValueError:
+        return None
+    if d < today - dt.timedelta(days=1):
+        try:
+            d = dt.date(today.year + 1, month, day)
+        except ValueError:
+            return None
+    return d
+
+
+def _date(day, month, year, today):
+    try:
+        day, month = int(day), int(month)
+        if year:
+            year = int(year)
+            year += 2000 if year < 100 else 0
+            return dt.date(year, month, day)
+        return _year_for(day, month, today)
+    except (ValueError, TypeError):
+        return None
+
+
+def parse(text, today, preset=None):
+    """German one-liner -> Parsed. Matches are cut out of the text (left to
+    right through the patterns below); what remains is the title."""
+    p = Parsed()
+    s = " " + text + " "
+    low = s.lower()
+
+    def take(pattern, fn):
+        nonlocal s, low
+        for m in list(re.finditer(pattern, low)):
+            if fn(m) is not False:
+                p.chips.append(s[m.start():m.end()].strip())
+                s = s[:m.start()] + " " * (m.end() - m.start()) + s[m.end():]
+                low = s.lower()
+                return True
+        return False
+
+    B = r"(?<![\w.:])"           # word start, not inside a number
+    E = r"(?![\w])"
+
+    # date ranges: 10.12.-14.12.(2026)
+    def date_range(m):
+        a = _date(m["d1"], m["m1"], m["y1"] or m["y2"], today)
+        b = _date(m["d2"], m["m2"], m["y2"], today)
+        if not a or not b:
+            return False
+        if b < a:
+            b = _date(m["d2"], m["m2"], str(a.year + 1), today)
+        p.date, p.end_date = a, b
+    take(B + r"(?P<d1>\d{1,2})\.(?P<m1>\d{1,2})\.(?P<y1>\d{2,4})?\s*(?:-|–|bis)\s*"
+         r"(?P<d2>\d{1,2})\.(?P<m2>\d{1,2})\.?(?P<y2>\d{4})?" + E, date_range)
+
+    # explicit dates: 24.11. / 24.11.2026 / 24.11 / 24. November
+    def explicit(m):
+        d = _date(m["d"], m["m"], m["y"], today)
+        if not d:
+            return False
+        p.date = d
+    if p.date is None:
+        take(B + r"(?:am\s+)?(?P<d>\d{1,2})\.(?P<m>\d{1,2})\.(?P<y>\d{4}|\d{2}(?!\d))?" + E, explicit) or \
+            take(B + r"(?:am\s+)?(?P<d>\d{1,2})\.(?P<m>1[0-2]|0?[1-9])(?P<y>)(?![\d.:])(?!\s*uhr)", explicit)
+    if p.date is None:
+        names = "|".join(sorted(MONTHS, key=len, reverse=True))
+
+        def named(m):
+            d = _date(m["d"], MONTHS[m["m"].rstrip(".")], m["y"], today)
+            if not d:
+                return False
+            p.date = d
+        take(B + r"(?:am\s+)?(?P<d>\d{1,2})\.?\s*(?P<m>" + names + r")\.?(?:\s+(?P<y>\d{4}))?" + E,
+             named)
+
+    # relative days
+    if p.date is None:
+        rel = {"heute": 0, "morgen": 1, "übermorgen": 2, "uebermorgen": 2}
+
+        def relative(m):
+            p.date = today + dt.timedelta(days=rel[m[1]])
+        take(B + r"(heute|übermorgen|uebermorgen|morgen)" + E, relative)
+    if p.date is None:
+        def in_days(m):
+            n = int(m[1])
+            unit = m[2]
+            p.date = today + dt.timedelta(days=n * (7 if unit.startswith("woche") else 1))
+        take(B + r"in\s+(\d{1,3})\s+(tag|tagen|woche|wochen)" + E, in_days)
+    if p.date is None:
+        def next_week(m):
+            p.date = today + dt.timedelta(days=7 - today.weekday())
+        take(B + r"(?:nächste|nächsten|kommende)\s+woche" + E, next_week)
+    if p.date is None:
+        names = "|".join(sorted(WEEKDAYS, key=len, reverse=True))
+
+        def weekday(m):
+            word = m["w"]
+            if word in ("mo", "di", "mi", "do", "fr", "sa") and not (m["n"] or m["dot"] or m["am"]
+                                                                    or re.match(r"\s*\d", low[m.end():])):
+                return False       # "do" / "mi" alone could be a word
+            wd = WEEKDAYS[word]
+            ahead = (wd - today.weekday()) % 7 or 7
+            if m["n"] and ahead < 7 and m["n"].startswith(("übernächst",)):
+                ahead += 7
+            p.date = today + dt.timedelta(days=ahead)
+        take(B + r"(?P<am>am\s+)?(?P<n>(?:über)?nächsten?\s+|kommenden?\s+)?(?P<w>" + names
+             + r")(?P<dot>\.)?" + E, weekday)
+
+    # length: für 2 Std, 30 min, für 1,5 h ("20h" alone is a time)
+    def length(m):
+        n = float(m["n"].replace(",", "."))
+        unit = m["u"]
+        p.length = dt.timedelta(minutes=n) if unit.startswith("min") else dt.timedelta(hours=n)
+    take(B + r"für\s+(?P<n>\d+(?:[.,]\d+)?)\s*(?P<u>min|minuten|std|stunden?|h)" + E, length) or \
+        take(B + r"(?P<n>\d+(?:[.,]\d+)?)\s*(?P<u>min|minuten|std|stunden?)" + E, length)
+
+    # time ranges: 18-20, 18:30–20 Uhr, von 9 bis 11.30
+    def time_range(m):
+        h1, h2 = int(m["h1"]), int(m["h2"])
+        m1, m2 = int(m["m1"] or 0), int(m["m2"] or 0)
+        if h1 > 24 or h2 > 24 or m1 > 59 or m2 > 59:
+            return False
+        p.start, p.end = dt.time(h1 % 24, m1), dt.time(h2 % 24, m2)
+    if p.date is None or p.end_date is None:
+        take(B + r"(?:von\s+)?(?P<h1>\d{1,2})(?:[:.](?P<m1>\d{2}))?\s*(?:uhr\s*)?(?:-|–|bis)\s*"
+             r"(?P<h2>\d{1,2})(?:[:.](?P<m2>\d{2}))?(?:\s*uhr)?" + E, time_range)
+
+    # single time: 20 Uhr, 20:15, um 9, 9.30 Uhr, 20h
+    if p.start is None:
+        def single(m):
+            h, mi = int(m["h"]), int(m["m"] or 0)
+            if h > 24 or mi > 59:
+                return False
+            p.start = dt.time(h % 24, mi)
+        take(B + r"(?:um\s+)?(?P<h>\d{1,2})(?:[:.](?P<m>\d{2}))?\s*(?:uhr|h)" + E, single) or \
+            take(B + r"(?:um\s+)?(?P<h>\d{1,2}):(?P<m>\d{2})" + E, single) or \
+            take(B + r"um\s+(?P<h>\d{1,2})(?P<m>)" + E, single)
+    if p.start is None:
+        def daytime(m):
+            p.start = dt.time(DAYTIMES[m[1]], 0)
+        take(B + r"(" + "|".join(DAYTIMES) + r")" + E, daytime)
+
+    def allday(m):
+        p.allday_word = True
+    take(B + r"(ganztägig|ganztags|den ganzen tag|ganzer tag)" + E, allday)
+
+    words = [w for w in s.split()]
+    while words and words[-1].lower().strip(",.") in FILLER:
+        words.pop()
+    while words and words[0].lower().strip(",.") in FILLER:
+        words.pop(0)
+    title = " ".join(words).strip(" ,-–")
+    title = re.sub(r"\s+([,.!?])", r"\1", title)
+    p.title = title[:1].upper() + title[1:]
+    if p.date is None:
+        p.date = preset or today
+    return p
+
+
+class Plan:
+    """What will be saved: start/end as datetimes or dates (all-day)."""
+
+    def __init__(self, p):
+        self.title = p.title
+        self.allday = p.start is None or p.allday_word or p.end_date is not None
+        if self.allday:
+            self.start = p.date
+            self.end = (p.end_date or p.date) + dt.timedelta(days=1)
+        else:
+            self.start = dt.datetime.combine(p.date, p.start, cal.TZ)
+            if p.end is not None:
+                end = dt.datetime.combine(p.date, p.end, cal.TZ)
+                if end <= self.start:
+                    end += dt.timedelta(days=1)
+            else:
+                end = self.start + (p.length or DEFAULT_LENGTH)
+            self.end = end
+
+
+def build():
+    import gi
+
+    gi.require_version("Gtk", "4.0")
+    gi.require_version("Gdk", "4.0")
+    from gi.repository import Gdk, GLib, Gtk
+
+    def label(text="", classes=(), **kw):
+        return Gtk.Label(label=text, css_classes=list(classes), **kw)
+
+    class Popup(Gtk.Window):
+        popup_width = WIDTH
+
+        def __init__(self):
+            super().__init__(title="Neuer Termin")
+            for c in ("popup", "menu", "event"):
+                self.add_css_class(c)
+            self.set_decorated(False)
+            self.set_default_size(WIDTH, 1)
+            self.preset = None
+            self.close_timer = None
+            self.cals = cal.calendars()
+            self.cal_id = cal.OWN
+            self.alarm_i = 1
+            self.plan = None
+
+            box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4,
+                          css_classes=["event-box"])
+            self.hello = label("Neuer Termin", ("menu-title", "event-hello"))
+            self.sub = label("Sag es einfach, wie du es sagen würdest", ("event-sub",))
+            box.append(self.hello)
+            box.append(self.sub)
+
+            self.entry = Gtk.Entry(placeholder_text="z. B. Kino morgen 20 Uhr",
+                                   css_classes=["menu-search", "event-entry"])
+            self.place = Gtk.Entry(placeholder_text="Wo? (optional)",
+                                   css_classes=["menu-search", "event-place"])
+            for e in (self.entry, self.place):
+                e.connect("activate", lambda _e: self.save())
+            self.entry.connect("changed", lambda _e: self.update())
+            box.append(self.entry)
+            self.chips = Gtk.Box(spacing=6, css_classes=["event-chips"])
+            box.append(self.chips)
+            box.append(self.place)
+
+            # the ticket: what will be saved
+            ticket = Gtk.Box(spacing=16, css_classes=["event-ticket"])
+            tile = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, valign=Gtk.Align.CENTER,
+                           css_classes=["cal-tile", "event-tile"])
+            self.t_month = label("", ("cal-tile-month",))
+            self.t_day = label("", ("cal-tile-day",))
+            tile.append(self.t_month)
+            tile.append(self.t_day)
+            self.tile = tile
+            lines = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, valign=Gtk.Align.CENTER,
+                            hexpand=True)
+            self.t_title = label("", ("event-t-title",), xalign=0, ellipsize=3)
+            self.t_when = label("", ("event-t-when",), xalign=0)
+            self.t_until = label("", ("event-t-until",), xalign=0)
+            lines.append(self.t_title)
+            lines.append(self.t_when)
+            lines.append(self.t_until)
+            ticket.append(tile)
+            ticket.append(lines)
+            self.ticket = ticket
+            box.append(ticket)
+
+            # whose calendar
+            row = Gtk.Box(spacing=34, halign=Gtk.Align.CENTER, css_classes=["event-row"])
+            self.cal_buttons = {}
+            for i, c in enumerate(self.cals):
+                b = Gtk.Button(css_classes=["event-cal", "flat", f"ec-{i}"], focusable=False)
+                inner = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=5)
+                inner.append(label(c.glyph, ("event-circle",), halign=Gtk.Align.CENTER))
+                inner.append(label(c.name, ("event-label",)))
+                keys = Gtk.Box(spacing=3, halign=Gtk.Align.CENTER)
+                keys.append(label("alt", ("key", "mod", "task-key")))
+                keys.append(label(c.name[0].upper(), ("key", "task-key")))
+                inner.append(keys)
+                b.set_child(inner)
+                b.connect("clicked", lambda _b, cid=c.id: self.pick_cal(cid))
+                self.cal_buttons[c.id] = b
+                row.append(b)
+            box.append(row)
+
+            # reminder
+            rem = Gtk.Box(spacing=6, halign=Gtk.Align.CENTER, css_classes=["event-alarms"])
+            rem.append(label("\U000F009A", ("event-alarm-icon",)))
+            self.alarm_buttons = []
+            for i in range(4):
+                b = Gtk.Button(css_classes=["segment", "small", "event-alarm"], focusable=False)
+                b.set_child(label(""))
+                b.connect("clicked", lambda _b, k=i: self.pick_alarm(k))
+                self.alarm_buttons.append(b)
+                rem.append(b)
+            box.append(rem)
+            self.caption = label("", ("task-caption",))
+            box.append(self.caption)
+            self.set_child(box)
+
+            keys = Gtk.EventControllerKey()
+            keys.set_propagation_phase(Gtk.PropagationPhase.CAPTURE)
+            keys.connect("key-pressed", self.on_key)
+            self.add_controller(keys)
+            self.colors_css = Gtk.CssProvider()
+            css = ""
+            for i, c in enumerate(self.cals):
+                css += (f"button.event-cal.ec-{i} .event-circle {{ color: {c.color}; }}\n"
+                        f"button.event-cal.ec-{i}:hover .event-circle {{ background-color: alpha({c.color}, 0.2); }}\n"
+                        f"button.event-cal.ec-{i}.chosen .event-circle {{ background-color: {c.color}; "
+                        f"color: #1c2029; box-shadow: 0 0 18px alpha({c.color}, 0.5); }}\n"
+                        f"button.event-cal.ec-{i}.chosen .event-label {{ color: {c.color}; }}\n"
+                        f"window.event.cal-{i} .event-ticket {{ border-left-color: {c.color}; }}\n")
+            try:
+                self.colors_css.load_from_string(css)
+            except AttributeError:
+                self.colors_css.load_from_data(css.encode(), -1)
+            Gtk.StyleContext.add_provider_for_display(
+                Gdk.Display.get_default(), self.colors_css, Gtk.STYLE_PROVIDER_PRIORITY_USER + 1)
+
+        # ------------------------------------------------------------ state
+        def take_opts(self, opts):
+            self.preset = None
+            if "--date" in opts:
+                i = opts.index("--date")
+                try:
+                    self.preset = dt.date.fromisoformat(opts[i + 1])
+                except (IndexError, ValueError):
+                    pass
+
+        def pick_cal(self, cid):
+            self.cal_id = cid
+            for i, c in enumerate(self.cals):
+                b = self.cal_buttons[c.id]
+                (b.add_css_class if c.id == cid else b.remove_css_class)("chosen")
+                (self.add_css_class if c.id == cid else self.remove_css_class)(f"cal-{i}")
+
+        def alarms(self):
+            return ALLDAY_ALARMS if (self.plan and self.plan.allday) else TIMED_ALARMS
+
+        def pick_alarm(self, k):
+            self.alarm_i = k
+            for i, b in enumerate(self.alarm_buttons):
+                (b.add_css_class if i == k else b.remove_css_class)("active")
+
+        def update(self):
+            today = dt.date.today()
+            was_allday = self.plan.allday if self.plan else None
+            p = parse(self.entry.get_text(), today, self.preset)
+            self.plan = Plan(p)
+            child = self.chips.get_first_child()
+            while child:
+                self.chips.remove(child)
+                child = self.chips.get_first_child()
+            for c in p.chips:
+                self.chips.append(label(c, ("event-chip",)))
+            self.chips.set_visible(bool(p.chips))
+
+            pl = self.plan
+            d = pl.start if pl.allday else pl.start.date()
+            self.t_month.set_text(cal.MONTHS_SHORT[d.month - 1].upper())
+            self.t_day.set_text(str(d.day))
+            (self.tile.add_css_class if d == today else self.tile.remove_css_class)("is-today")
+            self.t_title.set_text(pl.title or "…")
+            (self.t_title.add_css_class if not pl.title else self.t_title.remove_css_class)("placeholder")
+            day = f"{cal.DAYS[d.weekday()]}, {d.day}. {cal.MONTHS[d.month - 1]}"
+            if pl.allday:
+                days = (pl.end - pl.start).days
+                if days > 1:
+                    last = pl.end - dt.timedelta(days=1)
+                    when = f"{cal.date_text(d)} – {cal.date_text(last)} · {days} Tage"
+                else:
+                    when = f"{day} · ganztägig"
+                start = dt.datetime.combine(d, dt.time(), cal.TZ)
+            else:
+                when = f"{day} · {pl.start:%H:%M} – {pl.end:%H:%M}"
+                start = pl.start
+            self.t_when.set_text(when)
+            rel = cal.day_name(d, today)
+            if rel in cal.DAYS:
+                rel = cal.until_text(start) if start > cal.now() else "vorbei"
+            elif not pl.allday and d == today:
+                rel = cal.until_text(start) if start > cal.now() else "schon vorbei"
+            self.t_until.set_text(rel)
+            if was_allday is not None and was_allday != pl.allday:
+                self.alarm_i = 0 if pl.allday else 1
+            for i, b in enumerate(self.alarm_buttons):
+                b.get_child().set_text(self.alarms()[i][0])
+            self.pick_alarm(self.alarm_i)
+            # the date tile flips when the day changes
+            key = d.toordinal()
+            if getattr(self, "last_day", None) != key:
+                self.last_day = key
+                self.tile.remove_css_class("flip")
+                GLib.timeout_add(16, lambda: self.tile.add_css_class("flip") and False)
+
+        def save(self):
+            if self.close_timer:
+                return
+            self.update()
+            pl = self.plan
+            if not pl.title:
+                self.entry.remove_css_class("shake")
+                GLib.timeout_add(16, lambda: self.entry.add_css_class("shake") and False)
+                self.caption.set_text("Was steht an? Der Titel fehlt noch")
+                self.entry.grab_focus()
+                return
+            place = " ".join(self.place.get_text().split())
+            try:
+                cal.add(self.cal_id, pl.title, pl.start, pl.end, pl.allday, place,
+                        self.alarms()[self.alarm_i][1])
+            except OSError as e:
+                self.caption.set_text(f"Konnte nicht speichern: {e.strerror}")
+                self.caption.add_css_class("error")
+                return
+            self.entry.set_text("")
+            self.place.set_text("")
+            self.add_css_class("saved")
+            self.hello.set_text("Eingetragen ✓")
+            resident.type_title(self.hello)
+            who = next(c.name for c in self.cals if c.id == self.cal_id)
+            self.caption.set_text(f"In {who}s Kalender · geht gleich an Nextcloud")
+            self.close_timer = GLib.timeout_add(CLOSE_MS, self.done)
+
+        def done(self):
+            self.close_timer = None
+            self.close()
+            return False
+
+        # ------------------------------------------------------------ window
+        def show_up(self):
+            if self.close_timer:
+                GLib.source_remove(self.close_timer)
+                self.close_timer = None
+            self.remove_css_class("saved")
+            self.caption.remove_css_class("error")
+            self.hello.set_text("Neuer Termin")
+            if self.preset and self.preset != dt.date.today():
+                self.sub.set_text(f"Für {cal.DAYS[self.preset.weekday()]}, "
+                                  f"{self.preset.day}. {cal.MONTHS[self.preset.month - 1]} "
+                                  "– oder sag ein anderes Datum")
+            else:
+                self.sub.set_text("Sag es einfach, wie du es sagen würdest")
+            self.caption.set_text("Enter speichert · Tab: Ort")
+            self.pick_cal(self.cal_id)
+            self.last_day = None
+            self.update()
+            for b in self.cal_buttons.values():
+                b.remove_css_class("enter")
+            GLib.timeout_add(30, lambda: [b.add_css_class("enter")
+                                          for b in self.cal_buttons.values()] and False)
+            self.set_default_size(WIDTH, 1)
+            self.present()
+            self.entry.grab_focus()
+
+        def on_key(self, _ctrl, keyval, _code, state):
+            if keyval == Gdk.KEY_Escape:
+                self.close()
+                return True
+            if state & Gdk.ModifierType.ALT_MASK:
+                ch = chr(Gdk.keyval_to_unicode(keyval) or 0).lower()
+                if ch == "r":
+                    self.pick_alarm((self.alarm_i + 1) % 4)
+                    return True
+                for c in self.cals:
+                    if ch == c.name[0].lower():
+                        self.pick_cal(c.id)
+                        return True
+            return False
+
+    provider = Gtk.CssProvider()
+    provider.load_from_path(CSS)
+    Gtk.StyleContext.add_provider_for_display(
+        Gdk.Display.get_default(), provider, Gtk.STYLE_PROVIDER_PRIORITY_USER)
+    return Popup()
+
+
+if __name__ == "__main__":
+    if sys.argv[1:2] == ["--parse"]:          # test the parser: event-popup --parse "text"
+        today = dt.date.today()
+        for t in sys.argv[2:]:
+            pl = Plan(parse(t, today))
+            print(f"{t!r:45} -> {pl.title!r:22} {pl.start} .. {pl.end}"
+                  + ("  (ganztägig)" if pl.allday else ""))
+    else:
+        resident.main(APP, build, __doc__)

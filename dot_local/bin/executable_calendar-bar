@@ -1,0 +1,111 @@
+#!/usr/bin/env python3
+"""Bar agenda next to the clock (waybar custom/agenda): the next event of the
+two Nextcloud calendars (~/.local/lib/popup/cal.py), as a colored dot in the
+owner's calendar color + time + title, written like the clock's code comment.
+
+    ● 18:30 Kino          next timed event in the coming 12 hours
+    ● Kino · noch 40 Min  running right now (class "now")
+    class "soon"          starts within 15 minutes: the dot blinks orange
+    ● heute Putzen +1     nothing timed coming: today's all-day events
+    nothing at all        empty text: waybar hides the module
+
+The tooltip lists the next seven days, grouped by day. Prints one JSON line
+whenever that changes (checks every 15 s; the files change on every sync).
+Click: calendar popup, right click: new event (waybar config).
+"""
+import datetime as dt
+import html
+import json
+import os
+import sys
+import time
+
+sys.path.insert(0, os.path.expanduser("~/.local/lib/popup"))
+import cal  # noqa: E402
+
+AHEAD = dt.timedelta(hours=12)
+SOON = dt.timedelta(minutes=15)
+TITLE_MAX = 22
+COMMENT = "#7a8299"
+
+
+def short(text, n=TITLE_MAX):
+    return text if len(text) <= n else text[: n - 1].rstrip() + "…"
+
+
+def esc(text):
+    return html.escape(text, quote=False)
+
+
+def tooltip(t):
+    today = t.date()
+    occ = cal.occurrences(t, dt.datetime.combine(today + dt.timedelta(days=7), dt.time(), cal.TZ))
+    if not occ:
+        return "<b>Nächste 7 Tage</b>\nNichts geplant ☕\n\n<small>Klick: Kalender · Rechtsklick: neuer Termin</small>"
+    lines, last = [], None
+    for o in occ:
+        d = max(o.bounds()[0], t).date() if not o.allday else max(o.start, today)
+        if d != last:
+            if last is not None:
+                lines.append("")
+            lines.append(f"<b>{cal.day_name(d, today)}</b>  <span color='{COMMENT}'>"
+                         f"{cal.date_text(d)}</span>")
+            last = d
+        when = "ganztägig" if o.allday else o.time_text()
+        lines.append(f"<span color='{o.cal.color}'>●</span> <tt>{when:<13}</tt> "
+                     f"{esc(short(o.summary, 34))}")
+    lines += ["", f"<small><span color='{COMMENT}'>Klick: Kalender · Rechtsklick: neuer Termin</span></small>"]
+    return "\n".join(lines)
+
+
+def state():
+    t = cal.now()
+    timed = [o for o in cal.occurrences(t, t + AHEAD) if not o.allday]
+    text, cls = "", "empty"
+    running = [o for o in timed if o.start <= t < o.end]
+    if running:
+        o = running[0]
+        text = (f"<span color='{o.cal.color}'>●</span> {esc(short(o.summary))} "
+                f"<span color='{COMMENT}'>· {cal.left_text(o.end, t)}</span>")
+        cls = "now"
+    else:
+        upcoming = [o for o in timed if o.start > t]
+        if upcoming:
+            o = upcoming[0]
+            soon = o.start - t <= SOON
+            dot = "●"
+            text = (f"<span color='{o.cal.color}'>{dot}</span> "
+                    f"<span color='{COMMENT}'>{o.start:%H:%M}</span> {esc(short(o.summary))}")
+            if soon:
+                text += f" <span color='{COMMENT}'>· {cal.until_text(o.start, t)}</span>"
+            cls = "soon" if soon else "next"
+        else:
+            # nothing timed coming: today's all-day events, if there are any
+            allday = [o for o in cal.day(t.date()) if o.allday]
+            if allday:
+                o = allday[0]
+                more = f" <span color='{COMMENT}'>+{len(allday) - 1}</span>" if len(allday) > 1 else ""
+                text = (f"<span color='{o.cal.color}'>●</span> <span color='{COMMENT}'>heute</span> "
+                        f"{esc(short(o.summary))}{more}")
+                cls = "allday"
+    return {"text": text, "class": cls, "tooltip": tooltip(t)}
+
+
+def main():
+    last = None
+    while True:
+        try:
+            out = json.dumps(state())
+        except Exception as e:          # a broken .ics must not kill the module
+            out = json.dumps({"text": "", "class": "error", "tooltip": f"Kalender: {e}"})
+        if out != last:
+            print(out, flush=True)
+            last = out
+        time.sleep(15)
+
+
+if __name__ == "__main__":
+    if sys.argv[1:] == ["--once"]:
+        print(json.dumps(state(), ensure_ascii=False, indent=1))
+    else:
+        main()

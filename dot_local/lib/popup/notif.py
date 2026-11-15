@@ -74,7 +74,7 @@ APPS = [
     (("mail", "thunderbird"), "mail", "blue", False),
     (("download", "transmission", "qbittorrent"), "download", "green", False),
     (("camera",), "camera", "cyan", False),
-    (("calendar",), "calendar", "blue", False),
+    (("calendar", "kalender"), "calendar", "blue", True),
     (("music", "mpd", "player"), "music", "green", False),
     (("terminal", "kitty", "console", "shell"), "console", "slate", False),
     (("message", "chat", "telegram", "signal", "element"), "message", "blue", False),

@@ -70,6 +70,8 @@ bind(mod .. " + H", menu(v.bin .. "popup-cmd keybinds toggle"), "This overview")
 bind(mod .. " + C", hl.dsp.exec_cmd(v.bin .. "claude-pad toggle"), "Claude (show / hide)")
 bind(mod .. " + SHIFT + C", hl.dsp.exec_cmd(v.bin .. "claude-pad ask"), "Quick question to Claude")
 bind(mod .. " + T", menu(v.bin .. "popup-cmd task-popup toggle --center"), "New task for Claude (/todo list)")
+bind(mod .. " + K", menu(v.bin .. "popup-cmd calendar-popup toggle --center"), "Calendar (Pia + me)")
+bind(mod .. " + SHIFT + K", menu(v.bin .. "popup-cmd event-popup toggle --center"), "New event (\"Kino morgen 20 Uhr\")")
 
 -- Menus (the same menus open under the mouse when clicked in the bar)
 group("Menus")

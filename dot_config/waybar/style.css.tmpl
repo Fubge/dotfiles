@@ -103,6 +103,17 @@ tooltip {
     padding: 0 1px 0 12px;
     color: {{ .palette.comment }};
 }
+/* next event after the date (~/.local/bin/calendar-bar), the dot carries the
+   calendar color; starting soon: the whole thing blinks softly in orange */
+#custom-agenda {
+    padding: 0 4px 0 10px;
+    color: {{ .palette.fg_muted }};
+}
+#custom-agenda.now { color: {{ .palette.fg }}; }
+#custom-agenda.soon {
+    color: @accent;
+    animation: soft-blink 1.2s steps(6) infinite alternate;
+}
 #custom-caret {
     color: @accent;
     padding: 0 6px 0 3px;
@@ -220,7 +231,7 @@ tooltip {
 /* ---------------------------------------------------------------- hover
    Same effect everywhere: orange text on a slightly darker background.
    Kept last so it wins over the state colors above. */
-#workspaces button, #custom-window, #clock.date, #custom-music,
+#workspaces button, #custom-window, #clock.date, #custom-agenda, #custom-music,
 #cpu, #temperature, #memory,
 #idle_inhibitor, #custom-power-profile, #custom-brightness, #custom-battery,
 #wireplumber, #network, #bluetooth, #custom-notifications, #custom-power {
@@ -228,7 +239,7 @@ tooltip {
     border-radius: 12px;
 }
 #workspaces button:hover,
-#clock.date:hover, #custom-music:hover,
+#clock.date:hover, #custom-agenda:hover, #custom-music:hover,
 #cpu:hover, #temperature:hover, #memory:hover,
 #idle_inhibitor:hover, #custom-power-profile:hover, #custom-brightness:hover, #custom-battery:hover,
 #wireplumber:hover, #network:hover, #bluetooth:hover, #custom-notifications:hover {

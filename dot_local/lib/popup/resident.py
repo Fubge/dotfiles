@@ -266,6 +266,9 @@ def serve(app_id, build, show):
     def handle(line):
         cmd, *opts = line.split() or [""]
         center = "--center" in opts
+        # extra options (e.g. --date 2026-11-20) for popups that take them
+        if cmd in ("show", "toggle") and hasattr(win, "take_opts"):
+            win.take_opts([o for o in opts if o != "--center"])
         if cmd == "show":
             show_up(center)
         elif cmd == "toggle":
@@ -305,7 +308,8 @@ def serve(app_id, build, show):
     GLib.io_add_watch(fifo, GLib.PRIORITY_DEFAULT, GLib.IOCondition.IN, on_fifo)
 
     if show:
-        show_up()
+        # first start through "show/toggle [--center] [options]": same handling
+        handle(" ".join(sys.argv[1:]) if sys.argv[1:2] in (["show"], ["toggle"]) else "show")
     else:
         # warm up while hidden: CSS, layout and fonts of the first show would
         # otherwise cost ~80 ms on the first press after login
@@ -327,7 +331,7 @@ def serve(app_id, build, show):
 
 def main(app_id, build, usage):
     args = sys.argv[1:]
-    if args[:1] in (["show"], ["toggle"]) and args[1:] in ([], ["--center"]):
+    if args[:1] in (["show"], ["toggle"]):
         if not send(app_id, " ".join(args)):
             serve(app_id, build, show=True)
     elif args == ["quit"]:
