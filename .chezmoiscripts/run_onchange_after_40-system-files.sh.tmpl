@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Install root-owned files into / (copied, not symlinked):
 #   system/       every machine (SDDM theme, power profile switching, iwd Wi-Fi backend,
+#                 hyprlock PAM (unlocks the keyring too),
 #                 sysctl + journald tuning)
 #   system-boot/  only with machine.boot = true (GRUB, kernel cmdline, console)
 # *.tmpl files are rendered with the chezmoi data first.

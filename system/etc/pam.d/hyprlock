@@ -1,0 +1,9 @@
+# PAM configuration file for hyprlock (replaces the package's file,
+# installed by .chezmoiscripts/run_onchange_after_40-system-files.sh)
+# the 'login' configuration file (see /etc/pam.d/login)
+
+auth        include     login
+# Unlocking the screen also unlocks the login keyring, in case it got locked
+# while the session ran (e.g. after suspend, or when gnome-keyring-daemon was
+# restarted by D-Bus without the password). Needs keyring password = login password.
+-auth       optional    pam_gnome_keyring.so
