@@ -125,6 +125,40 @@ hl.window_rule({
     workspace = "special:claude silent",
 })
 
+-- Scratchpads (Claude, dropdown, Spotify) keep the spot they were first placed
+-- on: placed on the wide external screen and later shown on the laptop, they
+-- stuck out of its right edge. Every time a special workspace is shown, its
+-- floating windows are fitted to that screen: shrunk if too big, centered
+-- horizontally (all of them are), kept below the bar.
+local GAP = 16
+local function fit_specials()
+    local windows = hl.get_windows()
+    for _, m in ipairs(hl.get_monitors()) do
+        local sp = m.active_special_workspace
+        if sp and m.enabled then
+            local mw, mh = m.width / m.scale, m.height / m.scale
+            if m.transform % 2 == 1 then mw, mh = mh, mw end
+            local top = (m.reserved and m.reserved.top or 0) + GAP
+            for _, w in ipairs(windows) do
+                if w.floating and w.workspace and w.workspace.name == sp.name then
+                    local ww = math.min(w.size.x, mw - 2 * GAP)
+                    local wh = math.min(w.size.y, mh - top - GAP)
+                    local x = m.position.x + math.floor((mw - ww) / 2)
+                    local y = math.max(m.position.y + top,
+                        math.min(w.at.y, m.position.y + mh - GAP - wh))
+                    if ww ~= w.size.x or wh ~= w.size.y then
+                        hl.dispatch(hl.dsp.window.resize({ window = w, x = ww, y = wh }))
+                    end
+                    if x ~= w.at.x or y ~= w.at.y then
+                        hl.dispatch(hl.dsp.window.move({ window = w, x = x, y = y }))
+                    end
+                end
+            end
+        end
+    end
+end
+hl.on("workspace.special_active", fit_specials)
+
 -- The Claude and dropdown specials belong to one window each. Anything else
 -- started while one of them is shown (e.g. "Network settings" from the Wi-Fi
 -- popup) would open there, hidden behind it: send it to the normal workspace

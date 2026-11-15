@@ -15,8 +15,40 @@ local function internal_on()
 end
 internal_on()
 
--- Known external monitors (add when they arrive):
--- hl.monitor({ output = "desc:Dell Inc. DELL U2723QE XXXXXXX", mode = "preferred", position = "auto-left", scale = 1.5 })
+-- Known external monitors
+local dell = "desc:Dell Inc. DELL P2725DE"
+-- stands right of the laptop, vertically centered on it (the laptop panel
+-- is lower, so the mouse crosses over in the middle, not at the top)
+hl.monitor({ output = dell, mode = "2560x1440@99.95", position = "auto-center-right", scale = 1 })
+
+-- An external monitor is the main screen: workspaces 1-8 live on it, the
+-- laptop panel (if open) shows workspace 9. Unplugging hands everything back
+-- to the laptop on its own.
+-- The rules keep 1-8 alive (persistent, so the bar always shows all eight)
+-- and on the Dell; without the Dell they live on the laptop.
+for i = 1, 8 do
+    hl.workspace_rule({ workspace = tostring(i), monitor = dell, persistent = true })
+end
+
+local function externals_main()
+    local main
+    for _, m in ipairs(hl.get_monitors()) do
+        if m.name ~= internal then main = m.name end
+    end
+    if not main then return end
+    hl.dispatch(hl.dsp.focus({ monitor = internal }))
+    hl.dispatch(hl.dsp.focus({ workspace = "9" }))    -- laptop needs one of its own
+    for i = 1, 8 do
+        hl.dispatch(hl.dsp.workspace.move({ workspace = tostring(i), monitor = main }))
+    end
+    hl.dispatch(hl.dsp.focus({ workspace = "1" }))
+end
+
+hl.on("monitor.added", function()
+    -- give the new output a moment to finish its mode switch
+    hl.timer(externals_main, { timeout = 500, type = "oneshot" })
+end)
+hl.on("hyprland.start", externals_main)
 
 -- Lid switch: with an external monitor connected, closing the lid only turns
 -- off the internal panel. Without one, logind suspends as usual.
