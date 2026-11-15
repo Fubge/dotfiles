@@ -23,13 +23,37 @@ local positions = {
 -- everything not set up: preferred mode, automatic scale, right of the laptop
 hl.monitor({ output = "", mode = "preferred", position = "auto-center-right", scale = "auto" })
 
+-- On battery the laptop panel drops to 60 Hz (a 120 Hz OLED costs real watts);
+-- the charger brings the chosen rate back. Opt out in settings.lua with
+-- internal.battery_60 = false.
+local function on_battery()
+    for _, name in ipairs({ "AC", "ADP0", "ADP1", "ACAD" }) do
+        local f = io.open("/sys/class/power_supply/" .. name .. "/online")
+        if f then
+            local v = f:read("l")
+            f:close()
+            return v == "0"
+        end
+    end
+    return false   -- no charger to read (desktop): never on battery
+end
+
+local function panel_mode(d)
+    local mode = d.mode or "{{ .machine.monitor_mode }}"
+    local size, hz = mode:match("^(%d+x%d+)@([%d.]+)$")
+    if d.battery_60 ~= false and size and tonumber(hz) > 61 and on_battery() then
+        return size .. "@60"
+    end
+    return mode
+end
+
 -- Internal panel (default mode and scale come from `chezmoi init`, see
 -- ~/.config/chezmoi/chezmoi.toml [data.machine])
 local function internal_on()
     local d = s.get("displays").internal or {}
     hl.monitor({
         output = internal,
-        mode = d.mode or "{{ .machine.monitor_mode }}",
+        mode = panel_mode(d),
         position = "0x0",
         scale = d.scale or {{ if eq .machine.monitor_scale "auto" }}"auto"{{ else }}{{ .machine.monitor_scale }}{{ end }},
         vrr = d.vrr or 0,
@@ -146,6 +170,23 @@ hl.on("monitor.removed", function()
     end, { timeout = 300, type = "oneshot" })
 end)
 hl.on("hyprland.start", refresh)
+
+-- Follow the charger: a cheap sysfs read every 5 s, the panel only changes
+-- when the power source did. Each config load starts its own re-armed timer
+-- chain; an older chain sees a newer generation and stops (a reload never
+-- leaves two running, whether or not it keeps the Lua state).
+SlatePowerGen = (SlatePowerGen or 0) + 1
+local gen, last_battery = SlatePowerGen, on_battery()
+local function power_tick()
+    if gen ~= SlatePowerGen then return end
+    local now = on_battery()
+    if now ~= last_battery then
+        last_battery = now
+        if hl.get_monitor(internal) then internal_on() end
+    end
+    hl.timer(power_tick, { timeout = 5000, type = "oneshot" })
+end
+hl.timer(power_tick, { timeout = 5000, type = "oneshot" })
 
 -- Lid switch: with an external monitor connected, closing the lid only turns
 -- off the internal panel. Without one, logind suspends as usual.
