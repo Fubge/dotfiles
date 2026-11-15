@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """Now playing in the bar (waybar custom/music), next to the terminal clock.
 
-  music          watch the player; prints the title for custom/music and feeds
-                 the other parts (icon, bars) through FIFOs
-  music part P   print the JSON lines of part P (icon, bar0..bar5) for waybar
+  music          title module (custom/music) = `music part title`
+  music part P   print the JSON lines of part P (title, icon, bar0..bar5) for
+                 waybar; starts the daemon when none runs
+  music daemon   watch the player, feed every part through its FIFO
   music show     bring the player window here (Spotify), start it if needed
   music hide     Spotify's own "Minimize to Tray" (keeps playing; SUPER+X)
   music menu     right click menu: play/pause, next, show, quit (tray stand-in)
@@ -18,6 +19,7 @@ Closing its window quits Spotify; hiding goes through the tray menu over D-Bus.
 The bar icon also stays while Spotify runs, its right click menu can quit it.
 cava only runs while music plays. Spotify is preferred over other players.
 """
+import fcntl
 import html
 import json
 import os
@@ -142,47 +144,115 @@ class Cava:
 
 
 RUN = os.path.join(os.environ.get("XDG_RUNTIME_DIR", "/tmp"), "music")
-PARTS = ["icon"] + [f"bar{i}" for i in range(BARS)]
+PARTS = ["title", "icon"] + [f"bar{i}" for i in range(BARS)]
+LOCK = os.path.join(RUN, "daemon.lock")
 
 
 def fifo(name):
+    """One FIFO per reader (NAME.PID): waybar runs every module once PER BAR, so
+    with two monitors two readers of the same part must not share a FIFO
+    (they would steal each other's lines)."""
     os.makedirs(RUN, exist_ok=True)
-    path = os.path.join(RUN, name)
+    path = os.path.join(RUN, f"{name}.{os.getpid()}")
     if not os.path.exists(path):
         os.mkfifo(path)
     return path
 
 
+def alive(pid):
+    try:
+        os.kill(pid, 0)
+        return True
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+
+
 class Parts:
-    """The other bar modules: one FIFO each, `music part NAME` reads it.
-    Opened read-write and non-blocking: never waits for a reader, a missing
-    reader only drops frames. Only changes are sent (every line = a GTK restyle)."""
+    """Writes every part to all its readers' FIFOs. Opened read-write and
+    non-blocking: never waits for a reader, a stuck reader only drops frames.
+    Only changes are sent (every line = a GTK restyle). Readers are found by
+    rescanning RUN; a new reader first gets the current line."""
 
     def __init__(self):
-        self.fds = {p: os.open(fifo(p), os.O_RDWR | os.O_NONBLOCK) for p in PARTS}
-        self.last = {}
+        self.readers = {}   # path -> [part, fd, last line]
+        self.current = {}
+        self.scanned = 0.0
+        self.empty_since = None
 
-    def send(self, part, text="", tooltip="", cls=""):
-        # several classes must be a list ("a b" would be one class named "a b")
-        line = json.dumps({"text": text, "tooltip": tooltip, "class": cls.split()})
-        if self.last.get(part) != line:
+    def scan(self):
+        self.scanned = time.monotonic()
+        seen = set()
+        for f in os.listdir(RUN):
+            name, _, pid = f.rpartition(".")
+            if name not in PARTS or not pid.isdigit():
+                continue
+            path = os.path.join(RUN, f)
+            if not alive(int(pid)):
+                self.drop(path)
+                try:
+                    os.unlink(path)
+                except OSError:
+                    pass
+                continue
+            seen.add(path)
+            if path not in self.readers:
+                fd = os.open(path, os.O_RDWR | os.O_NONBLOCK)
+                self.readers[path] = [name, fd, None]
+                if name in self.current:
+                    self.write(path, self.current[name])
+        for path in set(self.readers) - seen:
+            self.drop(path)
+        self.empty_since = None if self.readers else (self.empty_since or self.scanned)
+
+    def drop(self, path):
+        r = self.readers.pop(path, None)
+        if r:
+            os.close(r[1])
+
+    def write(self, path, line):
+        r = self.readers[path]
+        if r[2] != line:
             try:
-                os.write(self.fds[part], (line + "\n").encode())
-                self.last[part] = line
+                os.write(r[1], (line + "\n").encode())
+                r[2] = line
             except BlockingIOError:
                 pass
 
+    def send(self, part, text="", tooltip="", cls=""):
+        if time.monotonic() - self.scanned > 1:
+            self.scan()
+        # several classes must be a list ("a b" would be one class named "a b")
+        line = json.dumps({"text": text, "tooltip": tooltip, "class": cls.split()})
+        self.current[part] = line
+        for path, r in list(self.readers.items()):
+            if r[0] == part:
+                self.write(path, line)
+
+
+def lock_free():
+    os.makedirs(RUN, exist_ok=True)
+    with open(LOCK, "a") as f:
+        try:
+            fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            return True
+        except BlockingIOError:
+            return False
+
 
 def part(name):
-    """`exec` of a waybar part module: pass the FIFO through. Hands over to cat:
-    no Python left running per part (an unbuffered Python line loop read byte
-    by byte, one syscall per character at the visualizer's frame rate)."""
+    """`exec` of a waybar module: start the daemon if needed, then pass this
+    reader's FIFO through. Hands over to cat: no Python left running per part
+    (an unbuffered Python line loop read byte by byte, one syscall per
+    character at the visualizer's frame rate)."""
     path = fifo(name)
-    os.execvp("sh", ["sh", "-c", 'while :; do cat "$1"; sleep 1; done', "sh", path])
-
-
-def emit(text="", tooltip="", cls=""):
-    print(json.dumps({"text": text, "tooltip": tooltip, "class": cls}), flush=True)
+    if lock_free():
+        subprocess.Popen([sys.argv[0], "daemon"], start_new_session=True,
+                         stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                         stderr=subprocess.DEVNULL)
+    os.execvp("sh", ["sh", "-c", 'trap \'rm -f "$1"\' EXIT; while :; do cat "$1"; sleep 1; done',
+                     "sh", path])
 
 
 def span(color, text):
@@ -239,10 +309,42 @@ def send_bars(parts, tip):
         parts.send(f"bar{i}", NBSP, tip, "bar l" + str(max(0, min(LEVELS, lv[i]))))
 
 
-def watch():
+def daemon():
+    """Exactly one per session (flock), however many bars exist. Ends when no
+    reader is left for a while (waybar gone) or when this script changed
+    (chezmoi update): the next reader starts the new code."""
+    os.makedirs(RUN, exist_ok=True)
+    lockf = open(LOCK, "a")
+    try:
+        fcntl.flock(lockf, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        return
+    me = os.path.realpath(sys.argv[0])
+    mtime = os.stat(me).st_mtime
+
+    def reaper(parts):
+        while True:
+            time.sleep(5)
+            try:
+                changed_code = os.stat(me).st_mtime != mtime
+            except OSError:
+                changed_code = True
+            idle = parts.empty_since and time.monotonic() - parts.empty_since > 10
+            if changed_code or idle:
+                os._exit(0)
+            with lock:
+                state["_tick"] = time.monotonic()  # wake the loop so it rescans
+            changed.set()
+
+    watch(reaper)
+
+
+def watch(reaper):
     threading.Thread(target=follow, daemon=True).start()
     cava = Cava()
     parts = Parts()
+    parts.scan()
+    threading.Thread(target=reaper, args=(parts,), daemon=True).start()
     last_title, since, last_out = None, 0.0, None
 
     def hide_all():
@@ -259,7 +361,7 @@ def watch():
             shown, moving = title_text(title, since, True)
             out = (shown, tip, cls)
             if out != last_out:
-                emit(*out)
+                parts.send("title", *out)
                 last_out = out
             if changed.wait(1 / FPS):
                 changed.clear()
@@ -273,7 +375,7 @@ def watch():
             if spotify_idle:  # running without a song: keep the icon as a tray
                 parts.send("icon", span(COLORS["dim"], ICONS["spotify"]),
                            "Spotify\n\n<small>Click show · Right click menu</small>", "idle")
-            emit()
+            parts.send("title")
             last_title, last_out, playing = None, None, False
             changed.wait()
             changed.clear()
@@ -304,7 +406,7 @@ def watch():
             shown = f"<i>{span(COLORS['dim'], shown)}</i>"
         out = (shown, tip, cls)
         if out != last_out:  # waybar only redraws when something changed
-            emit(*out)
+            parts.send("title", *out)
             last_out = out
 
         # playing: redraw with every cava frame (or the title timer); paused: on change
@@ -441,5 +543,7 @@ if __name__ == "__main__":
         menu()
     elif args[:1] == ["part"] and len(args) == 2:
         part(args[1])
+    elif args == ["daemon"]:
+        daemon()
     else:
-        watch()
+        part("title")
