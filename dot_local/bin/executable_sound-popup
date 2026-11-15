@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Sound popup (click on the speaker in the bar, SUPER+A): volume, microphone,
-output device and the volume of each app that plays sound.
+output device, input device (which microphone) and the volume of each app
+that plays sound.
 
     sound-popup toggle [--center]  bar click: show it, or hide it when open
                                    (--center: middle of the screen, SUPER+A)
@@ -33,6 +34,7 @@ I_VOL = ["\U000F057F", "\U000F0580", "\U000F057E"]   # low / medium / high
 I_MUTED = "\U000F075F"
 I_MIC, I_MIC_OFF = "\U000F036C", "\U000F036D"
 I_SPEAKER, I_HEADPHONES, I_SCREEN = "\U000F04C3", "\U000F02CB", "\U000F0379"
+I_HEADSET, I_WEBCAM = "\U000F02CE", "\U000F05A0"       # mic of a headset / of a webcam
 I_APP = "\U000F075A"                                  # music note: app without icon
 I_MIXER = "\U000F062E"                                 # sliders
 NOISY = 0.6     # s after a drag in which PipeWire's echo does not move the slider
@@ -57,17 +59,43 @@ def fetch():
     default_sink = info.get("default_sink_name", "")
     default_source = info.get("default_source_name", "")
     outputs = []
+    sources = [s for s in pactl_json("list", "sources")
+               if s["properties"].get("device.class") != "monitor"]
     for s in pactl_json("list", "sinks"):
         ports = [p.get("availability") for p in s.get("ports", [])]
         if s["name"] != default_sink and "not available" in ports:
             continue          # nothing plugged in (HDMI without a screen...)
-        name = s["properties"].get("device.profile.description") or s["description"]
-        icon = (I_HEADPHONES if s["name"].startswith("bluez") or "Headphone" in name
+        props = s["properties"]
+        usb = props.get("device.bus") == "usb"   # headset/DAC: profile says only "Analog Stereo"
+        name = ((props.get("device.product.name") if usb else None)
+                or props.get("device.profile.description") or s["description"])
+        icon = (I_HEADPHONES if usb or s["name"].startswith("bluez") or "Headphone" in name
                 else I_SCREEN if "HDMI" in name or "DisplayPort" in name else I_SPEAKER)
+        card = props.get("device.name")      # same card = the device's own mic
+        own_mic = next((m["name"] for m in sources
+                        if card and m["properties"].get("device.name") == card), None)
         outputs.append(dict(name=s["name"], label=name, icon=icon, volume=percent(s),
-                            mute=s["mute"]))
+                            mute=s["mute"], mic=own_mic, card=card))
     mic = next((dict(name=s["name"], volume=percent(s), mute=s["mute"])
-                for s in pactl_json("list", "sources") if s["name"] == default_source), None)
+                for s in sources if s["name"] == default_source), None)
+    inputs = []
+    sink_cards = {o["card"] for o in outputs if o["card"]}
+    for m in sources:
+        ports = [p.get("availability") for p in m.get("ports", [])]
+        if m["name"] != default_source and ports and all(p == "not available" for p in ports):
+            continue          # headset jack without a headset...
+        props = m["properties"]
+        usb = props.get("device.bus") == "usb"
+        name = ((props.get("device.product.name") if usb else None)
+                or props.get("device.profile.description") or m["description"])
+        # a mic whose device also plays sound is a headset; webcams say so
+        bt = m["name"].startswith("bluez")
+        headset = bt or (usb and props.get("device.name") in sink_cards)
+        if not (usb or bt):
+            name = "Built-in microphone"      # the laptop's own ("Microphones")
+        cam = props.get("device.form_factor") == "webcam" or "webcam" in name.lower()
+        inputs.append(dict(name=m["name"], label=name,
+                           icon=I_HEADSET if headset else I_WEBCAM if cam else I_MIC))
     apps = []
     for i in pactl_json("list", "sink-inputs"):
         p = i["properties"]
@@ -77,7 +105,8 @@ def fetch():
                          label=p.get("application.name") or p.get("media.name") or "App",
                          icon=p.get("application.icon_name") or p.get("application.process.binary")
                          or (p.get("application.name") or "").lower()))
-    return dict(default=default_sink, outputs=outputs, mic=mic, apps=apps)
+    return dict(default=default_sink, outputs=outputs, mic=mic, apps=apps,
+                source=default_source, inputs=inputs)
 
 
 def build():
@@ -235,6 +264,7 @@ def build():
                                 I_MIC_OFF if d["mic"]["mute"] else I_MIC)
 
             shape = (d["default"], tuple((o["name"], o["label"]) for o in d["outputs"]),
+                     d["source"], tuple((i["name"], i["label"]) for i in d["inputs"]),
                      tuple((a["index"], a["label"], a["icon"]) for a in d["apps"]))
             if shape != self.shape:
                 self.shape = shape
@@ -251,8 +281,14 @@ def build():
                 for o in d["outputs"]:
                     active = o["name"] == d["default"]
                     self.dynamic.append(row_button(
-                        f"{o['icon']}  {o['label']}", lambda n=o["name"]: self.set_output(n),
+                        f"{o['icon']}  {o['label']}", lambda n=o["name"], m=o["mic"]: self.set_output(n, m),
                         ["active"] if active else []))
+            if len(d["inputs"]) > 1:
+                self.dynamic.append(section("Input"))
+                for i in d["inputs"]:
+                    self.dynamic.append(row_button(
+                        f"{i['icon']}  {i['label']}", lambda n=i["name"]: self.set_input(n),
+                        ["active"] if i["name"] == d["source"] else []))
             self.apps = {}
             if d["apps"]:
                 self.dynamic.append(section("Apps"))
@@ -264,10 +300,19 @@ def build():
                 self.apps[a["index"]] = slider
                 self.dynamic.append(slider)
             if self.get_visible():
-                self.set_default_size(WIDTH, 1)    # grow / shrink with the list
+                self.set_default_size(WIDTH, 1)    # grow with the list...
+                GLib.timeout_add(30, lambda: resident.fit(self, APP, WIDTH) and False)  # ...shrink
 
-        def set_output(self, name):
+        def set_output(self, name, mic=None):
+            """Switch output; a headset/USB card brings its own mic along."""
             subprocess.Popen(["pactl", "set-default-sink", name])
+            if mic:
+                subprocess.Popen(["pactl", "set-default-source", mic])
+
+        @staticmethod
+        def set_input(name):
+            """Which microphone apps record from (muting stays on the slider)."""
+            subprocess.Popen(["pactl", "set-default-source", name])
 
         def open_mixer(self):
             self.close()
