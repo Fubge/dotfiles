@@ -35,7 +35,6 @@ PEOPLE = {
     "the-preu-plans-1": ("Flauschebär", "\U000F18FB", "#c3a6ff"),   # teddy bear
     "the-preu-plans": ("Pia", "\U000F02D1", None),                  # heart
 }
-DEFAULT_ALARM = dt.timedelta(minutes=-15)   # own timed events without a VALARM
 
 
 def _local_zone():
@@ -285,11 +284,8 @@ class Occurrence:
 
     def alarm_times(self):
         out = []
-        alarms = self.event.alarms
-        if not alarms and self.cal.own and not self.allday:
-            alarms = [DEFAULT_ALARM]
         base = self.bounds()[0]
-        for a in alarms:
+        for a in self.event.alarms:     # no VALARM, no reminder
             out.append(a + base if isinstance(a, dt.timedelta) else a)
         return out
 

@@ -4,7 +4,7 @@ at login (hypr/vars.lua M.background).
 
 - every alarm the events carry (VALARM, set in Nextcloud, on the iPhone or in
   ~/.local/bin/event-popup), from both calendars
-- the user's own timed events without one: 15 minutes before (cal.DEFAULT_ALARM)
+- events without one get no reminder
 - once a day, the first time the laptop is on between 7:00 and 12:00:
   "Guten Morgen" with today's events, if there are any
 

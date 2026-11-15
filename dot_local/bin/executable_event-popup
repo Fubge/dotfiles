@@ -270,7 +270,7 @@ def build():
             self.close_timer = None
             self.cals = cal.calendars()
             self.cal_id = cal.OWN
-            self.alarm_i = 1
+            self.alarm_i = 0             # new events: no reminder
             self.alarm_touched = False
             self.editing = None
             self.plan = None
@@ -444,7 +444,7 @@ def build():
             self.t_until.set_text(rel)
             touched = False
             if was_allday is not None and was_allday != pl.allday:
-                self.alarm_i = 0 if pl.allday else 1
+                self.alarm_i = 0
                 touched = True
             for i, b in enumerate(self.alarm_buttons):
                 b.get_child().set_text(self.alarms()[i][0])
@@ -478,7 +478,7 @@ def build():
             choices = ALLDAY_ALARMS if o.allday else TIMED_ALARMS
             first = next((a for a in o.event.alarms if isinstance(a, dt.timedelta)), None)
             if first is None and not o.event.alarms:
-                self.alarm_i = 1 if (o.cal.own and not o.allday) else 0
+                self.alarm_i = 0
             else:
                 self.alarm_i = next((i for i, c in enumerate(choices) if c[1] == first), -1)
             self.plan = None
@@ -537,6 +537,7 @@ def build():
                 self.fill_from(self.editing)
             else:
                 self.hello.set_text("Neuer Termin")
+                self.alarm_i = 0         # never a reminder unless picked
             if self.editing:
                 pass
             elif self.preset and self.preset != dt.date.today():
