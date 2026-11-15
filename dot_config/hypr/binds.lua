@@ -167,6 +167,14 @@ bind(
     "Screen to file"
 )
 
+-- Discord push-to-talk on ^ (the key left of 1, by keycode so the layout does
+-- not matter). Discord registers the shortcut through the portal; Hyprland has
+-- no approval dialog, the bind here is the approval. Hyprland sends press and
+-- release. non_consuming: ^ still types (Neovim's "start of line")
+group("Apps")
+bind("code:49", hl.dsp.global("discord:discord-push-to-talk"), "Discord push-to-talk (hold ^)",
+    { non_consuming = true })
+
 -- Media and brightness keys (work on the lock screen too)
 local held = { locked = true, repeating = true }
 hl.bind("XF86AudioRaiseVolume", hl.dsp.exec_cmd("wpctl set-volume -l 1 @DEFAULT_AUDIO_SINK@ 5%+"), held)
