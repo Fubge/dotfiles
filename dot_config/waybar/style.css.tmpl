@@ -159,33 +159,34 @@ tooltip {
 
 /* ---------------------------------------------------------------- right */
 #hardware { padding: 0 4px; }
-#system   { background: @steel; border-radius: 15px; padding: 0 4px; }
-#connect  { padding: 0 4px; }
+#system   { background: @steel; border-radius: 15px; padding: 0 2px; }
+#connect  { padding: 0 2px; }
+#session  { background: @dark; border-radius: 15px; padding: 0 2px; }
 
-#cpu, #temperature, #memory,
+#cpu, #temperature, #memory { padding: 0 10px; }
+
+/* Icon-only modules: one fixed slot each, glyph centered, so every icon sits
+   the same distance from the next. Padding alone gave 27-57 px gaps, as the
+   glyphs differ in width; the Propo font makes each glyph as wide as it looks
+   (the mono one lets wide icons hang out to the right). The battery grows
+   past its slot while the plug shows. */
 #idle_inhibitor, #custom-power-profile, #custom-brightness, #custom-battery,
-#wireplumber, #network, #bluetooth, #tray {
-    padding: 0 10px;
+#wireplumber, #network, #bluetooth,
+#custom-notifications, #custom-power {
+    font-family: "JetBrainsMono Nerd Font Propo", "Symbols Nerd Font";
+    padding: 0;
+    min-width: 38px;
 }
+/* tray icons on the same 38 px grid: 17 px icon + 21 px spacing */
+#tray { padding: 0 10px; }
 #custom-wifi-name { padding: 0 6px 0 0; margin-left: -6px; }
 
-#session {
-    background: @dark;
-    border-radius: 15px;
-}
-#custom-power {
-    color: @accent;
-    border-radius: 15px;
-    padding: 0 14px 0 12px;
-}
+#custom-power { color: @accent; }
 /* Notification bell (~/.local/bin/notification-bell) left of the power button:
    a calm light grey bell; with new ones it turns white and an orange dot sits
    in its cut out top right corner (drawn by the daemon, Pango markup); a
    sleeping bell (z) while do not disturb is on. Click opens the center */
-#custom-notifications {
-    padding: 0 8px 0 14px;
-    color: {{ .palette.fg_muted }};
-}
+#custom-notifications { color: {{ .palette.fg_muted }}; }
 #custom-notifications.unread { color: @fg; }
 #custom-notifications.dnd    { color: {{ .palette.cyan_bright }}; }   /* sleeping: night color, as the clock prompt */
 
