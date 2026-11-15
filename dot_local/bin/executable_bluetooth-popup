@@ -439,7 +439,8 @@ def build():
                 search.bt_key = "search"
                 self.body.append(search)
             if self.get_visible():
-                self.set_default_size(WIDTH, 1)    # grow / shrink with the list
+                self.set_default_size(WIDTH, 1)    # grow with the list...
+                GLib.timeout_add(30, lambda: resident.fit(self, APP, WIDTH) and False)  # ...shrink
                 if refocus:
                     self.focus_key(refocus)
             return False

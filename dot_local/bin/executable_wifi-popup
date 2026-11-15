@@ -501,7 +501,8 @@ def build():
             self.body.append(self.text_row(f"{I_SETTINGS}  Network settings",
                                            self.open_settings, "settings"))
             if self.get_visible():
-                self.set_default_size(WIDTH, 1)    # grow / shrink with the list
+                self.set_default_size(WIDTH, 1)    # grow with the list...
+                GLib.timeout_add(30, lambda: resident.fit(self, APP, WIDTH) and False)  # ...shrink
                 if refocus == "pw" and self.ask:
                     # plain grab_focus() selects all text, and the next key
                     # typed would replace the half-typed password

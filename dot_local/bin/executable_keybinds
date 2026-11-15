@@ -34,6 +34,10 @@ KEY_NAMES = {
 }
 
 
+# binds by keycode (layout independent) have no key name
+KEYCODES = {49: "^"}
+
+
 def load_binds(raw):
     """hyprctl binds JSON -> {group: [(keys, text), ...]} in the order of binds.lua"""
     try:
@@ -48,7 +52,8 @@ def load_binds(raw):
         if not text:
             group, text = "Other", group
         keys = [name for bit, name in MODS if b["modmask"] & bit]
-        keys.append(KEY_NAMES.get(b["key"], b["key"].upper() if len(b["key"]) == 1 else b["key"]))
+        key = b["key"] or KEYCODES.get(b.get("keycode"), "")   # bound by keycode: no key name
+        keys.append(KEY_NAMES.get(key, key.upper() if len(key) == 1 else key))
         groups.setdefault(group, []).append((keys, text))
     return groups
 
@@ -90,11 +95,15 @@ def build():
             pill.append(Gtk.Label(label="\U000F0349", css_classes=["lens", "mirror"]))
             root.append(pill)
 
-            # Cards in three columns
-            # (equal columns that share the fixed overlay width; long texts get "...")
-            self.flow = Gtk.FlowBox(selection_mode=Gtk.SelectionMode.NONE, homogeneous=True,
-                                    column_spacing=14, row_spacing=14, max_children_per_line=3,
-                                    min_children_per_line=3, valign=Gtk.Align.START)
+            # Cards in three equal columns that share the fixed overlay width
+            # (long texts get "..."). Each card goes below the shortest column
+            # (masonry): a grid with rows as high as the longest card pushed
+            # half of the groups out of sight.
+            self.flow = Gtk.Box(spacing=14, homogeneous=True, valign=Gtk.Align.START)
+            self.columns = [Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=14,
+                                    valign=Gtk.Align.START) for _ in range(3)]
+            for column in self.columns:
+                self.flow.append(column)
 
             scroll = Gtk.ScrolledWindow(child=self.flow, vexpand=True,
                                         hscrollbar_policy=Gtk.PolicyType.NEVER)
@@ -114,14 +123,16 @@ def build():
             if raw == getattr(self, "raw", None):
                 return
             self.raw = raw
-            while child := self.flow.get_first_child():
-                self.flow.remove(child)
-            self.rows = []    # (row widget, card child, search text)
+            for column in self.columns:
+                while child := column.get_first_child():
+                    column.remove(child)
+            self.rows = []    # (row widget, card, search text)
             self.cards = []
+            filled = [0] * len(self.columns)    # rows per column, card title included
             for group, binds in load_binds(raw).items():
                 card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2, css_classes=["card"])
                 card.append(Gtk.Label(label=group.upper(), css_classes=["card-title"], xalign=0))
-                child = Gtk.FlowBoxChild(child=card, valign=Gtk.Align.START)
+                child = card
                 for keys, text in binds:
                     row = Gtk.Box(spacing=14, css_classes=["row"])
                     row.append(Gtk.Label(label=text, css_classes=["desc"], xalign=0, hexpand=True,
@@ -129,8 +140,10 @@ def build():
                     row.append(keycaps(keys))
                     card.append(row)
                     self.rows.append((row, child, f"{group} {text} {' '.join(keys)}".lower()))
-                self.flow.append(child)
-                self.cards.append(child)
+                shortest = filled.index(min(filled))
+                self.columns[shortest].append(card)
+                filled[shortest] += len(binds) + 2
+                self.cards.append(card)
 
         def show_up(self):
             self.fill()
