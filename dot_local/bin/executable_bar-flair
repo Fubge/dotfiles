@@ -4,7 +4,7 @@
   bar-flair window   name of the focused app; on focus change the old name is
                      erased and the new one typed in (replaces hyprland/window).
                      Right after login it first types a greeting
-                     ("guten abend, raphael"), once per session
+                     ("Guten Abend, Raphael"), once per session
   bar-flair wifi     next to the network icon: the Wi-Fi name types itself in
                      when a connection comes up ("offline" when it drops),
                      stays a few seconds and is erased again
@@ -73,9 +73,9 @@ def friendly(cls):
 
 def greeting():
     h = time.localtime().tm_hour
-    hello = ("gute nacht" if h < 5 else "guten morgen" if h < 11 else
-             "guten tag" if h < 18 else "guten abend" if h < 22 else "gute nacht")
-    return f"{hello}, {os.environ.get('USER', '')}"
+    hello = ("Gute Nacht" if h < 5 else "Guten Morgen" if h < 11 else
+             "Guten Tag" if h < 18 else "Guten Abend" if h < 22 else "Gute Nacht")
+    return f"{hello}, {os.environ.get('USER', '').capitalize()}"
 
 
 def first_start():

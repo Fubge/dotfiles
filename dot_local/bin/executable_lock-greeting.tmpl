@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # lock-greeting: typewriter greeting for hyprlock (label with cmd[update:40]).
-# Prints the part typed so far, e.g. "guten abend, raphael▍"; once complete,
+# Prints the part typed so far, e.g. "Guten Abend, Raphael▍"; once complete,
 # the orange caret blinks like the one next to the clock in the bar.
 # The start time is remembered per hyprlock process, so every lock types anew.
 set -u
@@ -16,13 +16,13 @@ elapsed=$((now - start))
 
 hour=$(date +%H)
 hour=${hour#0}
-if   ((hour < 5));  then hello="gute nacht"
-elif ((hour < 11)); then hello="guten morgen"
-elif ((hour < 18)); then hello="guten tag"
-elif ((hour < 22)); then hello="guten abend"
-else                     hello="gute nacht"
+if   ((hour < 5));  then hello="Gute Nacht"
+elif ((hour < 11)); then hello="Guten Morgen"
+elif ((hour < 18)); then hello="Guten Tag"
+elif ((hour < 22)); then hello="Guten Abend"
+else                     hello="Gute Nacht"
 fi
-text="$hello, ${USER}"
+text="$hello, ${USER^}"
 
 delay=500   # ms: let the screen fade in first
 speed=59    # ms per character (= TYPE_SPEED 17/s in ~/.local/lib/flair/typewriter.py)

@@ -45,9 +45,9 @@ ACTIONS = [
 def greeting():
     """Same words as the lock screen (~/.local/bin/lock-greeting)."""
     hour = time.localtime().tm_hour
-    hello = ("gute nacht" if hour < 5 else "guten morgen" if hour < 11 else
-             "guten tag" if hour < 18 else "guten abend" if hour < 22 else "gute nacht")
-    return f"{hello}, {os.environ.get('USER', '')}"
+    hello = ("Gute Nacht" if hour < 5 else "Guten Morgen" if hour < 11 else
+             "Guten Tag" if hour < 18 else "Guten Abend" if hour < 22 else "Gute Nacht")
+    return f"{hello}, {os.environ.get('USER', '').capitalize()}"
 
 
 def uptime():
