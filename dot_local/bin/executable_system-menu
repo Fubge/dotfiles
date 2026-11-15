@@ -37,6 +37,7 @@ import threading
 
 sys.path.insert(0, os.path.expanduser("~/.local/lib/popup"))
 import resident  # noqa: E402
+from i18n import T, dec  # noqa: E402
 import settings  # noqa: E402
 import nightlight as nl  # noqa: E402
 
@@ -51,44 +52,45 @@ COLS = 4
 
 # id, icon, name, what it does: ("page", name) / ("popup", script) / ("run", argv)
 TILES = [
-    ("wifi", "\U000F05A9", "WLAN", ("popup", "wifi-popup")),
+    ("wifi", "\U000F05A9", T("wifi.title"), ("popup", "wifi-popup")),
     ("bluetooth", "\U000F00AF", "Bluetooth", ("popup", "bluetooth-popup")),
     ("sound", "\U000F057E", "Sound", ("popup", "sound-popup")),
-    ("power", "\U000F12A3", "Energie", ("popup", "power-popup")),
-    ("displays", "\U000F037A", "Bildschirme", ("page", "displays")),
-    ("mouse", "\U000F037D", "Maus & Touchpad", ("page", "mouse")),
-    ("keyboard", "\U000F030C", "Tastatur", ("page", "keyboard")),
-    ("nightlight", "\U000F0594", "Nachtlicht", ("page", "nightlight")),
-    ("idle", "\U000F04B2", "Sperre & Ruhe", ("page", "idle")),
-    ("wallpaper", "\U000F02E9", "Hintergrund", ("run", [BIN + "wallpaper", "pick"])),
-    ("keybinds", "\U000F097B", "Tastenkürzel", ("popup", "keybinds")),
+    ("power", "\U000F12A3", T("power.title"), ("popup", "power-popup")),
+    ("displays", "\U000F037A", T("sys.displays"), ("page", "displays")),
+    ("mouse", "\U000F037D", T("sys.mouse"), ("page", "mouse")),
+    ("keyboard", "\U000F030C", T("sys.keyboard"), ("page", "keyboard")),
+    ("nightlight", "\U000F0594", T("sys.nightlight"), ("page", "nightlight")),
+    ("idle", "\U000F04B2", T("sys.idle"), ("page", "idle")),
+    ("wallpaper", "\U000F02E9", T("sys.wallpaper"), ("run", [BIN + "wallpaper", "pick"])),
+    ("keybinds", "\U000F097B", T("sys.keybinds"), ("popup", "keybinds")),
     ("updates", "\U000F06B0", "Updates", ("run", ["uwsm", "app", "--", "kitty", "--class",
                                                   "system_update", "-e", "sh", "-c",
                                                   "sudo pacman -Syu; echo; read -n1 -rsp 'Done, press any key '"])),
 ]
 
 PAGES = {
-    "displays": ("Bildschirme", "Anordnen, schärfen, schneller machen"),
-    "mouse": ("Maus & Touchpad", "Tempo, Scrollen, Klicken"),
-    "keyboard": ("Tastatur", "Layout und Tastenwiederholung"),
-    "nightlight": ("Nachtlicht", "Abends wärmere Farben, schont die Augen"),
-    "idle": ("Sperre & Ruhe", "Wann dimmen, sperren, schlafen"),
+    "displays": (T("sys.displays"), T("sys.displays_sub")),
+    "mouse": (T("sys.mouse"), T("sys.mouse_sub")),
+    "keyboard": (T("sys.keyboard"), T("sys.keyboard_sub")),
+    "nightlight": (T("sys.nightlight"), T("sys.nightlight_sub")),
+    "idle": (T("sys.idle"), T("sys.idle_sub")),
 }
 
 SCALES = [1.0, 1.25, 1.5, 1.75, 2.0]
-VRR = [(0, "Aus"), (2, "Nur Spiele"), (1, "Immer")]
-POSITIONS = [("left", "Links"), ("right", "Rechts"), ("above", "Oben"), ("below", "Unten"),
-             ("mirror", "Spiegeln"), ("off", "Aus")]
-LAYOUTS = [("de", "Deutsch"), ("us", "US"), ("gb", "UK"), ("fr", "Français")]
-SWAPS = [("caps:swapescape", "Caps Lock ist Escape", "und Escape ist Caps Lock (gut für Neovim)"),
-         ("altwin:swap_lalt_lwin", "Alt und Super tauschen", "linke Alt- und Windows-Taste")]
-IDLE_STEPS = [("dim", "\U000F00DF", "Dimmen"), ("lock", "\U000F0341", "Sperren"),
-              ("off", "\U000F0D90", "Bildschirm aus"), ("suspend", "\U000F0904", "Ruhezustand")]
+VRR = [(0, T("common.off")), (2, T("sys.vrr_games")), (1, T("sys.always"))]
+POSITIONS = [("left", T("sys.left")), ("right", T("sys.right")), ("above", T("sys.above")),
+             ("below", T("sys.below")), ("mirror", T("sys.mirror")), ("off", T("common.off"))]
+LAYOUTS = [("de", T("sys.lang_de")), ("us", "US"), ("gb", "UK"), ("fr", "Français")]
+SWAPS = [("caps:swapescape", T("sys.swap_caps"), T("sys.swap_caps_sub")),
+         ("altwin:swap_lalt_lwin", T("sys.swap_alt"), T("sys.swap_alt_sub"))]
+IDLE_STEPS = [("dim", "\U000F00DF", T("sys.dim")), ("lock", "\U000F0341", T("sys.lock")),
+              ("off", "\U000F0D90", T("sys.screen_off")), ("suspend", "\U000F0904", T("sys.suspend"))]
 IDLE_VALUES = [0, 30, 60, 90, 120, 150, 180, 240, 270, 300, 330, 360, 600, 900, 1200,
                1800, 2700, 3600, 5400, 7200]
-NIGHT_MODES = [("off", "\U000F0599", "Aus"), ("sunset", "\U000F059A", "Abends"),
-               ("schedule", "\U000F0150", "Zeitplan"), ("always", "\U000F0594", "Immer")]
-PROFILES = {"performance": "Leistung", "balanced": "Ausgewogen", "power-saver": "Sparen"}
+NIGHT_MODES = [("off", "\U000F0599", T("common.off")), ("sunset", "\U000F059A", T("sys.sunset")),
+               ("schedule", "\U000F0150", T("sys.schedule")), ("always", "\U000F0594", T("sys.always"))]
+PROFILES = {"performance": T("power.performance"), "balanced": T("power.balanced"),
+            "power-saver": T("power.saver")}
 
 
 # ------------------------------------------------------------------ helpers
@@ -121,14 +123,14 @@ def run(argv):
 
 def idle_text(s):
     if s <= 0:
-        return "nie"
+        return T("sys.never")
     if s < 60:
         return f"{s} s"
     if s >= 3600 and s % 1800 == 0:
         h = s / 3600
-        return (f"{h:.0f} h" if h == int(h) else f"{h:.1f} h".replace(".", ","))
+        return (f"{h:.0f} h" if h == int(h) else dec(f"{h:.1f} h"))
     m = s / 60
-    return f"{m:.0f} min" if m == int(m) else f"{m:.1f} min".replace(".", ",")
+    return f"{m:.0f} min" if m == int(m) else dec(f"{m:.1f} min")
 
 
 def on_ac():
@@ -382,7 +384,7 @@ def build():
             root = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, css_classes=["sys-box"])
             head = Gtk.Box(spacing=8, css_classes=["sys-head"])
             self.back_btn = Gtk.Button(label="\U000F0141", css_classes=["sys-back"],
-                                       tooltip_text="zurück (Esc)")
+                                       tooltip_text=T("sys.back_tip"))
             self.back_btn.connect("clicked", lambda _b: self.go("hub"))
             self.title = Gtk.Label(css_classes=["menu-title", "sys-title"], hexpand=True)
             ghost = Gtk.Box(css_classes=["sys-back-ghost"])
@@ -413,9 +415,9 @@ def build():
             cbox.append(lbl("\U000F0DDC", "sys-confirm-icon"))
             self.confirm_lbl = lbl("", "sys-confirm-text", hexpand=True)
             cbox.append(self.confirm_lbl)
-            undo = Gtk.Button(label="Zurück", css_classes=["item-action"])
+            undo = Gtk.Button(label=T("sys.undo"), css_classes=["item-action"])
             undo.connect("clicked", lambda _b: self.revert())
-            keep = Gtk.Button(label="Behalten", css_classes=["item-action", "sys-keep"])
+            keep = Gtk.Button(label=T("sys.keep"), css_classes=["item-action", "sys-keep"])
             keep.connect("clicked", lambda _b: self.keep())
             cbox.append(undo)
             cbox.append(keep)
@@ -477,13 +479,13 @@ def build():
             mons = [m for m in monitors() if not m.get("disabled")]
             ext = [m for m in mons if m["name"] != INTERNAL]
             quick = {
-                "displays": (f"{len(mons)} Bildschirme" if len(mons) > 1 else
-                             "nur Laptop" if mons and not ext else short_name(mons[0]) if mons else ""),
-                "mouse": f"Tempo {float(option('input:sensitivity', 0)):+.1f}",
+                "displays": (T("sys.n_displays", n=len(mons)) if len(mons) > 1 else
+                             T("sys.laptop_only") if mons and not ext else short_name(mons[0]) if mons else ""),
+                "mouse": T("sys.speed_status", v=dec(f"{float(option('input:sensitivity', 0)):+.1f}")),
                 "keyboard": f"{str(option('input:kb_layout', 'de')).upper()} · "
                             f"{option('input:repeat_rate', 25)}/s",
                 "nightlight": nl.status(),
-                "idle": f"sperrt nach {idle_text(idle_steps('ac' if on_ac() else 'battery')['lock'])}",
+                "idle": T("sys.locks_after", time=idle_text(idle_steps('ac' if on_ac() else 'battery')['lock'])),
                 "wallpaper": "Super + W",
                 "keybinds": "Super + H",
             }
@@ -497,14 +499,14 @@ def build():
             names = [ln.split(":", 1)[1] for ln in wifi.splitlines()
                      if ln.startswith("802-11-wireless:")]
             wired = any(ln.startswith("802-3-ethernet:") for ln in wifi.splitlines())
-            out["wifi"] = names[0] if names else ("Kabel" if wired else "nicht verbunden")
+            out["wifi"] = names[0] if names else (T("sys.wired") if wired else T("sys.not_connected"))
             bt = run(["busctl", "get-property", "org.bluez", "/org/bluez/hci0",
                       "org.bluez.Adapter1", "Powered"])
-            out["bluetooth"] = "an" if "true" in bt else "aus"
+            out["bluetooth"] = T("common.on").lower() if "true" in bt else T("common.off").lower()
             vol = run(["wpctl", "get-volume", "@DEFAULT_AUDIO_SINK@"])
             try:
                 v = round(float(vol.split()[1]) * 100)
-                out["sound"] = "stumm" if "MUTED" in vol else f"{v} %"
+                out["sound"] = T("sys.muted") if "MUTED" in vol else f"{v} %"
             except (IndexError, ValueError):
                 out["sound"] = ""
             try:
@@ -517,7 +519,7 @@ def build():
             # updates last: checkupdates needs the network (a few seconds)
             ups = run(["checkupdates"])
             n = len([ln for ln in ups.splitlines() if ln.strip()])
-            GLib.idle_add(self.set_status, {"updates": f"{n} neu" if n else "alles aktuell"})
+            GLib.idle_add(self.set_status, {"updates": T("sys.n_updates", n=n) if n else T("sys.up_to_date")})
 
         def set_status(self, out):
             for k, text in out.items():
@@ -538,8 +540,8 @@ def build():
             self.page = page
             if back:
                 self.title.set_text(self.greeting())
-                self.sub.set_text("Was möchtest du einstellen?")
-                self.hint.set_text("Pfeile wählen · Enter öffnet · Esc schließt")
+                self.sub.set_text(T("sys.what"))
+                self.hint.set_text(T("sys.home_hint"))
                 self.back_btn.set_opacity(0)
                 self.back_btn.set_sensitive(False)
                 self.refresh_hub()
@@ -547,7 +549,7 @@ def build():
                 title, sub = PAGES[page]
                 self.title.set_text(title)
                 self.sub.set_text(sub)
-                self.hint.set_text("Änderungen gelten sofort · Esc zurück")
+                self.hint.set_text(T("sys.page_hint"))
                 self.back_btn.set_opacity(1)
                 self.back_btn.set_sensitive(True)
                 self.render(page)
@@ -607,8 +609,8 @@ def build():
         def greeting():
             import time
             h = time.localtime().tm_hour
-            return ("Na, Nachteule?" if h < 5 else "Guten Morgen" if h < 11 else
-                    "Hallo" if h < 18 else "Guten Abend" if h < 22 else "Na, Nachteule?")
+            return T("sys.greet_night" if h < 5 or h >= 22 else "sys.greet_morning" if h < 11 else
+                     "sys.greet_day" if h < 18 else "sys.greet_evening")
 
         def later(self, key, ms, fn):
             """Run fn after ms; a newer call with the same key replaces it
@@ -649,7 +651,7 @@ def build():
             screens = saved.get("screens", {})
             main = main_of(mons, saved)
             if not mons:
-                box.append(lbl("Keine Bildschirme gefunden.", "note"))
+                box.append(lbl(T("sys.no_displays"), "note"))
                 return
             descs = [m["description"] for m in mons]
             if self.mon_sel not in descs:
@@ -664,9 +666,9 @@ def build():
             key = "internal" if is_int else m["description"]
             is_main = key == main
             chip = Gtk.Button(css_classes=["sys-chip"] + (["on"] if is_main else []))
-            chip.set_child(lbl(("\U000F04CE  Hauptbildschirm" if is_main else
-                                "\U000F04D2  zum Hauptbildschirm machen")))
-            chip.set_tooltip_text("bekommt die Workspaces 1-8")
+            chip.set_child(lbl(("\U000F04CE  " + T("sys.main") if is_main else
+                                "\U000F04D2  " + T("sys.make_main"))))
+            chip.set_tooltip_text(T("sys.main_tip"))
             chip.connect("clicked", lambda _b: self.set_main(key))
             if m.get("disabled") or derive_position(m, mons) == "mirror":
                 chip = None
@@ -677,7 +679,7 @@ def build():
             if pos is not None and pos not in dict(POSITIONS):
                 pos = derive_position(m, mons)        # dragged: exact coordinates
             if not is_int:
-                rows.append(row("Anordnung", None, "oder oben im Bild an seinen Platz ziehen",
+                rows.append(row(T("sys.arrange"), None, T("sys.arrange_sub"),
                                 stacked=True))
                 rows.append(segments(POSITIONS, pos, lambda v: self.set_screen(m, mons, position=v)))
             if not m.get("disabled") and pos != "mirror":
@@ -685,31 +687,31 @@ def build():
                 sizes = sorted(table, key=lambda s: (s[0] * s[1], s[0]), reverse=True)
                 cur = (m["width"], m["height"])
                 if cur in sizes and len(sizes) > 1:
-                    rows.append(row("Auflösung", stepper(
+                    rows.append(row(T("sys.resolution"), stepper(
                         sizes, cur, lambda s: f"{s[0]} × {s[1]}",
                         lambda s: self.set_screen(m, mons, mode=self.best_mode(table, s, m)))))
                 rates = table.get(cur, {})
                 if len(rates) > 1:
                     now = round(m["refreshRate"])
-                    rows.append(row("Bildrate", segments(
+                    rows.append(row(T("sys.refresh"), segments(
                         [(r, f"{r} Hz") for r in sorted(rates)], now,
                         lambda r: self.set_screen(m, mons, mode=f"{cur[0]}x{cur[1]}@{rates[r]}"))))
-                logical = f"wirkt wie {round(m['width'] / m['scale'])} × {round(m['height'] / m['scale'])}"
-                rows.append(row("Skalierung", None, logical, stacked=True))
+                logical = T("sys.looks_like", w=round(m['width'] / m['scale']), h=round(m['height'] / m['scale']))
+                rows.append(row(T("sys.scale"), None, logical, stacked=True))
                 rows.append(segments([(s, f"{s:g}".replace(".", ",") + "×") for s in SCALES],
                                      min(SCALES, key=lambda s: abs(s - m["scale"])),
                                      lambda s: self.set_screen(m, mons, scale=s)))
                 vrr = (saved.get("internal", {}) if is_int else screens.get(m["description"], {})).get("vrr", 0)
-                rows.append(row("Adaptive Sync", segments(VRR, vrr,
+                rows.append(row(T("sys.vrr"), segments(VRR, vrr,
                                                           lambda v: self.set_screen(m, mons, vrr=v)),
-                                "gegen Ruckeln, wenn Spiele schwanken"))
+                                T("sys.vrr_sub")))
             if is_int:
                 off = saved.get("internal", {}).get("off_with_external", False)
-                rows.append(row("Aus, solange ein Bildschirm dran ist", switch(
+                rows.append(row(T("sys.lid_off"), switch(
                     off, lambda v: self.set_internal(off_with_external=v)),
-                    "Zuklappen macht das sowieso"))
+                    T("sys.lid_off_sub")))
             elif m.get("disabled"):
-                rows.append(lbl("Ausgeschaltet. Wähle oben, wo er stehen soll, dann geht er wieder an.",
+                rows.append(lbl(T("sys.disabled_note"),
                                 "sys-sub", wrap=True))
             title = short_name(m) + ("" if is_int else f"  ·  {m['name']}")
             box.append(card("\U000F0322" if is_int else "\U000F0379", title, *rows, extra=chip))
@@ -756,7 +758,7 @@ def build():
             star = "\U000F04CE " if key == main and not m.get("disabled") else ""
             tile.append(Gtk.Label(label=star + short_name(m), css_classes=["sys-screen-name"],
                                   ellipsize=3, vexpand=True, valign=Gtk.Align.END))
-            info = ("aus" if m.get("disabled") else
+            info = (T("common.off").lower() if m.get("disabled") else
                     f"{m['width']}×{m['height']} · {round(m['refreshRate'])} Hz" if h > 44 else "")
             tile.append(Gtk.Label(label=info, css_classes=["sys-screen-info"], ellipsize=3,
                                   vexpand=True, valign=Gtk.Align.START))
@@ -866,7 +868,7 @@ def build():
                     self.confirm[2] = GLib.timeout_add_seconds(1, self.confirm_tick)
                 else:
                     self.confirm[1] = CONFIRM_SECONDS     # keep the oldest state to go back to
-                self.confirm_lbl.set_text(f"Alles gut so? Sonst geht's in {self.confirm[1]} s zurück")
+                self.confirm_lbl.set_text(T("sys.confirm", n=self.confirm[1]))
                 self.confirm_rev.set_reveal_child(True)
 
         def confirm_tick(self):
@@ -876,7 +878,7 @@ def build():
             if self.confirm[1] <= 0:
                 self.revert()
                 return False
-            self.confirm_lbl.set_text(f"Alles gut so? Sonst geht's in {self.confirm[1]} s zurück")
+            self.confirm_lbl.set_text(T("sys.confirm", n=self.confirm[1]))
             return True
 
         def end_confirm(self):
@@ -916,15 +918,15 @@ def build():
                                     lambda v: f"{v:.1f}×", lambda v: setm(scroll=round(v, 2)),
                                     marks=[(1, None)])
             mouse = card(
-                "\U000F037D", "Maus",
-                self.slider_row("Tempo", sens), self.slider_row("Scrollen", scroll),
-                row("Beschleunigung", switch(m.get("accel", option("input:accel_profile", "flat")) == "adaptive",
+                "\U000F037D", T("sys.mouse_card"),
+                self.slider_row(T("sys.speed"), sens), self.slider_row(T("sys.scrolling"), scroll),
+                row(T("sys.accel"), switch(m.get("accel", option("input:accel_profile", "flat")) == "adaptive",
                                              lambda v: setm(accel="adaptive" if v else "flat")),
-                    "schnelle Bewegung = weiter"),
-                row("Natürlich scrollen", switch(m.get("natural", option("input:natural_scroll", False)),
-                                                 lambda v: setm(natural=v)), "wie am Handy"),
-                row("Linkshänder", switch(m.get("left_handed", option("input:left_handed", False)),
-                                          lambda v: setm(left_handed=v)), "Tasten getauscht"),
+                    T("sys.accel_sub")),
+                row(T("sys.natural"), switch(m.get("natural", option("input:natural_scroll", False)),
+                                                 lambda v: setm(natural=v)), T("sys.natural_sub")),
+                row(T("sys.left_handed"), switch(m.get("left_handed", option("input:left_handed", False)),
+                                          lambda v: setm(left_handed=v)), T("sys.left_handed_sub")),
             )
             tsens, _ = self.slider("t-sens", -1, 1, 0.05, float(t.get("sensitivity", 0)),
                                    lambda v: f"{v:+.2f}", lambda v: sett(sensitivity=round(v, 2)),
@@ -934,16 +936,16 @@ def build():
                                      lambda v: f"{v:.2f}×", lambda v: sett(scroll=round(v, 2)))
             click = t.get("clickfinger", option("input:touchpad:clickfinger_behavior", True))
             pad = card(
-                "\U000F0741", "Touchpad",
-                self.slider_row("Tempo", tsens), self.slider_row("Scrollen", tscroll),
-                row("Antippen klickt", switch(t.get("tap", option("input:touchpad:tap_to_click", True)),
+                "\U000F0741", T("sys.touchpad"),
+                self.slider_row(T("sys.speed"), tsens), self.slider_row(T("sys.scrolling"), tscroll),
+                row(T("sys.tap"), switch(t.get("tap", option("input:touchpad:tap_to_click", True)),
                                               lambda v: sett(tap=v))),
-                row("Natürlich scrollen", switch(t.get("natural", option("input:touchpad:natural_scroll", True)),
+                row(T("sys.natural"), switch(t.get("natural", option("input:touchpad:natural_scroll", True)),
                                                  lambda v: sett(natural=v))),
-                row("Aus beim Tippen", switch(t.get("dwt", option("input:touchpad:disable_while_typing", True)),
+                row(T("sys.dwt"), switch(t.get("dwt", option("input:touchpad:disable_while_typing", True)),
                                               lambda v: sett(dwt=v))),
-                row("Rechtsklick", None, stacked=True),
-                segments([(True, "Zwei Finger"), (False, "Ecke rechts unten")], bool(click),
+                row(T("sys.right_click"), None, stacked=True),
+                segments([(True, T("sys.two_fingers")), (False, T("sys.corner"))], bool(click),
                          lambda v: (sett(clickfinger=v), self.render("mouse"))),
             )
             cols = Gtk.Box(spacing=10, homogeneous=True)
@@ -986,20 +988,20 @@ def build():
                                    lambda v: f"{v:.0f} ms", lambda v: apply("keyboard", {"repeat_delay": int(v)}),
                                    marks=[(600, None)])
             rate, _ = self.slider("k-rate", 10, 60, 1, int(k.get("repeat_rate", option("input:repeat_rate", 25))),
-                                  lambda v: f"{v:.0f} pro s", lambda v: apply("keyboard", {"repeat_rate": int(v)}),
+                                  lambda v: T("sys.per_s", v=f"{v:.0f}"), lambda v: apply("keyboard", {"repeat_rate": int(v)}),
                                   marks=[(25, None)])
-            test = Gtk.Entry(placeholder_text="hier ausprobieren: eine Taste festhalten …",
+            test = Gtk.Entry(placeholder_text=T("sys.try_here"),
                              css_classes=["sys-test"])
             box.append(card(
-                "\U000F030C", "Tippen",
-                row("Layout", None, stacked=True),
+                "\U000F030C", T("sys.typing"),
+                row(T("sys.layout"), None, stacked=True),
                 segments(layouts, layout, lambda v: (apply("keyboard", {"layout": v}),
                                                      self.render("keyboard"))),
-                self.slider_row("Wiederholen nach", delay),
-                self.slider_row("Wiederholtempo", rate),
+                self.slider_row(T("sys.repeat_delay"), delay),
+                self.slider_row(T("sys.repeat_rate"), rate),
                 test,
             ))
-            box.append(card("\U000F04E1", "Tasten tauschen", *[
+            box.append(card("\U000F04E1", T("sys.swap_keys"), *[
                 row(title, switch(name in opts, lambda v, n=name: set_opt(n, v)), sub)
                 for name, title, sub in SWAPS]))
 
@@ -1026,26 +1028,26 @@ def build():
             scale.connect("value-changed", lambda s: self.later("n-prev", 40,
                                                                lambda: preview(round(s.get_value() / 100) * 100)))
             rows = [segments(NIGHT_MODES, c["mode"], set_mode, small=False),
-                    self.slider_row("Wärme", temp),
-                    self.axis("\u2190 wärmer", "neutraler \u2192")]
+                    self.slider_row(T("sys.warmth"), temp),
+                    self.axis(T("sys.warmer"), T("sys.neutral"))]
             if c["mode"] == "schedule":
                 times = list(range(0, 1440, 15))
-                rows.append(row("Warm ab", stepper(times, nl.parse(c["start"]), nl.hhmm,
+                rows.append(row(T("sys.warm_from"), stepper(times, nl.parse(c["start"]), nl.hhmm,
                                                    lambda v: (settings.update("nightlight", {"start": nl.hhmm(v)}),
                                                               subprocess.Popen([BIN + "nightlight", "refresh"])))))
-                rows.append(row("Neutral ab", stepper(times, nl.parse(c["end"]), nl.hhmm,
+                rows.append(row(T("sys.neutral_from"), stepper(times, nl.parse(c["end"]), nl.hhmm,
                                                       lambda v: (settings.update("nightlight", {"end": nl.hhmm(v)}),
                                                                  subprocess.Popen([BIN + "nightlight", "refresh"])))))
             if c["mode"] == "sunset":
                 sun = nl.sun_times()
                 z = nl.zone()
                 if sun:
-                    rows.append(lbl(f"heute {nl.hhmm(sun[1])} bis {nl.hhmm(sun[0])}  ·  "
-                                    f"{z[0].split('/')[-1].replace('_', ' ')}  ·  {nl.FADE_MIN} min Übergang",
+                    rows.append(lbl(T("sys.sun_today", set=nl.hhmm(sun[1]), rise=nl.hhmm(sun[0]),
+                                      zone=z[0].split('/')[-1].replace('_', ' '), fade=nl.FADE_MIN),
                                     "sys-sub", xalign=0.5))
             if not have:
-                rows.append(lbl("hyprsunset fehlt noch:  sudo pacman -S hyprsunset", "note", "error"))
-            box.append(card("\U000F0594", "Nachtlicht", *rows))
+                rows.append(lbl(T("sys.no_hyprsunset"), "note", "error"))
+            box.append(card("\U000F0594", T("sys.nightlight"), *rows))
 
         # ================================================================ idle
         def page_idle(self, box):
@@ -1067,16 +1069,15 @@ def build():
                 settings.update("idle", {src: cur})
                 subprocess.Popen([BIN + "idle-config", "apply"])
 
-            now = "  ·  jetzt"
-            box.append(segments([("ac", "\U000F06A5", "Am Netzteil" + (now if ac else "")),
-                                 ("battery", "\U000F0080", "Mit Akku" + ("" if ac else now))],
+            now = T("sys.now")
+            box.append(segments([("ac", "\U000F06A5", T("sys.on_ac") + (now if ac else "")),
+                                 ("battery", "\U000F0080", T("sys.on_battery") + ("" if ac else now))],
                                 src, pick_src, small=False))
             rows = [row(title, stepper(IDLE_VALUES, steps[key], idle_text,
                                        lambda v, k=key: set_step(k, v)))
                     for key, _icon, title in IDLE_STEPS]
-            box.append(card("\U000F0341", "Am Netzteil" if src == "ac" else "Mit Akku", *rows))
-            box.append(lbl("Tipp: Bildschirm aus kurz nach dem Sperren spart Strom, "
-                           "eine Taste weckt ihn ohne zu tippen.", "sys-sub", wrap=True, xalign=0.5))
+            box.append(card("\U000F0341", T("sys.on_ac") if src == "ac" else T("sys.on_battery"), *rows))
+            box.append(lbl(T("sys.idle_tip"), "sys-sub", wrap=True, xalign=0.5))
 
         # ================================================================ window
         def take_opts(self, opts):

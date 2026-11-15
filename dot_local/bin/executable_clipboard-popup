@@ -20,6 +20,7 @@ import sys
 
 sys.path.insert(0, os.path.expanduser("~/.local/lib/popup"))
 import resident  # noqa: E402
+from i18n import T  # noqa: E402
 
 APP = "popup.clipboard"
 CSS = os.path.expanduser("~/.config/popups/style.css")
@@ -42,11 +43,11 @@ def kind(preview):
         return I_IMAGE, f"{fmt.upper()} · {dims.replace('x', '×')} · {size}", f"image {fmt}"
     text = preview.strip()
     if COLOR.fullmatch(text):
-        return I_COLOR, "Color", text
+        return I_COLOR, T("clipboard.color"), text
     if URL.fullmatch(text):
         return I_LINK, re.sub(r"^\w+://(www\.)?|^www\.", "", text).split("/")[0], text
     if text.startswith(("/", "~/")) and "\n" not in text and " " not in text.strip():
-        return I_PATH, "Path", text
+        return I_PATH, T("clipboard.path"), text
     return I_TEXT, "", text           # plain text: no status line, the row stays slim
 
 
@@ -63,7 +64,7 @@ def build():
 
     class Clipboard(Gtk.Window):
         def __init__(self):
-            super().__init__(title="Clipboard")
+            super().__init__(title=T("clipboard.title"))
             for c in ("popup", "menu", "list-menu", "clipboard"):
                 self.add_css_class(c)
             self.set_decorated(False)
@@ -73,9 +74,9 @@ def build():
             self.query = ""
 
             box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8, css_classes=["menu-box"])
-            box.append(Gtk.Label(label="Clipboard", css_classes=["menu-title"]))
+            box.append(Gtk.Label(label=T("clipboard.title"), css_classes=["menu-title"]))
             self.entry = Gtk.Entry(css_classes=["menu-search"], xalign=0.5,
-                                   placeholder_text="Filter clipboard...")
+                                   placeholder_text=T("clipboard.filter"))
             self.entry.connect("changed", lambda e: self.set_query(e.get_text()))
             box.append(self.entry)
 
@@ -92,7 +93,7 @@ def build():
             box.append(self.empty)
 
             foot = Gtk.Box(spacing=8, css_classes=["clip-foot"])
-            foot.append(Gtk.Label(label="↵ copy  ·  Del remove  ·  Esc close",
+            foot.append(Gtk.Label(label=T("clipboard.footer"),
                                   css_classes=["note", "clip-hint"], hexpand=True, xalign=0))
             self.clear = Gtk.Button(css_classes=["more", "clip-clear"])
             self.clear.connect("clicked", self.on_clear)
@@ -137,7 +138,7 @@ def build():
                 if cid in self.thumbs:
                     pic.set_paintable(self.thumbs[cid])
                 box.append(pic)
-                title = "Image"
+                title = T("clipboard.image")
             elif icon == I_COLOR:
                 swatch = Gtk.Label(css_classes=["clip-swatch"], valign=Gtk.Align.CENTER)
                 swatch.set_size_request(LEAD, -1)
@@ -159,7 +160,7 @@ def build():
             box.append(texts)
 
             rm = Gtk.Button(label=I_CLOSE, css_classes=["clip-remove"], valign=Gtk.Align.CENTER,
-                            tooltip_text="Remove", focusable=False)
+                            tooltip_text=T("common.remove"), focusable=False)
             rm.connect("clicked", lambda _b: self.remove(row))
             box.append(rm)
             row.set_child(box)
@@ -193,7 +194,7 @@ def build():
             self.scroll.set_max_content_height(height)
             self.scroll.set_visible(bool(shown))
             self.empty.set_visible(not shown)
-            self.empty.set_text("Nothing copied yet" if not rows else "No match")
+            self.empty.set_text(T("clipboard.empty") if not rows else T("clipboard.no_match"))
             self.entry.set_visible(bool(rows))
             self.clear.set_visible(bool(rows))
             self.set_confirm(False)
@@ -226,7 +227,7 @@ def build():
 
         def set_confirm(self, on):
             self.confirm = on
-            self.clear.set_label(f"{I_TRASH} Sure?" if on else f"{I_TRASH} Clear")
+            self.clear.set_label(f"{I_TRASH} " + (T("common.sure") if on else T("common.clear")))
             (self.clear.add_css_class if on else self.clear.remove_css_class)("danger")
 
         def on_clear(self, _b):

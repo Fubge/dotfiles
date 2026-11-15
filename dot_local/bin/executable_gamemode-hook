@@ -1,13 +1,18 @@
 #!/usr/bin/env bash
 # Called by GameMode when the first game starts / the last one ends.
 # Games are registered automatically by game-watch (no `gamemoderun` needed).
+t() { jq -r --arg k "$1" '.[$k] // $k' ~/.config/popups/strings.json 2>/dev/null || echo "$1"; }
+profile() { local p; p=$(t "power.bar_tip"); echo "${p//\{name\}/$1}"; }
 case "$1" in
     start)
         powerprofilesctl set performance
-        notify-send -a GameMode -i applications-games "GameMode on" "Power profile: performance"
+        notify-send -a GameMode -i applications-games "$(t gamemode.on)" "$(profile "$(t power.performance)")"
         ;;
     end)
         /usr/local/bin/power-profile-auto
-        notify-send -a GameMode -i applications-games "GameMode off" "Power profile: $(powerprofilesctl get)"
+        case $(powerprofilesctl get) in
+            performance) p=power.performance ;; power-saver) p=power.saver ;; *) p=power.balanced ;;
+        esac
+        notify-send -a GameMode -i applications-games "$(t gamemode.off)" "$(profile "$(t $p)")"
         ;;
 esac

@@ -23,6 +23,7 @@ import time
 
 sys.path.insert(0, os.path.expanduser("~/.local/lib/popup"))
 import resident  # noqa: E402
+from i18n import T  # noqa: E402
 
 APP = "popup.sound"
 WIDTH = 360
@@ -92,7 +93,7 @@ def fetch():
         bt = m["name"].startswith("bluez")
         headset = bt or (usb and props.get("device.name") in sink_cards)
         if not (usb or bt):
-            name = "Built-in microphone"      # the laptop's own ("Microphones")
+            name = T("sound.builtin_mic")      # the laptop's own ("Microphones")
         cam = props.get("device.form_factor") == "webcam" or "webcam" in name.lower()
         inputs.append(dict(name=m["name"], label=name,
                            icon=I_HEADSET if headset else I_WEBCAM if cam else I_MIC))
@@ -182,7 +183,7 @@ def build():
         popup_width = WIDTH       # resident.place() puts it under the mouse
 
         def __init__(self):
-            super().__init__(title="Sound")
+            super().__init__(title=T("sound.title"))
             for c in ("popup", "menu", "sound"):
                 self.add_css_class(c)
             self.set_decorated(False)
@@ -193,7 +194,7 @@ def build():
 
             box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4,
                           css_classes=["menu-box"])
-            box.append(Gtk.Label(label="Sound", css_classes=["menu-title"]))
+            box.append(Gtk.Label(label=T("sound.title"), css_classes=["menu-title"]))
             self.master = Slider("sink", "@DEFAULT_SINK@")
             self.mic = Slider("source", "@DEFAULT_SOURCE@")
             box.append(self.master)
@@ -201,7 +202,7 @@ def build():
             self.dynamic = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
             box.append(self.dynamic)
             box.append(Gtk.Separator(css_classes=["sound-sep"]))
-            box.append(row_button(f"{I_MIXER}  Open mixer", self.open_mixer))
+            box.append(row_button(f"{I_MIXER}  " + T("sound.open_mixer"), self.open_mixer))
             self.set_child(box)
 
             keys = Gtk.EventControllerKey()
@@ -277,21 +278,21 @@ def build():
             while child := self.dynamic.get_first_child():
                 self.dynamic.remove(child)
             if len(d["outputs"]) > 1:
-                self.dynamic.append(section("Output"))
+                self.dynamic.append(section(T("sound.output")))
                 for o in d["outputs"]:
                     active = o["name"] == d["default"]
                     self.dynamic.append(row_button(
                         f"{o['icon']}  {o['label']}", lambda n=o["name"], m=o["mic"]: self.set_output(n, m),
                         ["active"] if active else []))
             if len(d["inputs"]) > 1:
-                self.dynamic.append(section("Input"))
+                self.dynamic.append(section(T("sound.input")))
                 for i in d["inputs"]:
                     self.dynamic.append(row_button(
                         f"{i['icon']}  {i['label']}", lambda n=i["name"]: self.set_input(n),
                         ["active"] if i["name"] == d["source"] else []))
             self.apps = {}
             if d["apps"]:
-                self.dynamic.append(section("Apps"))
+                self.dynamic.append(section(T("sound.apps")))
             for a in d["apps"]:
                 self.dynamic.append(Gtk.Label(label=a["label"], xalign=0,
                                               ellipsize=Pango.EllipsizeMode.END,

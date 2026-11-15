@@ -20,15 +20,16 @@ import sys
 
 sys.path.insert(0, os.path.expanduser("~/.local/lib/popup"))
 import resident  # noqa: E402
+from i18n import T  # noqa: E402
 
 APP = "popup.keybinds"
 CSS = os.path.expanduser("~/.config/popups/style.css")
 # Hyprland modmask bits, in the order they are shown
 MODS = [(64, "SUPER"), (4, "CTRL"), (8, "ALT"), (1, "SHIFT")]
 KEY_NAMES = {
-    "mouse:272": "Drag", "mouse:273": "Right drag",
-    "mouse_down": "Wheel ↓", "mouse_up": "Wheel ↑",
-    "space": "Space", "Return": "Enter", "Escape": "Esc",
+    "mouse:272": T("keys.drag"), "mouse:273": T("keys.right_drag"),
+    "mouse_down": T("keys.wheel_down"), "mouse_up": T("keys.wheel_up"),
+    "space": T("keys.space"), "Return": "Enter", "Escape": "Esc",
     # arrows and workspaces: only the first bind of each set has a description
     "left": "← ↑ → ↓", "1": "1 … 0",
 }
@@ -50,7 +51,7 @@ def load_binds(raw):
             continue
         group, _, text = b["description"].partition(": ")
         if not text:
-            group, text = "Other", group
+            group, text = T("binds.group_other"), group
         keys = [name for bit, name in MODS if b["modmask"] & bit]
         key = b["key"] or KEYCODES.get(b.get("keycode"), "")   # bound by keycode: no key name
         keys.append(KEY_NAMES.get(key, key.upper() if len(key) == 1 else key))
@@ -76,7 +77,7 @@ def build():
 
     class Overview(Gtk.Window):
         def __init__(self):
-            super().__init__(title="Shortcuts")
+            super().__init__(title=T("keys.title"))
             self.add_css_class("popup")
             self.add_css_class("overlay")
             self.set_decorated(False)
@@ -88,7 +89,7 @@ def build():
             # lens + entry + invisible lens, so the text is truly centered
             pill = Gtk.Box(spacing=10, halign=Gtk.Align.CENTER, css_classes=["search-pill"])
             pill.append(Gtk.Label(label="\U000F0349", css_classes=["lens"]))
-            self.search = Gtk.Entry(placeholder_text="Filter shortcuts...", hexpand=True,
+            self.search = Gtk.Entry(placeholder_text=T("keys.filter"), hexpand=True,
                                     xalign=0.5, css_classes=["search"])
             self.search.connect("changed", self.on_filter)
             pill.append(self.search)
@@ -108,7 +109,7 @@ def build():
             scroll = Gtk.ScrolledWindow(child=self.flow, vexpand=True,
                                         hscrollbar_policy=Gtk.PolicyType.NEVER)
             root.append(scroll)
-            root.append(Gtk.Label(label="SUPER = Windows key      ·      Esc  close",
+            root.append(Gtk.Label(label=T("keys.footer"),
                                   css_classes=["hint"]))
             self.set_child(root)
 

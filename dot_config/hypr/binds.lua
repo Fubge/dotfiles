@@ -1,4 +1,5 @@
 local v = require("vars")
+local S = require("strings") -- descriptions in the chosen language (.chezmoidata/locale.toml)
 local mod = "SUPER" -- the Windows key
 local run = function(cmd)
     return hl.dsp.exec_cmd(v.launch .. cmd)
@@ -12,7 +13,7 @@ end
 -- bind(keys, action, description[, extra options]): binds with a description show
 -- up in the shortcut overview (SUPER+H, built from `hyprctl binds`), grouped into
 -- cards by the last group() call above them
-local group_name = "Other"
+local group_name = S.group_other
 local function group(name)
     group_name = name
 end
@@ -22,10 +23,10 @@ local function bind(keys, action, desc, opts)
     hl.bind(keys, action, opts)
 end
 
-group("Apps")
-bind(mod .. " + Q", run(v.terminal), "Terminal")
-bind(mod .. " + B", run(v.browser), "Browser")
-bind(mod .. " + E", run(v.fileManager), "File manager")
+group(S.group_apps)
+bind(mod .. " + Q", run(v.terminal), S.terminal)
+bind(mod .. " + B", run(v.browser), S.browser)
+bind(mod .. " + E", run(v.fileManager), S.files)
 -- Discord: jump straight to its window (looked up here, no process to start);
 -- without one, focus-or-run starts it and switches once the window is there
 bind(mod .. " + D", function()
@@ -36,7 +37,7 @@ bind(mod .. " + D", function()
         end
     end
     hl.dispatch(run(v.bin .. "focus-or-run discord " .. v.bin .. "discord-start"))
-end, "Discord")
+end, S.discord)
 -- Obsidian: same idea, its window lives on workspace 8 (rules.lua). The window
 -- class is md.obsidian.Obsidian (it was "obsidian" before 1.15); with the wrong
 -- class SUPER+O started a second Obsidian, which only shows the vault picker.
@@ -51,7 +52,7 @@ bind(mod .. " + O", function()
         end
     end
     hl.dispatch(run(v.bin .. "focus-or-run md.obsidian.Obsidian obsidian '" .. obsidianVault .. "'"))
-end, "Obsidian (notes)")
+end, S.obsidian)
 -- YouTube: workspace 4; reopens the Vivaldi app window if it was closed
 -- (rules.lua puts it on workspace 4, so switching there right away is enough)
 bind(mod .. " + Y", function()
@@ -61,37 +62,37 @@ bind(mod .. " + Y", function()
     end
     if not open then hl.dispatch(run(v.browser .. " --app=https://www.youtube.com")) end
     hl.dispatch(hl.dsp.focus({ workspace = "4" }))
-end, "YouTube")
-bind(mod .. " + space", menu(v.menu), "App launcher / web")
-bind(mod .. " + V", menu(v.bin .. "popup-cmd clipboard-popup toggle --center"), "Clipboard history")
-bind(mod .. " + Return", menu(v.bin .. "rofi-websearch"), "Web search")
-bind(mod .. " + W", menu(v.bin .. "wallpaper pick"), "Wallpaper picker")
-bind(mod .. " + H", menu(v.bin .. "popup-cmd keybinds toggle"), "This overview")
-bind(mod .. " + C", hl.dsp.exec_cmd(v.bin .. "claude-pad toggle"), "Claude (show / hide)")
-bind(mod .. " + SHIFT + C", hl.dsp.exec_cmd(v.bin .. "claude-pad ask"), "Quick question to Claude")
-bind(mod .. " + T", menu(v.bin .. "popup-cmd task-popup toggle --center"), "New task for Claude (/todo list)")
-bind(mod .. " + K", menu(v.bin .. "popup-cmd calendar-popup toggle --center"), "Calendar (Pia + me)")
-bind(mod .. " + SHIFT + K", menu(v.bin .. "popup-cmd event-popup toggle --center"), "New event (\"Kino morgen 20 Uhr\")")
-bind(mod .. " + SHIFT + T", menu(v.bin .. "popup-cmd timer-popup toggle --center"), "Timer (\"Pizza 12\")")
+end, S.youtube)
+bind(mod .. " + space", menu(v.menu), S.launcher)
+bind(mod .. " + V", menu(v.bin .. "popup-cmd clipboard-popup toggle --center"), S.clipboard)
+bind(mod .. " + Return", menu(v.bin .. "rofi-websearch"), S.websearch)
+bind(mod .. " + W", menu(v.bin .. "wallpaper pick"), S.wallpaper)
+bind(mod .. " + H", menu(v.bin .. "popup-cmd keybinds toggle"), S.overview)
+bind(mod .. " + C", hl.dsp.exec_cmd(v.bin .. "claude-pad toggle"), S.claude)
+bind(mod .. " + SHIFT + C", hl.dsp.exec_cmd(v.bin .. "claude-pad ask"), S.claude_ask)
+bind(mod .. " + T", menu(v.bin .. "popup-cmd task-popup toggle --center"), S.task)
+bind(mod .. " + K", menu(v.bin .. "popup-cmd calendar-popup toggle --center"), S.calendar)
+bind(mod .. " + SHIFT + K", menu(v.bin .. "popup-cmd event-popup toggle --center"), S.event)
+bind(mod .. " + SHIFT + T", menu(v.bin .. "popup-cmd timer-popup toggle --center"), S.timer)
 
 -- Menus (the same menus open under the mouse when clicked in the bar)
-group("Menus")
-bind(mod .. " + ALT + space", menu(v.bin .. "popup-cmd system-menu toggle --center"), "System menu: displays, mouse, keyboard, night light, idle")
-bind(mod .. " + Escape", menu(v.bin .. "popup-cmd session-popup toggle --center"), "Lock, suspend, log out, reboot, shut down")
-bind(mod .. " + I", menu(v.bin .. "popup-cmd notification-center toggle"), "Notification center")
-bind(mod .. " + P", menu(v.bin .. "popup-cmd power-popup toggle --center"), "Power profile, battery")
-bind(mod .. " + N", menu(v.bin .. "popup-cmd wifi-popup toggle --center"), "Wi-Fi: networks, password, forget")
-bind(mod .. " + SHIFT + B", menu(v.bin .. "popup-cmd bluetooth-popup toggle --center"), "Bluetooth: devices, pairing")
-bind(mod .. " + A", menu(v.bin .. "popup-cmd sound-popup toggle --center"), "Sound: volume, outputs, apps")
-bind(mod .. " + M", run(v.bin .. "music show"), "Spotify (show / hide)")
-bind(mod .. " + G", hl.dsp.exec_cmd(v.bin .. "game-watch toggle"), "Game mode for this window")
-group("Session")
-bind(mod .. " + L", hl.dsp.exec_cmd("loginctl lock-session"), "Lock screen")
+group(S.group_menus)
+bind(mod .. " + ALT + space", menu(v.bin .. "popup-cmd system-menu toggle --center"), S.system)
+bind(mod .. " + Escape", menu(v.bin .. "popup-cmd session-popup toggle --center"), S.session)
+bind(mod .. " + I", menu(v.bin .. "popup-cmd notification-center toggle"), S.notifications)
+bind(mod .. " + P", menu(v.bin .. "popup-cmd power-popup toggle --center"), S.power)
+bind(mod .. " + N", menu(v.bin .. "popup-cmd wifi-popup toggle --center"), S.wifi)
+bind(mod .. " + SHIFT + B", menu(v.bin .. "popup-cmd bluetooth-popup toggle --center"), S.bluetooth)
+bind(mod .. " + A", menu(v.bin .. "popup-cmd sound-popup toggle --center"), S.sound)
+bind(mod .. " + M", run(v.bin .. "music show"), S.spotify)
+bind(mod .. " + G", hl.dsp.exec_cmd(v.bin .. "game-watch toggle"), S.gamemode)
+group(S.group_session)
+bind(mod .. " + L", hl.dsp.exec_cmd("loginctl lock-session"), S.lock)
 -- Log out behind SHIFT: one stray key would end every app
-bind(mod .. " + SHIFT + M", hl.dsp.exec_cmd("uwsm stop"), "Log out") -- uwsm stops all apps cleanly
+bind(mod .. " + SHIFT + M", hl.dsp.exec_cmd("uwsm stop"), S.logout) -- uwsm stops all apps cleanly
 
 -- Windows
-group("Windows")
+group(S.group_windows)
 bind(mod .. " + X", function()
     local win = hl.get_active_window()
     local keep = win and v.keepAlive[string.lower(win.class or "")]
@@ -102,35 +103,35 @@ bind(mod .. " + X", function()
     else
         hl.dispatch(hl.dsp.window.close())
     end
-end, "Close window (Spotify / Discord / Claude: keep running)")
-bind(mod .. " + SHIFT + X", hl.dsp.window.close(), "Really close (Spotify too)")
-bind(mod .. " + F", hl.dsp.window.float({ action = "toggle" }), "Float / tile window")
-bind(mod .. " + SHIFT + F", hl.dsp.window.fullscreen({ mode = "fullscreen" }), "Fullscreen")
-bind(mod .. " + CTRL + Return", hl.dsp.layout("swapwithmaster master"), "Main window")
+end, S.close)
+bind(mod .. " + SHIFT + X", hl.dsp.window.close(), S.kill)
+bind(mod .. " + F", hl.dsp.window.float({ action = "toggle" }), S.float)
+bind(mod .. " + SHIFT + F", hl.dsp.window.fullscreen({ mode = "fullscreen" }), S.fullscreen)
+bind(mod .. " + CTRL + Return", hl.dsp.layout("swapwithmaster master"), S.master)
 
 -- Focus and move with arrow keys (only the first gets a description: one
 -- line per group in the overview instead of four)
 for n, dir in ipairs({ "left", "right", "up", "down" }) do
     local first = n == 1
-    bind(mod .. " + " .. dir, hl.dsp.focus({ direction = dir }), first and "Focus window" or nil)
-    bind(mod .. " + SHIFT + " .. dir, hl.dsp.window.move({ direction = dir }), first and "Move window" or nil)
+    bind(mod .. " + " .. dir, hl.dsp.focus({ direction = dir }), first and S.focus or nil)
+    bind(mod .. " + SHIFT + " .. dir, hl.dsp.window.move({ direction = dir }), first and S.move or nil)
 end
 
 -- Workspaces 1-10
-group("Workspaces")
+group(S.group_workspaces)
 for i = 1, 10 do
     local key = i % 10
     local first = i == 1
-    bind(mod .. " + " .. key, hl.dsp.focus({ workspace = i }), first and "Go to workspace" or nil)
-    bind(mod .. " + SHIFT + " .. key, hl.dsp.window.move({ workspace = i }), first and "Send window" or nil)
+    bind(mod .. " + " .. key, hl.dsp.focus({ workspace = i }), first and S.workspace or nil)
+    bind(mod .. " + SHIFT + " .. key, hl.dsp.window.move({ workspace = i }), first and S.send or nil)
 end
-bind(mod .. " + mouse_down", hl.dsp.focus({ workspace = "e+1" }), "Next workspace")
-bind(mod .. " + mouse_up", hl.dsp.focus({ workspace = "e-1" }), "Previous workspace")
+bind(mod .. " + mouse_down", hl.dsp.focus({ workspace = "e+1" }), S.ws_next)
+bind(mod .. " + mouse_up", hl.dsp.focus({ workspace = "e-1" }), S.ws_prev)
 
 -- Mouse: drag to move, right-drag to resize
-group("Windows")
-bind(mod .. " + mouse:272", hl.dsp.window.drag(), "Move window", { mouse = true })
-bind(mod .. " + mouse:273", hl.dsp.window.resize(), "Resize window", { mouse = true })
+group(S.group_windows)
+bind(mod .. " + mouse:272", hl.dsp.window.drag(), S.move, { mouse = true })
+bind(mod .. " + mouse:273", hl.dsp.window.resize(), S.resize, { mouse = true })
 
 -- "Minimize": SUPER+S sends the window away, or brings it back if it is
 -- already minimized. SUPER+SHIFT+S shows/hides all minimized windows.
@@ -143,10 +144,10 @@ bind(mod .. " + S", function()
     elseif win then
         hl.dispatch(hl.dsp.window.move({ workspace = "special:minimized", follow = false }))
     end
-end, "Minimize / restore window")
-bind(mod .. " + SHIFT + S", hl.dsp.workspace.toggle_special("minimized"), "Minimized windows")
+end, S.minimize)
+bind(mod .. " + SHIFT + S", hl.dsp.workspace.toggle_special("minimized"), S.minimized)
 
-group("Apps")
+group(S.group_apps)
 -- Dropdown terminal: SUPER+Tab (physically Alt+Tab) toggles it, (re)starting it if needed
 bind(mod .. " + Tab", function()
     for _, w in ipairs(hl.get_windows()) do
@@ -157,23 +158,23 @@ bind(mod .. " + Tab", function()
     end
     -- Not running: just start it, the window rule opens the special workspace
     hl.dispatch(hl.dsp.exec_cmd(v.launch .. v.terminal .. " --class " .. v.dropdown.class))
-end, "Dropdown terminal")
+end, S.dropdown)
 
-group("Screenshots")
+group(S.group_screenshots)
 -- Screenshots: Home = select area -> clipboard, SHIFT+Home = whole screen -> file
-bind("Home", hl.dsp.exec_cmd([[grim -g "$(slurp -d)" - | wl-copy]]), "Area to clipboard")
+bind("Home", hl.dsp.exec_cmd([[grim -g "$(slurp -d)" - | wl-copy]]), S.shot_area)
 bind(
     "SHIFT + Home",
     hl.dsp.exec_cmd("mkdir -p " .. v.screenshotDir .. " && grim " .. v.screenshotDir .. "/$(date +%F_%H-%M-%S).png"),
-    "Screen to file"
+    S.shot_screen
 )
 
 -- Discord push-to-talk on ^ (the key left of 1, by keycode so the layout does
 -- not matter). Discord registers the shortcut through the portal; Hyprland has
 -- no approval dialog, the bind here is the approval. Hyprland sends press and
 -- release. non_consuming: ^ still types (Neovim's "start of line")
-group("Apps")
-bind("code:49", hl.dsp.global("discord:discord-push-to-talk"), "Discord push-to-talk (hold ^)",
+group(S.group_apps)
+bind("code:49", hl.dsp.global("discord:discord-push-to-talk"), S.ptt,
     { non_consuming = true })
 
 -- Media and brightness keys (work on the lock screen too)

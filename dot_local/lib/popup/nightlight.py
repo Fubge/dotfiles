@@ -16,6 +16,7 @@ import os
 import time
 
 import settings
+from i18n import T
 
 DAY_K = 6500               # neutral (hyprsunset identity)
 DEFAULTS = {"mode": "off", "temp": 4000, "start": "21:00", "end": "07:00"}
@@ -132,17 +133,17 @@ def target(c=None, now=None):
 
 
 def status(c=None):
-    """Short German line for the menu tile."""
+    """Short line for the menu tile."""
     c = c or config()
     mode = c["mode"]
     if mode == "off":
-        return "aus"
+        return T("nightlight.off")
     if mode == "always":
-        return f"an · {c['temp']} K"
+        return T("nightlight.always", temp=c['temp'])
     span = night(c)
     if not span:
-        return "aus"
+        return T("nightlight.off")
     now = target(c)
     if now < DAY_K:
-        return f"an bis {hhmm(span[1])}"
-    return f"ab {hhmm(span[0])}"
+        return T("nightlight.on_until", time=hhmm(span[1]))
+    return T("nightlight.from", time=hhmm(span[0]))

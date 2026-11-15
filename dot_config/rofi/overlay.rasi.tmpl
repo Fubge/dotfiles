@@ -63,7 +63,7 @@ entry {
     border-radius:     0;
     horizontal-align:  0.5;
     vertical-align:    0.5;
-    placeholder:       "Filter...";
+    placeholder:       "{{ index .strings.rofi.filter (dig "machine" "lang" "en" .) }}";
     placeholder-color: @hint;
 }
 

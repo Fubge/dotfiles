@@ -22,6 +22,7 @@ import sys
 
 sys.path.insert(0, os.path.expanduser("~/.local/lib/popup"))
 import cal  # noqa: E402
+from i18n import T, Tn  # noqa: E402
 
 import gi  # noqa: E402
 
@@ -67,7 +68,7 @@ class Reminder:
             res = self.bus.call_sync(
                 "org.freedesktop.Notifications", "/org/freedesktop/Notifications",
                 "org.freedesktop.Notifications", "Notify",
-                GLib.Variant("(susssasa{sv}i)", ("Kalender", 0, "x-office-calendar",
+                GLib.Variant("(susssasa{sv}i)", (T("cal.title"), 0, "x-office-calendar",
                                                 summary, body, actions,
                                                 {"urgency": GLib.Variant("y", urgency)}, -1)),
                 GLib.VariantType("(u)"), Gio.DBusCallFlags.NONE, 2000, None)
@@ -89,14 +90,14 @@ class Reminder:
     def body(self, o, t):
         parts = []
         if o.allday:
-            parts.append("ganztägig" if o.start == t.date() else f"{cal.day_name(o.start)} · ganztägig")
+            parts.append(T("cal.allday") if o.start == t.date() else f"{cal.day_name(o.start)} · " + T("cal.allday"))
         else:
             s, e = o.bounds()
             when = f"{o.start:%H:%M}" + (f" – {o.end:%H:%M}" if e > s else "")
             if s > t:
                 when += f" · {cal.until_text(s, t)}"
             elif s <= t < e:
-                when += " · läuft"
+                when += T("cal.running")
             if s.date() != t.date():
                 when = f"{cal.day_name(s.date())} {when}"
             parts.append(when)
@@ -107,7 +108,7 @@ class Reminder:
 
     def remind(self, o, t):
         self.notify(o.summary, self.body(o, t),
-                    ["default", "Kalender", "open", "Kalender", "snooze", "In 5 Min"], o)
+                    ["default", T("cal.title"), "open", T("cal.title"), "snooze", T("cal.snooze")], o)
 
     def check(self):
         t = cal.now()
@@ -140,13 +141,13 @@ class Reminder:
             if todays:
                 lines = []
                 for o in todays[:6]:
-                    when = "ganztägig" if o.allday else f"{o.start:%H:%M}"
+                    when = T("cal.allday") if o.allday else f"{o.start:%H:%M}"
                     lines.append(f"{o.cal.glyph} {when}  {o.summary}")
                 if len(todays) > 6:
-                    lines.append(f"… und {len(todays) - 6} mehr")
+                    lines.append(T("cal.n_more", n=len(todays) - 6))
                 n = len(todays)
-                self.notify(f"Guten Morgen! Heute {'1 Termin' if n == 1 else f'{n} Termine'}",
-                            "\n".join(lines), ["default", "Kalender", "open", "Kalender"],
+                self.notify(Tn("cal.morning", n),
+                            "\n".join(lines), ["default", T("cal.title"), "open", T("cal.title")],
                             todays[0])
         # forget old entries
         cutoff = (t - dt.timedelta(days=3)).isoformat()

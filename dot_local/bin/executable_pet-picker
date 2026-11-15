@@ -27,6 +27,7 @@ from pathlib import Path
 HOME = Path.home()
 sys.path.insert(0, str(HOME / ".local/lib/popup"))
 import resident  # noqa: E402
+from i18n import T  # noqa: E402
 
 CSS = HOME / ".config/popups/style.css"
 STATE = HOME / ".local/state/claude-pad/pet"
@@ -120,13 +121,13 @@ def build():
 
     class Picker(Gtk.Window):
         def __init__(self):
-            super().__init__(title="Pets")
+            super().__init__(title=T("pets.title"))
             self.add_css_class("popup")
             self.add_css_class("menu")  # same look as the rofi menus
             self.set_decorated(False)
 
             box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10, css_classes=["menu-box"])
-            box.append(Gtk.Label(label="Pet", css_classes=["menu-title"]))
+            box.append(Gtk.Label(label=T("pets.header"), css_classes=["menu-title"]))
             row = Gtk.Box(spacing=8, halign=Gtk.Align.CENTER)
             self.cards = []
             for kind in pet.PETS:

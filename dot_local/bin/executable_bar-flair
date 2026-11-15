@@ -20,20 +20,22 @@ import time
 
 sys.path.insert(0, os.path.expanduser("~/.local/lib/flair"))
 from typewriter import Typewriter  # noqa: E402
+sys.path.insert(0, os.path.expanduser("~/.local/lib/popup"))
+from i18n import T, greeting  # noqa: E402
 
 FPS = 60
 # Friendly names instead of raw window classes (regex on the class)
 NAMES = [
-    (r"org\.pulseaudio\.pavucontrol", "Volume"),
+    (r"org\.pulseaudio\.pavucontrol", T("flair.volume")),
     (r"vivaldi-stable", "Vivaldi"),
-    (r"org\.kde\.dolphin", "Files"),
+    (r"org\.kde\.dolphin", T("flair.files")),
     (r"kitty|popup-term|dropdown_terminal", "Terminal"),
     (r"discord", "Discord"),
     (r"obsidian", "Obsidian"),
     (r"claude_pad", "Claude"),
     (r"[Ss]potify", "Spotify"),
-    (r"popup\.keybinds", "Shortcuts"),
-    (r"popup\.brightness", "Brightness"),
+    (r"popup\.keybinds", T("flair.shortcuts")),
+    (r"popup\.brightness", T("flair.brightness")),
 ]
 MAX_LEN = 16             # longer names end in "…": the left pill must not reach the clock
 WIFI_HOLD = 4.0          # seconds the Wi-Fi name stays before it is erased
@@ -69,13 +71,6 @@ def friendly(cls):
     name = cls.split(".")[-1] if cls else ""
     name = name[:1].upper() + name[1:]
     return name if len(name) <= MAX_LEN else name[:MAX_LEN - 1] + "…"
-
-
-def greeting():
-    h = time.localtime().tm_hour
-    hello = ("Gute Nacht" if h < 5 else "Guten Morgen" if h < 11 else
-             "Guten Tag" if h < 18 else "Guten Abend" if h < 22 else "Gute Nacht")
-    return f"{hello}, {os.environ.get('USER', '').capitalize()}"
 
 
 def first_start():

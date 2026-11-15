@@ -180,6 +180,7 @@ Change one file, and the whole system follows, down to the boot menu.
 |---|---|
 | Colors | [`.chezmoidata/palette.toml`](.chezmoidata/palette.toml) |
 | Rounding, gaps, borders, fonts, overlay sizes | [`.chezmoidata/design.toml`](.chezmoidata/design.toml) |
+| Texts of popups, bar, notifications, shortcuts (German / English side by side) | [`.chezmoidata/locale.toml`](.chezmoidata/locale.toml); the language is `lang` in `[data.machine]` |
 | Displays, mouse, keyboard, night light, idle times | the system menu (`SUPER+ALT+Space`), kept per machine |
 | Keyboard, GPU, display, optional groups | `[data.machine]` in `~/.config/chezmoi/chezmoi.toml` |
 | Apps, workspaces, autostart, window sizes | [`dot_config/hypr/vars.lua.tmpl`](dot_config/hypr/vars.lua.tmpl) |

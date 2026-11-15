@@ -16,11 +16,14 @@ elapsed=$((now - start))
 
 hour=$(date +%H)
 hour=${hour#0}
-if   ((hour < 5));  then hello="Gute Nacht"
-elif ((hour < 11)); then hello="Guten Morgen"
-elif ((hour < 18)); then hello="Guten Tag"
-elif ((hour < 22)); then hello="Guten Abend"
-else                     hello="Gute Nacht"
+{{- $L := dig "machine" "lang" "en" . }}
+{{- $g := .strings.greet }}
+# words from the language file (.chezmoidata/locale.toml), as in the bar and session menu
+if   ((hour < 5));  then hello={{ index $g.night $L | quote }}
+elif ((hour < 11)); then hello={{ index $g.morning $L | quote }}
+elif ((hour < 18)); then hello={{ index $g.day $L | quote }}
+elif ((hour < 22)); then hello={{ index $g.evening $L | quote }}
+else                     hello={{ index $g.night $L | quote }}
 fi
 text="$hello, ${USER^}"
 

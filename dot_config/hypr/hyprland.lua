@@ -5,6 +5,7 @@
 -- copy cached: drop it, every reload then sees changed vars
 package.loaded["vars"] = nil
 package.loaded["settings"] = nil   -- same for the system menu settings
+package.loaded["strings"] = nil    -- and the shortcut descriptions (language file)
 
 require("env")
 require("monitors")

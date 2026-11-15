@@ -28,6 +28,7 @@ import sys
 
 sys.path.insert(0, os.path.expanduser("~/.local/lib/popup"))
 import resident  # noqa: E402
+from i18n import T  # noqa: E402
 
 APP = "popup.wifi"
 WIDTH = 360
@@ -55,7 +56,7 @@ I_MORE, I_LESS = "\U000F0140", "\U000F0143"     # chevron down / up
 
 def notify(text, urgent=False):
     subprocess.Popen(["notify-send", "-a", "Wi-Fi", "-t", "3000", "-i", "network-wireless",
-                      *(["-u", "critical"] if urgent else []), "Wi-Fi", text])
+                      *(["-u", "critical"] if urgent else []), T("wifi.title"), text])
 
 
 def build():
@@ -76,7 +77,7 @@ def build():
         popup_width = WIDTH       # resident.place() puts it under the mouse
 
         def __init__(self):
-            super().__init__(title="Wi-Fi")
+            super().__init__(title=T("wifi.title"))
             for c in ("popup", "menu", "wifi"):
                 self.add_css_class(c)
             self.set_decorated(False)
@@ -98,7 +99,7 @@ def build():
             box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2,
                           css_classes=["menu-box"])
             head = Gtk.CenterBox(css_classes=["head"])
-            head.set_center_widget(Gtk.Label(label="Wi-Fi", css_classes=["menu-title"]))
+            head.set_center_widget(Gtk.Label(label=T("wifi.title"), css_classes=["menu-title"]))
             self.switch = Gtk.Switch(valign=Gtk.Align.CENTER)
             self.switch_handler = self.switch.connect("state-set", self.on_switch)
             head.set_end_widget(self.switch)
@@ -240,13 +241,13 @@ def build():
             if n is None:
                 return
             if len(pw) < 8:
-                self.ask_error = "At least 8 characters"
+                self.ask_error = T("wifi.min_8")
                 self.shake = self.ask
                 self.shape = None
                 self.render()
                 return
             if n["known"]:          # saved, but the password changed: store the new one
-                self.busy[n["ssid"]] = "Connecting..."
+                self.busy[n["ssid"]] = T("common.connecting")
                 self.ask = None
                 self.run(["nmcli", "connection", "modify", "uuid", n["known"]["uuid"],
                           "802-11-wireless-security.psk", pw],
@@ -274,7 +275,7 @@ def build():
                       done=lambda err, r: self.started(n, err, r and r[0], conn_path, new))
 
         def start(self, n):
-            self.busy[n["ssid"]] = "Connecting..."
+            self.busy[n["ssid"]] = T("common.connecting")
             self.ask = self.open = self.confirm = None
             self.render()
 
@@ -298,13 +299,13 @@ def build():
                 self.attempt = None
                 self.busy.pop(a["ssid"], None)
                 if not self.get_visible():
-                    notify(f"Connected to {a['ssid']}")
+                    notify(T("common.connected_to", name=a['ssid']))
             elif state == DEACTIVATED or (obj is None and a["seen"]) or \
                     GLib.get_monotonic_time() - a["since"] > ATTEMPT_TIMEOUT * 1e6:
                 self.attempt = None
                 if a["new"] and a["conn"]:      # do not keep a wrong password
                     self.call(a["conn"], I_CONN, "Delete")
-                self.failed(dict(ssid=a["ssid"], secured=a["secured"]), "no connection")
+                self.failed(dict(ssid=a["ssid"], secured=a["secured"]), T("wifi.no_connection"))
             elif obj is not None:
                 a["seen"] = True
             else:   # not there yet (or already gone): look again in a moment
@@ -314,17 +315,17 @@ def build():
             ssid = n["ssid"]
             self.busy.pop(ssid, None)
             if n["secured"]:      # most likely the password: ask (again)
-                self.ask, self.ask_error = ssid, "Could not connect. Wrong password?"
+                self.ask, self.ask_error = ssid, T("wifi.wrong_password")
                 self.shake = ssid                 # the card shakes its head once
                 self.pw.set_text("")
                 if self.get_visible():
                     GLib.idle_add(lambda: self.pw.grab_focus() and False)
             else:
-                self.busy[ssid] = "Failed: " + err
+                self.busy[ssid] = T("common.failed", err=err)
                 GLib.timeout_add_seconds(4, lambda: (self.busy.pop(ssid, None),
                                                      self.render(), False)[-1])
             if not self.get_visible():
-                notify(f"Could not connect to {ssid}", urgent=True)
+                notify(T("common.connect_failed_to", name=ssid), urgent=True)
             self.shape = None
             self.render()
 
@@ -332,7 +333,7 @@ def build():
             dev = self.device()
             active = prop(dev, I_DEV, "ActiveConnection", "/")
             if active != "/":
-                self.busy[n["ssid"]] = "Disconnecting..."
+                self.busy[n["ssid"]] = T("common.disconnecting")
                 self.call(NM_PATH, NM, "DeactivateConnection", GLib.Variant("(o)", (active,)),
                           done=lambda _e, _r: (self.busy.pop(n["ssid"], None), self.soon()))
                 self.render()
@@ -399,14 +400,14 @@ def build():
                     enterprise=bool(keys & KEY_8021X),
                     sae_only=bool(keys & KEY_SAE) and not keys & KEY_PSK,
                     security=("WPA3" if keys & KEY_SAE else "WPA2" if keys else
-                              "WEP" if prop(obj, I_AP, "Flags", 0) & 1 else "Open"),
+                              "WEP" if prop(obj, I_AP, "Flags", 0) & 1 else T("wifi.open")),
                     band="6 GHz" if freq > 5925 else "5 GHz" if freq > 4900 else "2.4 GHz",
                     known=known.get(ssid), status=self.busy.get(ssid))
             if dev_state in range(40, 100) and active_ap != "/":   # connecting
                 obj = self.manager.get_object(active_ap)
                 ssid = bytes(prop(obj, I_AP, "Ssid", [])).decode("utf-8", "replace")
                 if ssid in nets and not nets[ssid]["status"]:
-                    nets[ssid]["status"] = "Connecting..."
+                    nets[ssid]["status"] = T("common.connecting")
             return nets
 
         def ip(self, dev):
@@ -468,37 +469,37 @@ def build():
             while child := self.body.get_first_child():
                 self.body.remove(child)
             if wired:
-                self.body.append(self.section("Wired"))
-                self.body.append(self.info_row(I_ETHERNET, "Ethernet",
-                                               "Connected  ·  " + (self.ip(ether) or "no address")))
+                self.body.append(self.section(T("wifi.wired")))
+                self.body.append(self.info_row(I_ETHERNET, T("wifi.ethernet"),
+                                               T("common.connected") + "  ·  " + (self.ip(ether) or T("wifi.no_address"))))
             if nm is None:
-                self.body.append(self.note("NetworkManager is not running"))
+                self.body.append(self.note(T("wifi.nm_down")))
             elif dev is None:
-                self.body.append(self.note("No Wi-Fi adapter found"))
+                self.body.append(self.note(T("wifi.no_adapter")))
             elif not hw:
-                self.body.append(self.note("Wi-Fi is blocked by a hardware switch"))
+                self.body.append(self.note(T("wifi.hw_blocked")))
             elif not enabled:
-                self.body.append(self.note("Wi-Fi is off"))
+                self.body.append(self.note(T("wifi.is_off")))
             else:
                 if current:
-                    self.body.append(self.section("Connected"))
+                    self.body.append(self.section(T("common.connected")))
                     self.body.append(self.net_row(current[0], ip))
                 if saved:
-                    self.body.append(self.section("Saved networks"))
+                    self.body.append(self.section(T("wifi.saved_networks")))
                     for n in saved:
                         self.body.append(self.net_row(n))
-                self.body.append(self.section("Searching..." if scanning and not other
-                                              else "Other networks", busy=scanning))
+                self.body.append(self.section(T("wifi.searching") if scanning and not other
+                                              else T("wifi.other_networks"), busy=scanning))
                 if other:
                     self.body.append(self.scrolled([self.net_row(n) for n in other]))
                 elif not scanning:
-                    self.body.append(self.note("No other networks around"))
+                    self.body.append(self.note(T("wifi.none_around")))
             self.body.append(Gtk.Separator(css_classes=["sound-sep"]))
             if enabled and dev is not None:
                 self.body.append(self.text_row(
-                    f"{I_SCAN}  " + ("Scanning..." if scanning else "Scan again"),
+                    f"{I_SCAN}  " + (T("wifi.scanning") if scanning else T("wifi.scan_again")),
                     lambda: self.scan() and False, "scan", spin=scanning))
-            self.body.append(self.text_row(f"{I_SETTINGS}  Network settings",
+            self.body.append(self.text_row(f"{I_SETTINGS}  " + T("wifi.settings"),
                                            self.open_settings, "settings"))
             if self.get_visible():
                 self.set_default_size(WIDTH, 1)    # grow with the list...
@@ -583,13 +584,13 @@ def build():
             if n["status"]:
                 status = n["status"]
             elif n["active"]:
-                status = "Connected" + (f"  ·  {ip}" if ip else "")
+                status = T("common.connected") + (f"  ·  {ip}" if ip else "")
             elif n["known"]:
-                status = "Saved" if n["known"]["auto"] else "Saved  ·  joins only on click"
+                status = T("wifi.saved") if n["known"]["auto"] else T("wifi.saved_manual")
             elif n["enterprise"]:
-                status = "Enterprise  ·  set up in Network settings"
+                status = T("wifi.enterprise")
             else:
-                status = n["security"] if n["secured"] else "Open network"
+                status = n["security"] if n["secured"] else T("wifi.open_network")
             classes = ["sound-row", "flat", "device"]
             if n["active"]:
                 classes.append("active")
@@ -605,7 +606,7 @@ def build():
             if n["known"]:
                 more = Gtk.Button(label=I_LESS if self.open == ssid else I_MORE,
                                   css_classes=["more", "flat"], valign=Gtk.Align.CENTER,
-                                  tooltip_text="Manage this network")
+                                  tooltip_text=T("wifi.manage"))
                 more.wkey = "more" + ssid
                 more.connect("clicked", lambda _b: self.toggle_open(ssid))
                 top.append(more)
@@ -624,9 +625,9 @@ def build():
                     card.append(Gtk.Label(label=self.ask_error, xalign=0,
                                           css_classes=["item-info", "error"]))
                 line = Gtk.Box(spacing=6, css_classes=["item-actions"])
-                self.pw.set_property("placeholder-text", f"Password for {ssid}")
+                self.pw.set_property("placeholder-text", T("wifi.password_for", ssid=ssid))
                 line.append(self.pw)
-                join = Gtk.Button(label="Join", css_classes=["item-action", "flat"])
+                join = Gtk.Button(label=T("wifi.join"), css_classes=["item-action", "flat"])
                 join.wkey = "join"
                 join.connect("clicked", lambda _b: self.submit())
                 line.append(join)
@@ -642,7 +643,7 @@ def build():
                 card.add_css_class("opening")
                 self.opening = None
             card.append(top)
-            info = f"Signal {n['strength']}%  ·  {n['band']}  ·  {n['security']}"
+            info = T("wifi.signal", strength=n['strength'], band=n['band'], security=n['security'])
             card.append(Gtk.Label(label=info, xalign=0, css_classes=["item-info"]))
             actions = Gtk.Box(spacing=6, homogeneous=True, css_classes=["item-actions"])
 
@@ -652,15 +653,15 @@ def build():
                 b.connect("clicked", lambda _b: on_click())
                 actions.append(b)
             if n["active"]:
-                action("Disconnect", "conn", lambda: self.disconnect(n))
+                action(T("common.disconnect"), "conn", lambda: self.disconnect(n))
             else:
-                action("Connect", "conn", lambda: self.activate(n, n["known"]["path"], False))
+                action(T("common.connect"), "conn", lambda: self.activate(n, n["known"]["path"], False))
             if n["known"]:
                 # accent when it joins by itself, grey when only on click
-                action("Auto-join", "auto", lambda: self.toggle_auto(n),
+                action(T("wifi.auto_join"), "auto", lambda: self.toggle_auto(n),
                        ["on"] if n["known"]["auto"] else ["off"])
                 sure = self.confirm == ssid
-                action("Sure?" if sure else "Forget", "forget", lambda: self.forget(n),
+                action(T("common.sure") if sure else T("common.forget"), "forget", lambda: self.forget(n),
                        ["danger"] if sure else [])
             card.append(actions)
             return card

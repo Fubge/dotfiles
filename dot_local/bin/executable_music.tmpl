@@ -39,6 +39,8 @@ LEVELS = 16                   # bar heights l0..l16 (CSS classes in style.css, 1
 FPS = 60
 # typing speed shared with the other typewriter texts
 sys.path.insert(0, os.path.expanduser("~/.local/lib/flair"))
+sys.path.insert(0, os.path.expanduser("~/.local/lib/popup"))
+from i18n import T  # noqa: E402
 from typewriter import TYPE_SPEED  # noqa: E402
 SCROLL_SPEED = 4              # marquee characters per second (moves pixel by pixel)
 CHAR_W = 14 * 0.6             # advance of one JetBrains Mono character at the bar's 14 px
@@ -374,7 +376,7 @@ def watch(reaper):
             hide_all()
             if spotify_idle:  # running without a song: keep the icon as a tray
                 parts.send("icon", span(COLORS["dim"], ICONS["spotify"]),
-                           "Spotify\n\n<small>Click show · Right click menu</small>", "idle")
+                           "Spotify\n\n<small>" + T("claude.bar_hint") + "</small>", "idle")
             parts.send("title")
             last_title, last_out, playing = None, None, False
             changed.wait()
@@ -390,7 +392,7 @@ def watch(reaper):
         tip = html.escape(title)
         if s["artist"]:
             tip += "\n" + html.escape(" · ".join(x for x in (s["artist"], s["album"]) if x))
-        tip += "\n\n<small>Click play/pause · Right click menu · Scroll skip</small>"
+        tip += "\n\n<small>" + T("music.bar_hint") + "</small>"
 
         cls = "playing" if playing else "paused"
         parts.send("icon", span(COLORS["icon"] if playing else COLORS["dim"],
@@ -512,14 +514,14 @@ def menu():
     """Right click menu, the tray stand-in (Spotify has no tray icon on Linux)."""
     status = subprocess.run(["playerctl", "-p", PLAYERS, "status"],
                             capture_output=True, text=True).stdout.strip()
-    rows = [("\U000F03E4  Pause" if status == "Playing" else "\U000F040A  Play",
+    rows = [("\U000F03E4  " + T("music.pause") if status == "Playing" else "\U000F040A  " + T("music.play"),
              lambda: subprocess.run(["playerctl", "-p", PLAYERS, "play-pause"])),
-            ("\U000F04AD  Next song", lambda: subprocess.run(["playerctl", "-p", PLAYERS, "next"])),
-            ("\U000F04AE  Previous song",
+            ("\U000F04AD  " + T("music.next"), lambda: subprocess.run(["playerctl", "-p", PLAYERS, "next"])),
+            ("\U000F04AE  " + T("music.previous"),
              lambda: subprocess.run(["playerctl", "-p", PLAYERS, "previous"])),
-            ("\U000F05AF  Show / hide Spotify", show)]
+            ("\U000F05AF  " + T("music.show_hide"), show)]
     if subprocess.run(["pgrep", "-x", "spotify"], stdout=subprocess.DEVNULL).returncode == 0:
-        rows.append(("\U000F0156  Quit Spotify", quit_spotify))
+        rows.append(("\U000F0156  " + T("music.quit"), quit_spotify))
     # bound to on-click-right-release: the menu closes when focus leaves it,
     # so it must only open after the right click (touchpad: two-finger press) is let go
     meta = subprocess.run(["playerctl", "-p", PLAYERS, "metadata", "--format",

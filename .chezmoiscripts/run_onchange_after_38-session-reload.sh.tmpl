@@ -32,6 +32,8 @@
 # {{ include "dot_local/lib/popup/nightlight.py" | sha256sum }}
 # {{ include "dot_local/bin/executable_nightlight" | sha256sum }}
 # {{ include "dot_local/bin/executable_idle-config" | sha256sum }}
+# texts: {{ include ".chezmoidata/locale.toml" | sha256sum }} {{ dig "machine" "lang" "en" . }}
+# {{ include "dot_local/lib/popup/i18n.py" | sha256sum }}
 {{ range (glob (joinPath .chezmoi.sourceDir "dot_config/hypr/*.lua*")) -}}
 # {{ include . | sha256sum }}
 {{ end -}}

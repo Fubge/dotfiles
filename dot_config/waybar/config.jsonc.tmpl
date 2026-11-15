@@ -147,7 +147,7 @@
     },
     "memory": {
         "format": "\udb80\udf5b {used:0.1f}/{total:0.0f} GB",
-        "tooltip-format": "Swap: {swapUsed:0.1f}/{swapTotal:0.0f} GB",
+        "tooltip-format": {{ .strings.bar.swap | toJson }},
         "interval": 5,
         "states": { "high": 85 }
     },
@@ -157,8 +157,8 @@
     "idle_inhibitor": {
         "format": "{icon}",
         "format-icons": { "activated": "\udb80\udd76", "deactivated": "\udb81\udcb2" },
-        "tooltip-format-activated": "Staying awake",
-        "tooltip-format-deactivated": "Idle as usual"
+        "tooltip-format-activated": {{ index .strings.bar.awake (dig "machine" "lang" "en" .) | toJson }},
+        "tooltip-format-deactivated": {{ index .strings.bar.idle (dig "machine" "lang" "en" .) | toJson }}
     },
     // Icon from ~/.local/bin/power-profile; click opens the power popup (battery,
     // the three profiles: ~/.local/bin/power-popup)
@@ -193,7 +193,7 @@
         // Material speakers; the glyphs are
         // drawn small, so they get a larger size
         "format": "<span size='larger'>{icon}</span>",   // icon only, percent in the tooltip
-        "tooltip-format": "Volume {volume}%\n{node_name}\nClick: sound, right click: mute",
+        "tooltip-format": {{ index .strings.bar.volume (dig "machine" "lang" "en" .) | toJson }},
         "format-muted": "<span size='larger'>\udb81\udf5f</span>",
         "format-icons": ["\udb81\udd7f", "\udb81\udd80", "\udb81\udd7e"],
         "scroll-step": 2,

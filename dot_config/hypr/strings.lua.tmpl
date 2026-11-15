@@ -1,0 +1,9 @@
+-- Generated from .chezmoidata/locale.toml ([strings.binds]) in the language
+-- picked at `chezmoi init`: shortcut descriptions for binds.lua
+{{- $lang := dig "machine" "lang" "en" . }}
+return {
+{{- range $key, $v := .strings.binds }}
+{{- if kindIs "map" $v }}{{ $v = index $v $lang }}{{ end }}
+    {{ $key }} = {{ $v | quote }},
+{{- end }}
+}

@@ -18,10 +18,15 @@ the charging fill.
 Waits for udev power_supply events, so it sleeps while nothing changes.
 """
 import json
+import os
 import select
 import subprocess
+import sys
 import time
 from pathlib import Path
+
+sys.path.insert(0, os.path.expanduser("~/.local/lib/popup"))
+from i18n import T  # noqa: E402
 
 BAT = Path("/sys/class/power_supply/BAT0")
 AC = Path("/sys/class/power_supply/AC/online")
@@ -71,21 +76,21 @@ def hours(h):
 
 
 def tooltip(s):
-    lines = [f"Battery {s['cap']}%"]
+    lines = [T("battery.title", pct=s['cap'])]
     w = s["watts"]
     if s["kind"] == "charging":
         target = s["full"] * s["limit"] / 100
         if w > 0.5 and target > s["now"]:
-            lines.append(f"{s['limit']}% in {hours((target - s['now']) / 1e6 / w)}")
-        lines.append(f"Charging with {w:.1f} W")
+            lines.append(T("battery.until_limit", pct=s['limit'], time=hours((target - s['now']) / 1e6 / w)))
+        lines.append(T("battery.charging_w", w=f"{w:.1f}"))
     elif s["kind"] == "discharging":
         if w > 0.5:
-            lines.append(f"{hours(s['now'] / 1e6 / w)} left")
+            lines.append(T("battery.left", time=hours(s['now'] / 1e6 / w)))
         lines.append(f"{w:.1f} W")
     elif s["kind"] == "plugged":
-        lines.append(f"Plugged in, held at {s['limit']}% to spare the battery")
+        lines.append(T("battery.held", pct=s['limit']))
     else:
-        lines.append("Full, plugged in")
+        lines.append(T("battery.full"))
     return "\n".join(lines)
 
 

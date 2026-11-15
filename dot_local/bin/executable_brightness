@@ -15,14 +15,17 @@ dev=$(find /sys/class/backlight -mindepth 1 -maxdepth 1 | head -1)
 # class night / cloud / sun colors it (waybar style.css)
 icons=($'\U000F0594' $'\U000F0595' $'\U000F05A8')
 classes=(night cloud sun)
+# tooltip text from the language file (.chezmoidata/locale.toml), {pct} filled below
+tip=$(jq -r '."brightness.bar_tip" // "{pct}%"' ~/.config/popups/strings.json 2>/dev/null) || tip="{pct}%"
+tip=${tip//$'\n'/\\n}
 
 status() {
     local p i
     p=$(awk -v c="$(<"$dev/brightness")" -v m="$(<"$dev/max_brightness")" \
         'BEGIN { print (c < 1 ? 0 : int(((c - 1) / (m - 1)) ^ 0.5 * 99 + 1.5)) }')
     i=$(( p <= 33 ? 0 : p <= 66 ? 1 : 2 ))
-    printf '{"text": "%s", "class": "%s", "tooltip": "Brightness %d%%\\nClick for a slider, scroll to change"}\n' \
-        "${icons[i]}" "${classes[i]}" "$p"
+    printf '{"text": "%s", "class": "%s", "tooltip": "%s"}\n' \
+        "${icons[i]}" "${classes[i]}" "${tip//\{pct\}/$p}"
 }
 
 case ${1-status} in

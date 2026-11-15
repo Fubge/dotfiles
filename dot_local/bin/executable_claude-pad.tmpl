@@ -39,6 +39,9 @@ import subprocess
 import sys
 import time
 
+sys.path.insert(0, os.path.expanduser("~/.local/lib/popup"))
+from i18n import T  # noqa: E402
+
 CLASS = "claude_pad"
 WS = "claude"
 RUN = os.path.join(os.environ.get("XDG_RUNTIME_DIR", "/tmp"), "claude-pad")
@@ -77,9 +80,7 @@ ACTIVITIES = {
 }
 # played once when a state begins
 INTROS = {"starting": "wake", "done": "cheer", "waiting": "alert"}
-TIPS = {"off": "Claude is not running", "starting": "Claude starts…",
-        "idle": "Claude is ready", "busy": "Claude is working…",
-        "waiting": "Claude needs you", "done": "Claude is done"}
+TIPS = {k: T("claude." + k) for k in ("off", "starting", "idle", "busy", "waiting", "done")}
 NBSP = "\u00a0"
 
 
@@ -280,9 +281,9 @@ ASK_THEME = """
 window       { location: north; anchor: north; y-offset: {{ sub .design.launcher_top 30 }}px; width: {{ .design.websearch_width }}px; height: 0; padding: 20px 20px 12px 20px; }
 mainbox      { children: [ inputbar, textbox-hint ]; spacing: 12px; }
 box-search   { width: {{ sub .design.websearch_width 40 }}px; }
-entry        { placeholder: "Ask Claude..."; }
+entry        { placeholder: "{{ index .strings.rofi.claude (dig "machine" "lang" "en" .) }}"; }
 textbox-lens { str: "\uEC10"; }
-textbox-hint { str: "Enter  ask + open    ·    Ctrl+Enter  ask in background    ·    Esc  close"; }
+textbox-hint { str: "{{ index .strings.rofi.claude_hint (dig "machine" "lang" "en" .) }}"; }
 message      { padding: 0 6px; }
 textbox      { horizontal-align: 0.5; text-color: {{ .palette.fg_muted }}; }
 """
@@ -326,13 +327,13 @@ def menu():
     except (ValueError, IndexError):
         x = None
     running = window() is not None
-    rows = [("\U000F05AF  Show / hide", toggle),
-            ("\U000F0415  New chat (/clear)", lambda: (show(), send("/clear"))),
-            ("\U000F0450  Resume a chat", lambda: (show(), send("/resume")))]
+    rows = [("\U000F05AF  " + T("claude.show_hide"), toggle),
+            ("\U000F0415  " + T("claude.new_chat"), lambda: (show(), send("/clear"))),
+            ("\U000F0450  " + T("claude.resume"), lambda: (show(), send("/resume")))]
     if running:
-        rows += [("\U000F0709  Restart Claude", restart),
-                 ("\U000F0156  Quit Claude", quit_pad)]
-    rows.append(("\U000F03E9  Choose pet", lambda: open_picker(x)))
+        rows += [("\U000F0709  " + T("claude.restart"), restart),
+                 ("\U000F0156  " + T("claude.quit"), quit_pad)]
+    rows.append(("\U000F03E9  " + T("claude.pet"), lambda: open_picker(x)))
     pick = subprocess.run([os.path.join(BIN, "list-menu"), "--bar", "Claude", ""],
                           input="\n".join(r[0] for r in rows), capture_output=True, text=True)
     if pick.stdout.strip().isdigit():
@@ -368,7 +369,7 @@ def last_answer(event):
         elif para:
             break
     para = " ".join(para).replace("**", "").replace("`", "")
-    return (para[:297] + "…" if len(para) > 300 else para) or "Finished."
+    return (para[:297] + "…" if len(para) > 300 else para) or T("claude.finished")
 
 
 def notify(title, body):
@@ -420,7 +421,7 @@ def hook(name):
         set_state("busy")
     elif name == "ask":                           # AskUserQuestion / permission
         set_state("waiting")
-        msg = event.get("message") or "Waiting for your answer."
+        msg = event.get("message") or T("claude.waiting_msg")
         if name == "ask" and event.get("tool_input", {}).get("questions"):
             msg = event["tool_input"]["questions"][0].get("question", msg)
         with open(LAST, "w") as f:
@@ -572,7 +573,7 @@ def watch():
         classes = ["pet", pet.kind, state] + ([pet.frame] if pet.frame else [])
         if pet.width:
             classes.append(pet.width)
-        tip = TIPS.get(state, "") + "\n\n<small>Click show · Right click menu</small>"
+        tip = TIPS.get(state, "") + "\n\n<small>" + T("claude.bar_hint") + "</small>"
         out = json.dumps({"text": NBSP, "class": classes, "tooltip": tip})
         if out != last:
             print(out, flush=True)

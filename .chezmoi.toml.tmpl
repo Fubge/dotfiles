@@ -10,6 +10,7 @@
 {{- $gpu := promptChoiceOnce . "machine.gpu" "Graphics (driver packages)" (list "intel" "amd" "nvidia" "none") "intel" -}}
 {{- $layout := promptStringOnce . "machine.kb_layout" "Keyboard layout (xkb, e.g. us, de, fr)" "us" -}}
 {{- $kbopts := promptStringOnce . "machine.kb_options" "xkb options (caps:swapescape = Caps Lock is Escape; altwin:swap_lalt_lwin swaps left Alt and Super)" "caps:swapescape" -}}
+{{- $lang := promptChoiceOnce . "machine.lang" "Desktop language for popups and bar texts" (list "de" "en") "en" -}}
 {{- $clock := promptStringOnce . "machine.clock_locale" "Locale for dates in the bar (must be in `locale -a`)" "en_US.UTF-8" -}}
 {{- $mode := promptStringOnce . "machine.monitor_mode" "Internal display mode (preferred, or e.g. 2560x1600@165)" "preferred" -}}
 {{- $scale := promptStringOnce . "machine.monitor_scale" "Internal display scale (auto, 1, 1.5, 2, ...)" "auto" -}}
@@ -23,6 +24,7 @@ cpu = {{ $cpu | quote }}
 gpu = {{ $gpu | quote }}
 kb_layout = {{ $layout | quote }}
 kb_options = {{ $kbopts | quote }}
+lang = {{ $lang | quote }}
 clock_locale = {{ $clock | quote }}
 monitor_mode = {{ $mode | quote }}
 monitor_scale = {{ $scale | quote }}

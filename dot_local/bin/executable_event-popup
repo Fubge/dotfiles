@@ -38,6 +38,7 @@ import sys
 sys.path.insert(0, os.path.expanduser("~/.local/lib/popup"))
 import cal  # noqa: E402
 import resident  # noqa: E402
+from i18n import T, Tn  # noqa: E402
 
 APP = "popup.event"
 
@@ -52,10 +53,10 @@ POPUP_CMD = os.path.expanduser("~/.local/bin/popup-cmd")
 DEFAULT_LENGTH = dt.timedelta(hours=1)
 
 # reminder choices: (label, timedelta before start or None)
-TIMED_ALARMS = [("Keine", None), ("15 Min", dt.timedelta(minutes=-15)),
-                ("1 Std", dt.timedelta(hours=-1)), ("1 Tag", dt.timedelta(days=-1))]
-ALLDAY_ALARMS = [("Keine", None), ("Am Tag 9 Uhr", dt.timedelta(hours=9)),
-                 ("Vortag 18 Uhr", dt.timedelta(hours=-6)), ("2 Tage vorher", dt.timedelta(days=-2))]
+TIMED_ALARMS = [(T("event.alarm_none"), None), (T("event.alarm_15"), dt.timedelta(minutes=-15)),
+                (T("event.alarm_1h"), dt.timedelta(hours=-1)), (T("event.alarm_1d"), dt.timedelta(days=-1))]
+ALLDAY_ALARMS = [(T("event.alarm_none"), None), (T("event.alarm_day9"), dt.timedelta(hours=9)),
+                 (T("event.alarm_eve18"), dt.timedelta(hours=-6)), (T("event.alarm_2d"), dt.timedelta(days=-2))]
 
 WEEKDAYS = {"montag": 0, "mo": 0, "dienstag": 1, "di": 1, "mittwoch": 2, "mi": 2,
             "donnerstag": 3, "do": 3, "freitag": 4, "fr": 4, "samstag": 5, "sa": 5,
@@ -317,7 +318,7 @@ def build():
         popup_width = WIDTH
 
         def __init__(self):
-            super().__init__(title="Neuer Termin")
+            super().__init__(title=T("event.new"))
             for c in ("popup", "menu", "event"):
                 self.add_css_class(c)
             self.set_decorated(False)
@@ -333,16 +334,16 @@ def build():
 
             box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4,
                           css_classes=["event-box"])
-            self.hello = label("Neuer Termin", ("menu-title", "event-hello"))
+            self.hello = label(T("event.new"), ("menu-title", "event-hello"))
             self.sub = label("", ("event-sub",))
             box.append(self.hello)
             box.append(self.sub)
 
-            self.entry = Gtk.Entry(placeholder_text="Was? z. B. Auto fertig machen",
+            self.entry = Gtk.Entry(placeholder_text=T("event.what"),
                                    css_classes=["menu-search", "event-entry"])
-            self.when = Gtk.Entry(placeholder_text="Wann? z. B. Fr bis So · morgen 20 Uhr",
+            self.when = Gtk.Entry(placeholder_text=T("event.when"),
                                   css_classes=["menu-search", "event-when"])
-            self.place = Gtk.Entry(placeholder_text="Wo? (optional)",
+            self.place = Gtk.Entry(placeholder_text=T("event.where"),
                                    css_classes=["menu-search", "event-place"])
             for e in (self.entry, self.when, self.place):
                 e.connect("activate", lambda _e: self.save())
@@ -515,14 +516,14 @@ def build():
             (self.tile.add_css_class if d == today else self.tile.remove_css_class)("is-today")
             self.t_title.set_text(pl.title or "…")
             (self.t_title.add_css_class if not pl.title else self.t_title.remove_css_class)("placeholder")
-            day = f"{cal.DAYS[d.weekday()]}, {d.day}. {cal.MONTHS[d.month - 1]}"
+            day = f"{cal.DAYS[d.weekday()]}, " + T("cal.day_month", d=d.day, month=cal.MONTHS[d.month - 1])
             if pl.allday:
                 days = (pl.end - pl.start).days
                 if days > 1:
                     last = pl.end - dt.timedelta(days=1)
-                    when = f"{cal.date_text(d)} – {cal.date_text(last)} · {days} Tage"
+                    when = f"{cal.date_text(d)} – {cal.date_text(last)} · " + Tn("cal.days", days)
                 else:
-                    when = f"{day} · ganztägig"
+                    when = f"{day} · " + T("cal.allday")
                 start = dt.datetime.combine(d, dt.time(), cal.TZ)
             else:
                 when = f"{day} · {pl.start:%H:%M} – {pl.end:%H:%M}"
@@ -530,9 +531,9 @@ def build():
             self.t_when.set_text(when)
             rel = cal.day_name(d, today)
             if rel in cal.DAYS:
-                rel = cal.until_text(start) if start > cal.now() else "vorbei"
+                rel = cal.until_text(start) if start > cal.now() else T("event.past")
             elif not pl.allday and d == today:
-                rel = cal.until_text(start) if start > cal.now() else "schon vorbei"
+                rel = cal.until_text(start) if start > cal.now() else T("event.already_past")
             self.t_until.set_text(rel)
             touched = False
             if was_allday is not None and was_allday != pl.allday:
@@ -630,7 +631,7 @@ def build():
             new = o is NEW
             allday = self.plan.allday if new else o.allday
             i = ci if new else next((k for k, c in enumerate(self.cals) if c.id == o.cal.id), 0)
-            title = (self.plan.title or "Neu") if new else o.summary
+            title = (self.plan.title or T("event.new_short")) if new else o.summary
             if long(s, e, allday):
                 classes = ["cal-chip", "bar", f"cal-bg-c{i}"]
                 before = s.date() < day
@@ -652,9 +653,9 @@ def build():
         def fill_from(self, o):
             """edit: the event written out the way it would be typed, so the
             same parser reads it back ("Testo 20.11.2026 20:00-20:15")"""
-            self.hello.set_text("Termin bearbeiten")
-            self.sub.set_text(("Ganze Serie · " if o.event.rrule else "")
-                              + f"aus {o.cal.name}s Kalender")
+            self.hello.set_text(T("event.edit"))
+            self.sub.set_text((T("event.series") if o.event.rrule else "")
+                              + T("event.from_cal", name=o.cal.name))
             if o.allday:
                 last = o.end - dt.timedelta(days=1)
                 when = (f"{o.start.day}.{o.start.month}.{o.start.year}" if last <= o.start else
@@ -686,7 +687,7 @@ def build():
             if not pl.title:
                 self.entry.remove_css_class("shake")
                 GLib.timeout_add(16, lambda: self.entry.add_css_class("shake") and False)
-                self.caption.set_text("Was steht an? Der Titel fehlt noch")
+                self.caption.set_text(T("event.no_title"))
                 self.entry.grab_focus()
                 return
             place = " ".join(self.place.get_text().split())
@@ -698,22 +699,22 @@ def build():
                                     alarm=alarm if self.alarm_touched else ...,
                                     cal_id=self.cal_id)
                     if not ok:
-                        raise OSError(0, "Termin nicht mehr gefunden")
+                        raise OSError(0, T("event.gone"))
                 else:
                     cal.add(self.cal_id, pl.title, pl.start, pl.end, pl.allday, place, alarm)
             except OSError as e:
-                self.caption.set_text(f"Konnte nicht speichern: {e.strerror}")
+                self.caption.set_text(T("event.save_failed", err=e.strerror))
                 self.caption.add_css_class("error")
                 return
             self.back_day = _day(pl.start)
             for e in (self.entry, self.when, self.place):
                 e.set_text("")
             self.add_css_class("saved")
-            self.hello.set_text("Geändert ✓" if self.editing else "Eingetragen ✓")
+            self.hello.set_text(T("event.changed") if self.editing else T("event.added"))
             self.editing = None
             resident.type_title(self.hello)
             who = next(c.name for c in self.cals if c.id == self.cal_id)
-            self.caption.set_text(f"In {who}s Kalender · geht gleich an Nextcloud")
+            self.caption.set_text(T("event.to_nextcloud", name=who))
             self.close_timer = GLib.timeout_add(CLOSE_MS, self.done)
 
         def done(self):
@@ -744,7 +745,7 @@ def build():
             if self.editing:
                 self.fill_from(self.editing)
             else:
-                self.hello.set_text("Neuer Termin")
+                self.hello.set_text(T("event.new"))
                 self.alarm_i = 0         # never a reminder unless picked
                 if getattr(self, "from_edit", False):   # an edit left by Escape
                     for e in (self.entry, self.when, self.place):
@@ -753,13 +754,11 @@ def build():
             if self.editing:
                 pass
             elif self.preset and self.preset != dt.date.today():
-                self.sub.set_text(f"Für {cal.DAYS[self.preset.weekday()]}, "
-                                  f"{self.preset.day}. {cal.MONTHS[self.preset.month - 1]} "
-                                  "– oder sag unter Wann ein anderes Datum")
+                self.sub.set_text(T("event.for_day", date=f"{cal.DAYS[self.preset.weekday()]}, " + T(
+                    "cal.day_month", d=self.preset.day, month=cal.MONTHS[self.preset.month - 1])))
             else:
-                self.sub.set_text("Was steht an, und wann?")
-            self.caption.set_text("Enter speichert · Tab: nächstes Feld" if not self.editing else
-                                  "Ändere Titel, Datum oder Uhrzeit · Enter speichert")
+                self.sub.set_text(T("event.hello_sub"))
+            self.caption.set_text(T("event.hint_new") if not self.editing else T("event.hint_edit"))
             self.pick_cal(self.cal_id)
             self.last_day = None
             self.update()

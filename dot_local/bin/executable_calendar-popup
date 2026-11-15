@@ -41,6 +41,7 @@ import time
 sys.path.insert(0, os.path.expanduser("~/.local/lib/popup"))
 import cal  # noqa: E402
 import resident  # noqa: E402
+from i18n import T, Tn  # noqa: E402
 
 APP = "popup.calendar"
 WIDTH = 1090
@@ -63,11 +64,11 @@ G = {
     "bell": "\U000F009A", "sun": "\U000F05A8",
 }
 EMPTY = [
-    (G["coffee"], "Nichts geplant", "Zeit für einen Kaffee zu zweit?"),
-    ("\U000F02D1", "Ein freier Tag", "Perfekt für Pia & Flauschebär"),
-    ("\U000F0F62", "Leer wie ein frisches Blatt", "N trägt etwas ein"),
-    ("\U000F18FB", "Kein Termin weit und breit", "Kuscheltag?"),
-    ("\U000F04DD", "Ganz entspannt", "Heute plant niemand was"),
+    (G["coffee"], T("cal.empty1"), T("cal.empty1_sub")),
+    ("\U000F02D1", T("cal.empty2"), T("cal.empty2_sub")),
+    ("\U000F0F62", T("cal.empty3"), T("cal.empty3_sub")),
+    ("\U000F18FB", T("cal.empty4"), T("cal.empty4_sub")),
+    ("\U000F04DD", T("cal.empty5"), T("cal.empty5_sub")),
 ]
 
 
@@ -85,7 +86,7 @@ def build():
         popup_width = WIDTH
 
         def __init__(self):
-            super().__init__(title="Kalender")
+            super().__init__(title=T("cal.title"))
             for c in ("popup", "menu", "calendar"):
                 self.add_css_class(c)
             self.set_decorated(False)
@@ -123,7 +124,7 @@ def build():
             today = Gtk.Button(css_classes=["cal-today-btn", "flat"], focusable=False)
             tb = Gtk.Box(spacing=6)
             tb.append(label(G["today"], ("cal-today-icon",)))
-            tb.append(label("Heute"))
+            tb.append(label(T("cal.today")))
             today.set_child(tb)
             today.connect("clicked", lambda _b: self.go(dt.date.today()))
             nav = Gtk.Box(spacing=4)
@@ -185,7 +186,7 @@ def build():
             self.list = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
             right.append(self.list)
 
-            self.after_head = label("Danach", ("cal-section",), xalign=0)
+            self.after_head = label(T("cal.after"), ("cal-section",), xalign=0)
             right.append(self.after_head)
             self.after = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
             right.append(self.after)
@@ -204,10 +205,11 @@ def build():
             root.append(body)
 
             hints = Gtk.Box(spacing=16, halign=Gtk.Align.CENTER, css_classes=["cal-hints"])
-            for keys, what in ((("←", "→"), "Tag"), (("↑", "↓"), "Woche"),
-                               (("Bild↑", "Bild↓"), "Monat"), (("T",), "Heute"),
-                               (("N",), "Neu"), (("Klick",), "bearbeiten"),
-                               (("Ziehen",), "verschieben")):
+            for keys, what in ((("←", "→"), T("cal.key_day")), (("↑", "↓"), T("cal.key_week")),
+                               ((T("cal.key_pgup"), T("cal.key_pgdn")), T("cal.key_month")),
+                               (("T",), T("cal.today")), (("N",), T("cal.key_new")),
+                               ((T("cal.key_click"),), T("cal.key_edit")),
+                               ((T("cal.key_drag"),), T("cal.key_move"))):
                 h = Gtk.Box(spacing=3)
                 for k in keys:
                     h.append(label(k, ("key", "cal-key")))
@@ -251,7 +253,7 @@ def build():
             self.avatars = {}
             for i, c in enumerate(self.cals):
                 b = Gtk.Button(css_classes=["cal-avatar", "flat", f"av-c{i}", "on"],
-                               focusable=False, tooltip_text=f"{c.name} aus- / einblenden")
+                               focusable=False, tooltip_text=T("cal.toggle_cal", name=c.name))
                 inner = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
                 # the heart carries its weight up top: it gets nudged down a bit more
                 circle = ("cal-avatar-circle",) + (("heart",) if c.glyph == "\U000F02D1" else ())
@@ -333,7 +335,7 @@ def build():
                     for o in shown:
                         box.append(self.chip(o, d, covers))
                     if len(events) > len(shown):
-                        box.append(label(f"+{len(events) - len(shown)} weitere",
+                        box.append(label(T("cal.more_short", n=len(events) - len(shown)),
                                          ("cal-more",), xalign=0))
                     b.set_child(box)
                     b.connect("clicked", lambda _b, day=d: self.pick(day))
@@ -373,13 +375,12 @@ def build():
                 b = dt.datetime.combine(week_end + dt.timedelta(days=1), dt.time(), cal.TZ)
                 n = len([o for o in occ if a <= o.bounds()[1] and o.bounds()[0] < b])
                 if n == 0:
-                    return "Der Rest der Woche ist frei \u2728"
-                return f"Diese Woche noch {n} {'Termin' if n == 1 else 'Termine'}"
+                    return T("cal.week_free")
+                return Tn("cal.week_left", n)
             months = (first.year - today.year) * 12 + first.month - today.month
             n = len([o for o in occ if (o.start if o.allday else o.start.date()).month == first.month])
-            when = (f"in {months} {'Monat' if months == 1 else 'Monaten'}" if months > 0
-                    else f"vor {-months} {'Monat' if months == -1 else 'Monaten'}")
-            return f"{when} · {n} {'Termin' if n == 1 else 'Termine'}"
+            when = Tn("cal.in_months", months) if months > 0 else Tn("cal.ago_months", -months)
+            return f"{when} · " + (T("cal.events_zero") if n == 0 else Tn("cal.events", n))
 
         @staticmethod
         def long(o):
@@ -411,8 +412,8 @@ def build():
                 w = label(f"{o.start:%H:%M} {o.summary}", classes, xalign=0, ellipsize=3,
                           max_width_chars=1, hexpand=True,
                           tooltip_text=f"{o.time_text()}  {o.summary}")
-            w.set_tooltip_text(w.get_tooltip_text() + "\nDoppelklick: bearbeiten"
-                               + ("" if o.event.rrule else " · ziehen: verschieben"))
+            w.set_tooltip_text(w.get_tooltip_text() + T("cal.dbl_edit")
+                               + ("" if o.event.rrule else T("cal.drag_move")))
             self.draggable(w, o)
             dbl = Gtk.GestureClick()
             dbl.connect("pressed", lambda g, n, _x, _y: n == 2 and (
@@ -527,16 +528,16 @@ def build():
             delta = (d - today).days
             title = cal.day_name(d, today)
             if title in cal.DAYS:
-                title = f"{title}, {d.day}. {cal.MONTHS[d.month - 1]}"
+                title = f"{title}, " + T("cal.day_month", d=d.day, month=cal.MONTHS[d.month - 1])
             self.day_title.set_text(title)
             occ = [o for o in cal.day(d) if o.cal.id not in self.hidden]
             n = len(occ)
-            count = "keine Termine" if n == 0 else ("1 Termin" if n == 1 else f"{n} Termine")
+            count = T("cal.events_zero") if n == 0 else Tn("cal.events", n)
             when = ""
             if abs(delta) >= 2:
-                when = (f"in {delta} Tagen · " if delta > 0 else f"vor {-delta} Tagen · ")
-            if title.startswith(("Heute", "Morgen", "Übermorgen", "Gestern")):
-                when = f"{cal.DAYS[d.weekday()]}, {d.day}. {cal.MONTHS[d.month - 1]} · "
+                when = T("cal.in_days_dot", n=delta) if delta > 0 else T("cal.ago_days_dot", n=-delta)
+            if not title.startswith(tuple(cal.DAYS)):   # Heute, Morgen, ...: add the date
+                when = f"{cal.DAYS[d.weekday()]}, " + T("cal.day_month", d=d.day, month=cal.MONTHS[d.month - 1]) + " · "
             self.day_sub.set_text(when + count)
 
             child = self.list.get_first_child()
@@ -557,7 +558,7 @@ def build():
                 self.list.append(card)
             if len(occ) > CARDS_MAX:
                 rest = len(occ) - CARDS_MAX
-                self.list.append(label(f"+ {rest} weitere" if rest > 1 else "+ 1 weiterer",
+                self.list.append(label(Tn("cal.more", rest),
                                        ("cal-more-events",), xalign=0))
 
             # what comes after this day
@@ -583,7 +584,7 @@ def build():
                 row.set_child(rb)
                 row.connect("clicked", lambda _b, day=od: self.go(day))
                 self.after.append(row)
-            self.add_label.set_text(f"Neuer Termin am {cal.date_text(d)}")
+            self.add_label.set_text(T("cal.new_on", date=cal.date_text(d)))
             self.update_live()
 
         def card(self, o, k):
@@ -605,7 +606,7 @@ def build():
             top.append(badge)
             trash = Gtk.Button(css_classes=["cal-trash", "flat"], focusable=False)
             trash.set_child(label(G["trash"]))
-            trash.set_tooltip_text("Löschen" + (" (ganze Serie)" if o.event.rrule else ""))
+            trash.set_tooltip_text(T("cal.delete") + (T("cal.whole_series") if o.event.rrule else ""))
             trash.connect("clicked", lambda _b: self.ask_delete(card, trash, o))
             top.append(trash)
             card.append(top)
@@ -627,8 +628,7 @@ def build():
             click = Gtk.GestureClick()
             click.connect("released", lambda g, n, x, y: self.card_clicked(card, x, y))
             card.add_controller(click)
-            card.set_tooltip_text("Klick: bearbeiten" + ("" if o.event.rrule else
-                                                         " · auf einen Tag ziehen: verschieben"))
+            card.set_tooltip_text(T("cal.click_edit") + ("" if o.event.rrule else T("cal.drag_day")))
             self.draggable(card, o)
             self.cards.append(card)
             return card
@@ -677,7 +677,7 @@ def build():
                 card.trash_btn = trash
                 card.add_css_class("arming")
                 trash.add_css_class("danger")
-                trash.get_child().set_text("Serie löschen?" if o.event.rrule else "Sicher?")
+                trash.get_child().set_text(T("cal.delete_series") if o.event.rrule else T("common.sure"))
                 return
             card.add_css_class("leaving")
             cal.delete(o)

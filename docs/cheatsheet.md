@@ -69,6 +69,9 @@ All apps read the same files:
 
 - `.chezmoidata/palette.toml` - every color (accent, backgrounds, text, ...)
 - `.chezmoidata/design.toml` - rounding, border width, gaps, fonts
+- `.chezmoidata/locale.toml` - every visible text (popups, bar, notifications,
+  shortcut descriptions), German and English side by side; which one is used
+  is `lang` in `~/.config/chezmoi/chezmoi.toml`. `chezmoi apply` restarts popups and waybar
 
 Edit them (`dots`, then `nvim .chezmoidata/palette.toml`), run `chezmoi apply`,
 then reload: `hyprctl reload`, `systemctl --user restart waybar`, restart kitty/apps.

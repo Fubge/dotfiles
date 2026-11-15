@@ -21,6 +21,9 @@ import subprocess
 import sys
 import threading
 
+sys.path.insert(0, os.path.expanduser("~/.local/lib/popup"))
+from i18n import T  # noqa: E402
+
 # Programs that start games. Matched against the name of every parent process
 # (also the script name for Python launchers such as lutris / umu-run).
 LAUNCHERS = {
@@ -146,13 +149,13 @@ class Watcher:
         with self.lock:
             if addr in self.games:
                 self.remove(addr)
-                note = "Not a game any more"
+                note = T("gamemode.not_game")
             else:
                 c = next((c for c in hypr_json("clients") or [] if c["address"] == addr), None)
                 if not c:
                     return
                 self.add(addr, c["pid"])
-                note = f"Game mode for {c.get('class') or 'this window'}"
+                note = T("gamemode.for", name=c.get('class') or T("gamemode.this_win"))
         subprocess.run(["notify-send", "-a", "GameMode", "-i", "applications-games", note])
 
     # Loops

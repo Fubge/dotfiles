@@ -1,0 +1,556 @@
+# Every visible text of the desktop (popups, bar, notifications, shortcut
+# descriptions), German and English side by side. `chezmoi init` asks for the
+# language (machine.lang); chezmoi renders it into ~/.config/popups/strings.json
+# (Python: ~/.local/lib/popup/i18n.py, T("area.key")) and hypr/strings.lua.
+#
+#   key = { de = "…", en = "…" }     one text per language
+#   key = "…"                        same in both
+#   {name} is filled in by the code (str.format); key_one / key_other are
+#   picked by count (Tn), {n} is the count.
+# Code, comments and terminal tools stay English.
+
+[strings.meta]
+lang = { de = "de", en = "en" }
+
+[strings.common]
+sure       = { de = "Sicher?", en = "Sure?" }
+forget     = { de = "Vergessen", en = "Forget" }
+connect    = { de = "Verbinden", en = "Connect" }
+disconnect = { de = "Trennen", en = "Disconnect" }
+connected  = { de = "Verbunden", en = "Connected" }
+connecting = { de = "Verbinde …", en = "Connecting..." }
+disconnecting = { de = "Trenne …", en = "Disconnecting..." }
+connected_to  = { de = "Verbunden mit {name}", en = "Connected to {name}" }
+connect_failed_to = { de = "Keine Verbindung zu {name}", en = "Could not connect to {name}" }
+failed     = { de = "Fehlgeschlagen: {err}", en = "Failed: {err}" }
+off        = { de = "Aus", en = "Off" }
+on         = { de = "An", en = "On" }
+clear      = { de = "Leeren", en = "Clear" }
+remove     = { de = "Entfernen", en = "Remove" }
+
+[strings.wifi]
+title          = { de = "WLAN", en = "Wi-Fi" }
+min_8          = { de = "Mindestens 8 Zeichen", en = "At least 8 characters" }
+no_connection  = { de = "keine Verbindung", en = "no connection" }
+wrong_password = { de = "Klappt nicht. Falsches Passwort?", en = "Could not connect. Wrong password?" }
+open           = { de = "Offen", en = "Open" }
+wired          = { de = "Kabel", en = "Wired" }
+ethernet       = "Ethernet"
+no_address     = { de = "keine Adresse", en = "no address" }
+nm_down        = { de = "NetworkManager läuft nicht", en = "NetworkManager is not running" }
+no_adapter     = { de = "Kein WLAN-Adapter gefunden", en = "No Wi-Fi adapter found" }
+hw_blocked     = { de = "WLAN ist per Hardware-Schalter gesperrt", en = "Wi-Fi is blocked by a hardware switch" }
+is_off         = { de = "WLAN ist aus", en = "Wi-Fi is off" }
+saved_networks = { de = "Gespeicherte Netze", en = "Saved networks" }
+searching      = { de = "Suche …", en = "Searching..." }
+other_networks = { de = "Weitere Netze", en = "Other networks" }
+none_around    = { de = "Keine anderen Netze in der Nähe", en = "No other networks around" }
+scanning       = { de = "Suche läuft …", en = "Scanning..." }
+scan_again     = { de = "Neu suchen", en = "Scan again" }
+settings       = { de = "Netzwerk-Einstellungen", en = "Network settings" }
+saved          = { de = "Gespeichert", en = "Saved" }
+saved_manual   = { de = "Gespeichert  ·  verbindet nur per Klick", en = "Saved  ·  joins only on click" }
+enterprise     = { de = "Enterprise  ·  in den Netzwerk-Einstellungen einrichten", en = "Enterprise  ·  set up in Network settings" }
+open_network   = { de = "Offenes Netz", en = "Open network" }
+manage         = { de = "Dieses Netz verwalten", en = "Manage this network" }
+password_for   = { de = "Passwort für {ssid}", en = "Password for {ssid}" }
+join           = { de = "Verbinden", en = "Join" }
+signal         = { de = "Signal {strength} %  ·  {band}  ·  {security}", en = "Signal {strength}%  ·  {band}  ·  {security}" }
+auto_join      = { de = "Automatisch", en = "Auto-join" }
+
+[strings.bluetooth]
+title          = "Bluetooth"
+type_code      = { de = "{code} + Enter am Gerät tippen", en = "Type {code} + Enter on the device" }
+confirm_code   = { de = "Code {code} am Gerät bestätigen", en = "Confirm code {code} on the device" }
+disconnect_failed = { de = "{name} ließ sich nicht trennen", en = "Could not disconnect {name}" }
+pair_failed    = { de = "Kopplung mit {name} fehlgeschlagen", en = "Could not pair with {name}" }
+paired_no_conn = { de = "{name} gekoppelt, aber keine Verbindung", en = "Paired {name}, but could not connect" }
+pairing        = { de = "Kopple …", en = "Pairing..." }
+no_adapter     = { de = "Kein Bluetooth-Adapter gefunden", en = "No Bluetooth adapter found" }
+is_off         = { de = "Bluetooth ist aus", en = "Bluetooth is off" }
+my_devices     = { de = "Meine Geräte", en = "My devices" }
+searching      = { de = "Suche Geräte …", en = "Searching for devices..." }
+repair_hint    = { de = "{name} in den Kopplungsmodus bringen, es koppelt von selbst", en = "Put {name} in pairing mode, it pairs by itself" }
+pair_hint      = { de = "Gerät in den Kopplungsmodus bringen", en = "Put your device in pairing mode" }
+pairing_section = { de = "Kopplung", en = "Pairing" }
+stop_search    = { de = "Suche beenden", en = "Stop searching" }
+add_device     = { de = "Gerät hinzufügen", en = "Add a device" }
+click_to_pair  = { de = "Klick zum Koppeln", en = "Click to pair" }
+manage         = { de = "Dieses Gerät verwalten", en = "Manage this device" }
+trusted        = { de = "  ·  vertraut", en = "  ·  trusted" }
+pair_again     = { de = "Neu koppeln", en = "Pair again" }
+
+[strings.sound]
+title       = "Sound"
+builtin_mic = { de = "Eingebautes Mikrofon", en = "Built-in microphone" }
+open_mixer  = { de = "Mixer öffnen", en = "Open mixer" }
+output      = { de = "Ausgabe", en = "Output" }
+input       = { de = "Eingabe", en = "Input" }
+apps        = "Apps"
+
+[strings.brightness]
+title = { de = "Helligkeit", en = "Brightness" }
+low   = { de = "Schwach", en = "Low" }
+high  = { de = "Hell", en = "High" }
+bar_tip = { de = "Helligkeit {pct} %\nKlick: Regler, Scrollen: ändern", en = "Brightness {pct}%\nClick for a slider, scroll to change" }
+
+[strings.power]
+title          = { de = "Energie", en = "Power" }
+saver          = { de = "Sparen", en = "Saver" }
+balanced       = { de = "Ausgewogen", en = "Balanced" }
+performance    = { de = "Leistung", en = "Performance" }
+profile        = { de = "Energieprofil", en = "Power profile" }
+session        = { de = "Sperren, neu starten, ausschalten …", en = "Lock, reboot, shut down..." }
+charging       = { de = "Lädt", en = "Charging" }
+full_in        = { de = ", voll in {time}", en = ", full in {time}" }
+held           = { de = "Am Netzteil, hält am Ladelimit", en = "Plugged in, held at the charge limit" }
+full           = { de = "Am Netzteil, voll", en = "Plugged in, full" }
+on_battery     = { de = "Im Akkubetrieb", en = "On battery" }
+left           = { de = ", noch {time}", en = ", {time} left" }
+health         = { de = "Zustand {pct} %", en = "health {pct}%" }
+limit          = { de = "Limit {pct} %", en = "limit {pct}%" }
+bar_tip        = { de = "Energieprofil: {name}", en = "Power profile: {name}" }
+
+[strings.battery]
+title        = { de = "Akku {pct} %", en = "Battery {pct}%" }
+until_limit  = { de = "{pct} % in {time}", en = "{pct}% in {time}" }
+charging_w   = { de = "Lädt mit {w} W", en = "Charging with {w} W" }
+left         = { de = "noch {time}", en = "{time} left" }
+held         = { de = "Am Netzteil, hält bei {pct} %, schont den Akku", en = "Plugged in, held at {pct}% to spare the battery" }
+full         = { de = "Voll, am Netzteil", en = "Full, plugged in" }
+
+[strings.menu]
+title = { de = "Menü", en = "Menu" }
+
+[strings.pets]
+title  = { de = "Haustiere", en = "Pets" }
+header = { de = "Haustier", en = "Pet" }
+
+[strings.gamemode]
+on       = { de = "GameMode an", en = "GameMode on" }
+off      = { de = "GameMode aus", en = "GameMode off" }
+for      = { de = "GameMode für {name}", en = "Game mode for {name}" }
+this_win = { de = "dieses Fenster", en = "this window" }
+not_game = { de = "Kein Spiel mehr", en = "Not a game any more" }
+
+[strings.notif]
+title       = { de = "Benachrichtigungen", en = "Notifications" }
+dnd_note    = { de = "Bitte nicht stören: nur Kritisches poppt auf", en = "Do not disturb: only critical ones pop up" }
+clear_all   = { de = "Alle löschen", en = "Clear all" }
+dnd_on      = { de = "Bitte nicht stören: an", en = "Do not disturb: on" }
+dnd_off     = { de = "Bitte nicht stören: aus", en = "Do not disturb: off" }
+caught_up   = { de = "Alles erledigt", en = "All caught up" }
+today       = { de = "Heute", en = "Today" }
+yesterday   = { de = "Gestern", en = "Yesterday" }
+earlier     = { de = "Früher", en = "Earlier" }
+fallback_app = { de = "Benachrichtigung", en = "Notification" }
+bar_dnd     = { de = "Bitte nicht stören\nKlick: Benachrichtigungen, Rechtsklick: aus", en = "Do not disturb\nClick: notifications, right click: off" }
+bar_unread  = { de = "{n} neu\nKlick: Benachrichtigungen, Rechtsklick: bitte nicht stören", en = "{n} new\nClick: notifications, right click: do not disturb" }
+bar_idle    = { de = "Benachrichtigungen\nKlick: öffnen, Rechtsklick: bitte nicht stören", en = "Notifications\nClick: open, right click: do not disturb" }
+
+[strings.clipboard]
+title       = { de = "Zwischenablage", en = "Clipboard" }
+color       = { de = "Farbe", en = "Color" }
+path        = { de = "Pfad", en = "Path" }
+image       = { de = "Bild", en = "Image" }
+filter      = { de = "Zwischenablage filtern …", en = "Filter clipboard..." }
+footer      = { de = "↵ kopieren  ·  Entf löschen  ·  Esc schließen", en = "↵ copy  ·  Del remove  ·  Esc close" }
+empty       = { de = "Noch nichts kopiert", en = "Nothing copied yet" }
+no_match    = { de = "Kein Treffer", en = "No match" }
+
+[strings.keys]
+title       = { de = "Tastenkürzel", en = "Shortcuts" }
+filter      = { de = "Tastenkürzel filtern …", en = "Filter shortcuts..." }
+footer      = { de = "SUPER = Windows-Taste      ·      Esc  schließen", en = "SUPER = Windows key      ·      Esc  close" }
+drag        = { de = "Ziehen", en = "Drag" }
+right_drag  = { de = "Rechts ziehen", en = "Right drag" }
+wheel_down  = { de = "Rad ↓", en = "Wheel ↓" }
+wheel_up    = { de = "Rad ↑", en = "Wheel ↑" }
+space       = { de = "Leertaste", en = "Space" }
+
+[strings.binds]  # shortcut descriptions (SUPER+H), hypr/binds.lua
+group_apps        = "Apps"
+group_menus       = { de = "Menüs", en = "Menus" }
+group_session     = { de = "Sitzung", en = "Session" }
+group_windows     = { de = "Fenster", en = "Windows" }
+group_workspaces  = { de = "Arbeitsflächen", en = "Workspaces" }
+group_screenshots = "Screenshots"
+group_other       = { de = "Sonstiges", en = "Other" }
+terminal          = "Terminal"
+browser           = "Browser"
+files             = { de = "Dateimanager", en = "File manager" }
+discord           = "Discord"
+obsidian          = { de = "Obsidian (Notizen)", en = "Obsidian (notes)" }
+youtube           = "YouTube"
+launcher          = { de = "Apps starten / Web", en = "App launcher / web" }
+clipboard         = { de = "Zwischenablage-Verlauf", en = "Clipboard history" }
+websearch         = { de = "Websuche", en = "Web search" }
+wallpaper         = { de = "Hintergrund wählen", en = "Wallpaper picker" }
+overview          = { de = "Diese Übersicht", en = "This overview" }
+claude            = { de = "Claude (zeigen / verstecken)", en = "Claude (show / hide)" }
+claude_ask        = { de = "Schnelle Frage an Claude", en = "Quick question to Claude" }
+task              = { de = "Neue Aufgabe für Claude (/todo-Liste)", en = "New task for Claude (/todo list)" }
+calendar          = { de = "Kalender (Pia + ich)", en = "Calendar (Pia + me)" }
+event             = { de = "Neuer Termin („Kino morgen 20 Uhr“)", en = "New event (\"Kino morgen 20 Uhr\")" }
+timer             = { de = "Timer („Pizza 12“)", en = "Timer (\"Pizza 12\")" }
+system            = { de = "Systemmenü: Bildschirme, Maus, Tastatur, Nachtlicht, Ruhe", en = "System menu: displays, mouse, keyboard, night light, idle" }
+session           = { de = "Sperren, Standby, Abmelden, Neustart, Ausschalten", en = "Lock, suspend, log out, reboot, shut down" }
+notifications     = { de = "Benachrichtigungen", en = "Notification center" }
+power             = { de = "Energieprofil, Akku", en = "Power profile, battery" }
+wifi              = { de = "WLAN: Netze, Passwort, vergessen", en = "Wi-Fi: networks, password, forget" }
+bluetooth         = { de = "Bluetooth: Geräte, koppeln", en = "Bluetooth: devices, pairing" }
+sound             = { de = "Sound: Lautstärke, Ausgänge, Apps", en = "Sound: volume, outputs, apps" }
+spotify           = { de = "Spotify (zeigen / verstecken)", en = "Spotify (show / hide)" }
+gamemode          = { de = "GameMode für dieses Fenster", en = "Game mode for this window" }
+lock              = { de = "Bildschirm sperren", en = "Lock screen" }
+logout            = { de = "Abmelden", en = "Log out" }
+close             = { de = "Fenster schließen (Spotify / Discord / Claude laufen weiter)", en = "Close window (Spotify / Discord / Claude: keep running)" }
+kill              = { de = "Wirklich schließen (auch Spotify)", en = "Really close (Spotify too)" }
+float             = { de = "Fenster schweben / kacheln", en = "Float / tile window" }
+fullscreen        = { de = "Vollbild", en = "Fullscreen" }
+master            = { de = "Hauptfenster", en = "Main window" }
+focus             = { de = "Fenster fokussieren", en = "Focus window" }
+move              = { de = "Fenster verschieben", en = "Move window" }
+workspace         = { de = "Zur Arbeitsfläche", en = "Go to workspace" }
+send              = { de = "Fenster verschicken", en = "Send window" }
+ws_next           = { de = "Nächste Arbeitsfläche", en = "Next workspace" }
+ws_prev           = { de = "Vorige Arbeitsfläche", en = "Previous workspace" }
+resize            = { de = "Fenstergröße ändern", en = "Resize window" }
+minimize          = { de = "Fenster minimieren / zurückholen", en = "Minimize / restore window" }
+minimized         = { de = "Minimierte Fenster", en = "Minimized windows" }
+dropdown          = { de = "Dropdown-Terminal", en = "Dropdown terminal" }
+shot_area         = { de = "Bereich in die Zwischenablage", en = "Area to clipboard" }
+shot_screen       = { de = "Bildschirm als Datei", en = "Screen to file" }
+ptt               = { de = "Discord Push-to-Talk (^ halten)", en = "Discord push-to-talk (hold ^)" }
+
+[strings.greet]
+night     = { de = "Gute Nacht", en = "Good night" }
+morning   = { de = "Guten Morgen", en = "Good morning" }
+day       = { de = "Guten Tag", en = "Good afternoon" }
+evening   = { de = "Guten Abend", en = "Good evening" }
+with_name = "{hello}, {name}"
+
+[strings.session]
+title    = { de = "Sitzung", en = "Session" }
+lock     = { de = "Sperren", en = "Lock" }
+lock_c   = { de = "bin gleich zurück", en = "back in a sec" }
+suspend  = { de = "Standby", en = "Suspend" }
+suspend_c = { de = "Nickerchen", en = "nap time" }
+logout   = { de = "Abmelden", en = "Log out" }
+logout_c = { de = "bis gleich", en = "see you soon" }
+reboot   = { de = "Neustart", en = "Reboot" }
+reboot_c = { de = "frisch starten", en = "fresh start" }
+shutdown = { de = "Ausschalten", en = "Shut down" }
+shutdown_c = { de = "Licht aus", en = "lights out" }
+again    = { de = "nochmal klicken: {action}", en = "click again to {action}" }
+uptime   = { de = "läuft seit {time}", en = "up {time}" }
+
+[strings.flair]
+volume     = { de = "Lautstärke", en = "Volume" }
+files      = { de = "Dateien", en = "Files" }
+shortcuts  = { de = "Tastenkürzel", en = "Shortcuts" }
+brightness = { de = "Helligkeit", en = "Brightness" }
+
+[strings.claude]
+off        = { de = "Claude läuft nicht", en = "Claude is not running" }
+starting   = { de = "Claude startet …", en = "Claude starts…" }
+idle       = { de = "Claude ist bereit", en = "Claude is ready" }
+busy       = { de = "Claude arbeitet …", en = "Claude is working…" }
+waiting    = { de = "Claude braucht dich", en = "Claude needs you" }
+done       = { de = "Claude ist fertig", en = "Claude is done" }
+finished   = { de = "Fertig.", en = "Finished." }
+waiting_msg = { de = "Wartet auf deine Antwort.", en = "Waiting for your answer." }
+bar_hint   = { de = "Klick: zeigen · Rechtsklick: Menü", en = "Click show · Right click menu" }
+show_hide  = { de = "Zeigen / verstecken", en = "Show / hide" }
+new_chat   = { de = "Neuer Chat (/clear)", en = "New chat (/clear)" }
+resume     = { de = "Chat fortsetzen", en = "Resume a chat" }
+restart    = { de = "Claude neu starten", en = "Restart Claude" }
+quit       = { de = "Claude beenden", en = "Quit Claude" }
+pet        = { de = "Haustier wählen", en = "Choose pet" }
+
+[strings.music]
+bar_hint   = { de = "Klick: Play/Pause · Rechtsklick: Menü · Scrollen: springen", en = "Click play/pause · Right click menu · Scroll skip" }
+pause      = "Pause"
+play       = "Play"
+next       = { de = "Nächster Song", en = "Next song" }
+previous   = { de = "Vorheriger Song", en = "Previous song" }
+show_hide  = { de = "Spotify zeigen / verstecken", en = "Show / hide Spotify" }
+quit       = { de = "Spotify beenden", en = "Quit Spotify" }
+
+[strings.nightlight]
+off       = { de = "aus", en = "off" }
+always    = { de = "an · {temp} K", en = "on · {temp} K" }
+on_until  = { de = "an bis {time}", en = "on until {time}" }
+from      = { de = "ab {time}", en = "from {time}" }
+
+[strings.timer]
+egg     = { de = "Ei", en = "Egg" }
+tea     = { de = "Tee", en = "Tea" }
+pasta   = { de = "Nudeln", en = "Pasta" }
+pizza   = "Pizza"
+break   = { de = "Pause", en = "Break" }
+focus   = { de = "Fokus", en = "Focus" }
+h       = { de = "{n} Std", en = "{n} h" }
+min     = "{n} Min"
+sec     = { de = "{n} Sek", en = "{n} s" }
+done_short = { de = "Fertig!", en = "Done!" }
+name       = "Timer"
+hello      = { de = "Timer stellen", en = "Set a timer" }
+sub        = { de = "Wie lange, und wofür?", en = "How long, and what for?" }
+example    = { de = "z. B. Pizza 12 · 25 min Fokus · 1h 30", en = "e.g. Pizza 12 · 25 min focus · 1h 30" }
+preset_tip = "{name}, {mins} Min · Alt+{key}"
+how_long   = { de = "Wie lange? Eine Zahl reicht: 10 = 10 Minuten", en = "How long? A number will do: 10 = 10 minutes" }
+running_ok = { de = "Läuft ✓", en = "Running ✓" }
+rings_at   = { de = "{name} · klingelt um {time}", en = "{name} · rings at {time}" }
+paused     = { de = " · Pause", en = " · paused" }
+done_title = { de = "{icon}  {name} ist fertig!", en = "{icon}  {name} is done!" }
+done_body  = { de = "{time} sind um", en = "{time} are up" }
+stop       = { de = "Aus", en = "Off" }
+snooze     = "+ 5 Min"
+ringing    = { de = "{icon}  {names} – fertig! Klick: Ruhe", en = "{icon}  {names} – done! Click: silence" }
+resume     = { de = "Weiter", en = "Resume" }
+pause      = "Pause"
+plus       = "+1 Min"
+cancel     = { de = "Stopp", en = "Stop" }
+running_one   = { de = "{n} läuft schon · noch einer?", en = "{n} running · one more?" }
+running_other = { de = "{n} laufen schon · noch einer?", en = "{n} running · one more?" }
+hint       = { de = "Enter startet · ↑↓ / Scrollen: ±1 Min · Alt+1–6", en = "Enter starts · ↑↓ / scroll: ±1 min · Alt+1–6" }
+
+[strings.rofi]
+filter          = { de = "Filtern …", en = "Filter..." }
+launcher        = { de = "Apps oder das Web durchsuchen", en = "Search apps or the web" }
+launcher_hint   = { de = "Enter  öffnen      ·      kein Treffer? Enter sucht im Web      ·      Esc  schließen", en = "Enter  open      ·      no match? Enter searches the web      ·      Esc  close" }
+web             = { de = "Im Web suchen …", en = "Search the web..." }
+web_hint        = { de = "Enter  suchen      ·      Esc  schließen", en = "Enter  search      ·      Esc  close" }
+wallpaper       = { de = "Hintergründe filtern …", en = "Filter wallpapers..." }
+wallpaper_hint  = { de = "Enter  Desktop      ·      Shift+Enter  Anmeldebildschirm      ·      Strg+Enter  beides      ·      Esc  schließen", en = "Enter  desktop      ·      Shift+Enter  login screen      ·      Ctrl+Enter  both      ·      Esc  close" }
+claude          = { de = "Frag Claude …", en = "Ask Claude..." }
+claude_hint     = { de = "Enter  fragen + öffnen    ·    Strg+Enter  im Hintergrund fragen    ·    Esc  schließen", en = "Enter  ask + open    ·    Ctrl+Enter  ask in background    ·    Esc  close" }
+
+[strings.task]
+title     = { de = "Neue Aufgabe", en = "New task" }
+bug       = { de = "Etwas ist kaputt", en = "Something is broken" }
+better    = { de = "Geht noch besser", en = "Could be better" }
+idea      = { de = "Etwas ganz Neues", en = "Something new" }
+hello     = { de = "Neue Aufgabe für Claude", en = "New task for Claude" }
+what      = { de = "Was soll ich mir anschauen?", en = "What should I look at?" }
+details   = { de = "Details (optional)", en = "Details (optional)" }
+enter_saves = { de = "  ·  Enter speichert", en = "  ·  Enter saves" }
+save_failed = { de = "Konnte nicht speichern: {err}", en = "Could not save: {err}" }
+saved     = { de = "Notiert ✓", en = "Noted ✓" }
+lands_in  = { de = "Landet in Aufgaben.md", en = "Goes to Aufgaben.md" }
+
+[strings.sys]
+displays     = { de = "Bildschirme", en = "Displays" }
+mouse        = { de = "Maus & Touchpad", en = "Mouse & touchpad" }
+keyboard     = { de = "Tastatur", en = "Keyboard" }
+nightlight   = { de = "Nachtlicht", en = "Night light" }
+idle         = { de = "Sperre & Ruhe", en = "Lock & idle" }
+wallpaper    = { de = "Hintergrund", en = "Wallpaper" }
+keybinds     = { de = "Tastenkürzel", en = "Shortcuts" }
+displays_sub = { de = "Anordnen, schärfen, schneller machen", en = "Arrange, sharpen, speed up" }
+mouse_sub    = { de = "Tempo, Scrollen, Klicken", en = "Speed, scrolling, clicking" }
+keyboard_sub = { de = "Layout und Tastenwiederholung", en = "Layout and key repeat" }
+nightlight_sub = { de = "Abends wärmere Farben, schont die Augen", en = "Warmer colors in the evening, easy on the eyes" }
+idle_sub     = { de = "Wann dimmen, sperren, schlafen", en = "When to dim, lock, sleep" }
+vrr_games    = { de = "Nur Spiele", en = "Games only" }
+always       = { de = "Immer", en = "Always" }
+left         = { de = "Links", en = "Left" }
+right        = { de = "Rechts", en = "Right" }
+above        = { de = "Oben", en = "Above" }
+below        = { de = "Unten", en = "Below" }
+mirror       = { de = "Spiegeln", en = "Mirror" }
+lang_de      = "Deutsch"
+swap_caps    = { de = "Caps Lock ist Escape", en = "Caps Lock is Escape" }
+swap_caps_sub = { de = "und Escape ist Caps Lock (gut für Neovim)", en = "and Escape is Caps Lock (good for Neovim)" }
+swap_alt     = { de = "Alt und Super tauschen", en = "Swap Alt and Super" }
+swap_alt_sub = { de = "linke Alt- und Windows-Taste", en = "left Alt and Windows key" }
+dim          = { de = "Dimmen", en = "Dim" }
+lock         = { de = "Sperren", en = "Lock" }
+screen_off   = { de = "Bildschirm aus", en = "Screen off" }
+suspend      = { de = "Ruhezustand", en = "Suspend" }
+sunset       = { de = "Abends", en = "Evenings" }
+schedule     = { de = "Zeitplan", en = "Schedule" }
+never        = { de = "nie", en = "never" }
+back_tip     = { de = "zurück (Esc)", en = "back (Esc)" }
+undo         = { de = "Zurück", en = "Undo" }
+keep         = { de = "Behalten", en = "Keep" }
+n_displays   = { de = "{n} Bildschirme", en = "{n} displays" }
+laptop_only  = { de = "nur Laptop", en = "laptop only" }
+speed_status = { de = "Tempo {v}", en = "Speed {v}" }
+locks_after  = { de = "sperrt nach {time}", en = "locks after {time}" }
+wired        = { de = "Kabel", en = "Wired" }
+not_connected = { de = "nicht verbunden", en = "not connected" }
+muted        = { de = "stumm", en = "muted" }
+n_updates    = { de = "{n} neu", en = "{n} new" }
+up_to_date   = { de = "alles aktuell", en = "up to date" }
+what         = { de = "Was möchtest du einstellen?", en = "What would you like to set up?" }
+home_hint    = { de = "Pfeile wählen · Enter öffnet · Esc schließt", en = "Arrows choose · Enter opens · Esc closes" }
+page_hint    = { de = "Änderungen gelten sofort · Esc zurück", en = "Changes apply at once · Esc back" }
+greet_night  = { de = "Na, Nachteule?", en = "Hey, night owl" }
+greet_morning = { de = "Guten Morgen", en = "Good morning" }
+greet_day    = { de = "Hallo", en = "Hello" }
+greet_evening = { de = "Guten Abend", en = "Good evening" }
+no_displays  = { de = "Keine Bildschirme gefunden.", en = "No displays found." }
+main         = { de = "Hauptbildschirm", en = "Main display" }
+make_main    = { de = "zum Hauptbildschirm machen", en = "make main display" }
+main_tip     = { de = "bekommt die Workspaces 1-8", en = "gets workspaces 1-8" }
+arrange      = { de = "Anordnung", en = "Arrangement" }
+arrange_sub  = { de = "oder oben im Bild an seinen Platz ziehen", en = "or drag it into place in the picture above" }
+resolution   = { de = "Auflösung", en = "Resolution" }
+refresh      = { de = "Bildrate", en = "Refresh rate" }
+looks_like   = { de = "wirkt wie {w} × {h}", en = "looks like {w} × {h}" }
+scale        = { de = "Skalierung", en = "Scale" }
+vrr          = "Adaptive Sync"
+vrr_sub      = { de = "gegen Ruckeln, wenn Spiele schwanken", en = "against stutter when games fluctuate" }
+lid_off      = { de = "Aus, solange ein Bildschirm dran ist", en = "Off while a display is plugged in" }
+lid_off_sub  = { de = "Zuklappen macht das sowieso", en = "Closing the lid does that anyway" }
+disabled_note = { de = "Ausgeschaltet. Wähle oben, wo er stehen soll, dann geht er wieder an.", en = "Switched off. Pick where it should sit above, and it comes back on." }
+confirm      = { de = "Alles gut so? Sonst geht's in {n} s zurück", en = "All good? Otherwise it goes back in {n} s" }
+mouse_card   = { de = "Maus", en = "Mouse" }
+speed        = { de = "Tempo", en = "Speed" }
+scrolling    = { de = "Scrollen", en = "Scrolling" }
+accel        = { de = "Beschleunigung", en = "Acceleration" }
+accel_sub    = { de = "schnelle Bewegung = weiter", en = "fast movement = farther" }
+natural      = { de = "Natürlich scrollen", en = "Natural scrolling" }
+natural_sub  = { de = "wie am Handy", en = "like on a phone" }
+left_handed  = { de = "Linkshänder", en = "Left-handed" }
+left_handed_sub = { de = "Tasten getauscht", en = "buttons swapped" }
+touchpad     = "Touchpad"
+tap          = { de = "Antippen klickt", en = "Tap to click" }
+dwt          = { de = "Aus beim Tippen", en = "Off while typing" }
+right_click  = { de = "Rechtsklick", en = "Right click" }
+two_fingers  = { de = "Zwei Finger", en = "Two fingers" }
+corner       = { de = "Ecke rechts unten", en = "Bottom right corner" }
+per_s        = { de = "{v} pro s", en = "{v} per s" }
+try_here     = { de = "hier ausprobieren: eine Taste festhalten …", en = "try it here: hold a key …" }
+typing       = { de = "Tippen", en = "Typing" }
+layout       = "Layout"
+repeat_delay = { de = "Wiederholen nach", en = "Repeat after" }
+repeat_rate  = { de = "Wiederholtempo", en = "Repeat rate" }
+swap_keys    = { de = "Tasten tauschen", en = "Swap keys" }
+warmth       = { de = "Wärme", en = "Warmth" }
+warmer       = { de = "← wärmer", en = "← warmer" }
+neutral      = { de = "neutraler →", en = "more neutral →" }
+warm_from    = { de = "Warm ab", en = "Warm from" }
+neutral_from = { de = "Neutral ab", en = "Neutral from" }
+sun_today    = { de = "heute {set} bis {rise}  ·  {zone}  ·  {fade} min Übergang", en = "today {set} to {rise}  ·  {zone}  ·  {fade} min fade" }
+no_hyprsunset = { de = "hyprsunset fehlt noch:  sudo pacman -S hyprsunset", en = "hyprsunset is missing:  sudo pacman -S hyprsunset" }
+now          = { de = "  ·  jetzt", en = "  ·  now" }
+on_ac        = { de = "Am Netzteil", en = "Plugged in" }
+on_battery   = { de = "Mit Akku", en = "On battery" }
+idle_tip     = { de = "Tipp: Bildschirm aus kurz nach dem Sperren spart Strom, eine Taste weckt ihn ohne zu tippen.", en = "Tip: screen off shortly after locking saves power, any key wakes it without typing." }
+
+[strings.cal]
+weekdays       = { de = ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag"], en = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"] }
+weekdays_short = { de = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"], en = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] }
+months         = { de = ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember"], en = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"] }
+months_short   = { de = ["Jan", "Feb", "Mär", "Apr", "Mai", "Jun", "Jul", "Aug", "Sep", "Okt", "Nov", "Dez"], en = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"] }
+date           = { de = "{wd} {d}. {mon}", en = "{wd}, {mon} {d}" }
+untitled       = { de = "(ohne Titel)", en = "(untitled)" }
+allday         = { de = "ganztägig", en = "all day" }
+days_other     = { de = "{n} Tage", en = "{n} days" }
+days_one       = { de = "{n} Tag", en = "{n} day" }
+today          = { de = "Heute", en = "Today" }
+tomorrow       = { de = "Morgen", en = "Tomorrow" }
+day_after      = { de = "Übermorgen", en = "In two days" }
+yesterday      = { de = "Gestern", en = "Yesterday" }
+now            = { de = "jetzt", en = "now" }
+in_min         = { de = "in {n} Min", en = "in {n} min" }
+in_hm          = { de = "in {h}:{m} Std", en = "in {h}:{m} h" }
+in_h           = { de = "in {n} Std", en = "in {n} h" }
+tomorrow_lc    = { de = "morgen", en = "tomorrow" }
+in_days        = { de = "in {n} Tagen", en = "in {n} days" }
+left_min       = { de = "noch {n} Min", en = "{n} min left" }
+left_hm        = { de = "noch {h}:{m} Std", en = "{h}:{m} h left" }
+day_month      = { de = "{d}. {month}", en = "{month} {d}" }
+empty1         = { de = "Nichts geplant", en = "Nothing planned" }
+empty1_sub     = { de = "Zeit für einen Kaffee zu zweit?", en = "Time for a coffee together?" }
+empty2         = { de = "Ein freier Tag", en = "A free day" }
+empty2_sub     = { de = "Perfekt für Pia & Flauschebär", en = "Perfect for Pia & Flauschebär" }
+empty3         = { de = "Leer wie ein frisches Blatt", en = "Empty as a fresh page" }
+empty3_sub     = { de = "N trägt etwas ein", en = "N adds something" }
+empty4         = { de = "Kein Termin weit und breit", en = "Not an event in sight" }
+empty4_sub     = { de = "Kuscheltag?", en = "Cuddle day?" }
+empty5         = { de = "Ganz entspannt", en = "All relaxed" }
+empty5_sub     = { de = "Heute plant niemand was", en = "Nobody plans anything today" }
+title          = { de = "Kalender", en = "Calendar" }
+after          = { de = "Danach", en = "Later" }
+key_day        = { de = "Tag", en = "Day" }
+key_week       = { de = "Woche", en = "Week" }
+key_pgup       = { de = "Bild↑", en = "PgUp" }
+key_pgdn       = { de = "Bild↓", en = "PgDn" }
+key_month      = { de = "Monat", en = "Month" }
+key_new        = { de = "Neu", en = "New" }
+key_click      = { de = "Klick", en = "Click" }
+key_edit       = { de = "bearbeiten", en = "edit" }
+key_drag       = { de = "Ziehen", en = "Drag" }
+key_move       = { de = "verschieben", en = "move" }
+toggle_cal     = { de = "{name} aus- / einblenden", en = "Show / hide {name}" }
+week_free      = { de = "Der Rest der Woche ist frei ✨", en = "The rest of the week is free ✨" }
+week_left_one  = { de = "Diese Woche noch {n} Termin", en = "{n} more event this week" }
+week_left_other = { de = "Diese Woche noch {n} Termine", en = "{n} more events this week" }
+in_months_one  = { de = "in {n} Monat", en = "in {n} month" }
+in_months_other = { de = "in {n} Monaten", en = "in {n} months" }
+ago_months_one = { de = "vor {n} Monat", en = "{n} month ago" }
+ago_months_other = { de = "vor {n} Monaten", en = "{n} months ago" }
+events_zero    = { de = "keine Termine", en = "no events" }
+events_one     = { de = "{n} Termin", en = "{n} event" }
+events_other   = { de = "{n} Termine", en = "{n} events" }
+in_days_dot    = { de = "in {n} Tagen · ", en = "in {n} days · " }
+ago_days_dot   = { de = "vor {n} Tagen · ", en = "{n} days ago · " }
+more_one       = { de = "+ 1 weiterer", en = "+ 1 more" }
+more_other     = { de = "+ {n} weitere", en = "+ {n} more" }
+more_short     = { de = "+{n} weitere", en = "+{n} more" }
+dbl_edit       = { de = "\nDoppelklick: bearbeiten", en = "\nDouble click: edit" }
+drag_move      = { de = " · ziehen: verschieben", en = " · drag: move" }
+new_on         = { de = "Neuer Termin am {date}", en = "New event on {date}" }
+delete         = { de = "Löschen", en = "Delete" }
+whole_series   = { de = " (ganze Serie)", en = " (whole series)" }
+click_edit     = { de = "Klick: bearbeiten", en = "Click: edit" }
+drag_day       = { de = " · auf einen Tag ziehen: verschieben", en = " · drag onto a day: move" }
+delete_series  = { de = "Serie löschen?", en = "Delete series?" }
+running        = { de = " · läuft", en = " · now on" }
+n_more         = { de = "… und {n} mehr", en = "… and {n} more" }
+morning_one    = { de = "Guten Morgen! Heute {n} Termin", en = "Good morning! {n} event today" }
+morning_other  = { de = "Guten Morgen! Heute {n} Termine", en = "Good morning! {n} events today" }
+snooze         = { de = "In 5 Min", en = "In 5 min" }
+
+[strings.event]
+alarm_none     = { de = "Keine", en = "None" }
+alarm_15       = "15 Min"
+alarm_1h       = { de = "1 Std", en = "1 h" }
+alarm_1d       = { de = "1 Tag", en = "1 day" }
+alarm_day9     = { de = "Am Tag 9 Uhr", en = "Same day 9:00" }
+alarm_eve18    = { de = "Vortag 18 Uhr", en = "Day before 18:00" }
+alarm_2d       = { de = "2 Tage vorher", en = "2 days before" }
+new            = { de = "Neuer Termin", en = "New event" }
+what           = { de = "Was? z. B. Auto fertig machen", en = "What? e.g. Auto fertig machen" }
+when           = { de = "Wann? z. B. Fr bis So · morgen 20 Uhr", en = "When? (German) e.g. Fr bis So · morgen 20 Uhr" }
+where          = { de = "Wo? (optional)", en = "Where? (optional)" }
+past           = { de = "vorbei", en = "past" }
+already_past   = { de = "schon vorbei", en = "already past" }
+new_short      = { de = "Neu", en = "New" }
+edit           = { de = "Termin bearbeiten", en = "Edit event" }
+series         = { de = "Ganze Serie · ", en = "Whole series · " }
+from_cal       = { de = "aus {name}s Kalender", en = "from {name}'s calendar" }
+no_title       = { de = "Was steht an? Der Titel fehlt noch", en = "What's on? The title is still missing" }
+gone           = { de = "Termin nicht mehr gefunden", en = "Event not found any more" }
+save_failed    = { de = "Konnte nicht speichern: {err}", en = "Could not save: {err}" }
+changed        = { de = "Geändert ✓", en = "Changed ✓" }
+added          = { de = "Eingetragen ✓", en = "Added ✓" }
+to_nextcloud   = { de = "In {name}s Kalender · geht gleich an Nextcloud", en = "In {name}'s calendar · syncing to Nextcloud" }
+for_day        = { de = "Für {date} – oder sag unter Wann ein anderes Datum", en = "For {date} – or name another date under When" }
+hello_sub      = { de = "Was steht an, und wann?", en = "What's on, and when?" }
+hint_new       = { de = "Enter speichert · Tab: nächstes Feld", en = "Enter saves · Tab: next field" }
+hint_edit      = { de = "Ändere Titel, Datum oder Uhrzeit · Enter speichert", en = "Change title, date or time · Enter saves" }
+
+[strings.bar]  # waybar's own modules (config.jsonc), {…} are waybar's placeholders
+swap       = "Swap: {swapUsed:0.1f}/{swapTotal:0.0f} GB"
+awake      = { de = "Bleibt wach", en = "Staying awake" }
+idle       = { de = "Ruht wie gewohnt", en = "Idle as usual" }
+volume     = { de = "Lautstärke {volume} %\n{node_name}\nKlick: Sound, Rechtsklick: stumm", en = "Volume {volume}%\n{node_name}\nClick: sound, right click: mute" }
+
+[strings.lock]  # hyprlock
+date       = { de = "%A, %d. %B", en = "%A, %B %-d" }
+password   = { de = "Passwort", en = "Password" }

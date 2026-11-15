@@ -26,6 +26,8 @@ from zoneinfo import ZoneInfo
 
 from dateutil import rrule
 
+from i18n import T, Tn
+
 ROOT = os.path.expanduser("~/.local/share/calendars")
 OWN = "the-preu-plans-1"            # Flauschebär: the user's own calendar
 # short names, glyphs and colors per calendar (Nextcloud's names are long).
@@ -224,7 +226,7 @@ def _parse_file(cal, path):
             else:
                 e.end = e.start
         if not e.summary:
-            e.summary = "(ohne Titel)"
+            e.summary = T("cal.untitled")
     return events
 
 
@@ -292,7 +294,7 @@ class Occurrence:
     def time_text(self):
         if self.allday:
             days = (self.end - self.start).days
-            return "ganztägig" if days <= 1 else f"{days} Tage"
+            return T("cal.allday") if days <= 1 else Tn("cal.days", days)
         if self.end <= self.start:
             return self.start.strftime("%H:%M")
         return f"{self.start:%H:%M} – {self.end:%H:%M}"
@@ -585,25 +587,23 @@ def sync():
 
 
 # ---------------------------------------------------------------- words
-DAYS = ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag"]
-DAYS_SHORT = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"]
-MONTHS = ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August",
-          "September", "Oktober", "November", "Dezember"]
-MONTHS_SHORT = ["Jan", "Feb", "Mär", "Apr", "Mai", "Jun", "Jul", "Aug", "Sep", "Okt",
-                "Nov", "Dez"]
+DAYS = T("cal.weekdays")
+DAYS_SHORT = T("cal.weekdays_short")
+MONTHS = T("cal.months")
+MONTHS_SHORT = T("cal.months_short")
 
 
 def day_name(d, today=None):
     today = today or now().date()
     delta = (d - today).days
-    names = {0: "Heute", 1: "Morgen", 2: "Übermorgen", -1: "Gestern"}
+    names = {0: T("cal.today"), 1: T("cal.tomorrow"), 2: T("cal.day_after"), -1: T("cal.yesterday")}
     if delta in names:
         return names[delta]
     return DAYS[d.weekday()]
 
 
 def date_text(d, year=False):
-    s = f"{DAYS_SHORT[d.weekday()]} {d.day}. {MONTHS_SHORT[d.month - 1]}"
+    s = T("cal.date", wd=DAYS_SHORT[d.weekday()], d=d.day, mon=MONTHS_SHORT[d.month - 1])
     return s + (f" {d.year}" if year else "")
 
 
@@ -612,16 +612,16 @@ def until_text(t, ref=None):
     ref = ref or now()
     mins = round((t - ref).total_seconds() / 60)
     if mins <= 0:
-        return "jetzt"
+        return T("cal.now")
     if mins < 60:
-        return f"in {mins} Min"
+        return T("cal.in_min", n=mins)
     if mins < 60 * 24:
         h, m = divmod(mins, 60)
         if h < 3 and m >= 10:
-            return f"in {h}:{m:02d} Std"
-        return f"in {round(mins / 60)} Std"
+            return T("cal.in_hm", h=h, m=f"{m:02d}")
+        return T("cal.in_h", n=round(mins / 60))
     days = (t.date() - ref.date()).days
-    return "morgen" if days == 1 else f"in {days} Tagen"
+    return T("cal.tomorrow_lc") if days == 1 else T("cal.in_days", n=days)
 
 
 def left_text(t, ref=None):
@@ -629,6 +629,6 @@ def left_text(t, ref=None):
     ref = ref or now()
     mins = max(1, round((t - ref).total_seconds() / 60))
     if mins < 60:
-        return f"noch {mins} Min"
+        return T("cal.left_min", n=mins)
     h, m = divmod(mins, 60)
-    return f"noch {h}:{m:02d} Std"
+    return T("cal.left_hm", h=h, m=f"{m:02d}")

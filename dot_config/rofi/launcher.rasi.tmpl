@@ -17,7 +17,7 @@ window {
 mainbox    { spacing: 16px; }
 box-search { width: 340px; padding: 9px 16px; }
 entry {
-    placeholder: "Search apps or the web";
+    placeholder: "{{ index .strings.rofi.launcher (dig "machine" "lang" "en" .) }}";
     font:        "{{ .design.font_ui }} 12";
 }
 
@@ -46,5 +46,5 @@ element-text {
 }
 
 textbox-hint {
-    str: "Enter  open      ·      no match? Enter searches the web      ·      Esc  close";
+    str: "{{ index .strings.rofi.launcher_hint (dig "machine" "lang" "en" .) }}";
 }

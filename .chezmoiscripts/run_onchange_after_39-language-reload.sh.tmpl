@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+# Texts changed (.chezmoidata/locale.toml or the language picked at `chezmoi
+# init`): the bar modules (battery, brightness, music, Claude pet, flair ...)
+# read them once at start, so restart waybar. Popups restart in 38-session-reload.
+# {{ include ".chezmoidata/locale.toml" | sha256sum }} {{ dig "machine" "lang" "en" . }}
+set -uo pipefail
+[[ -n ${HYPRLAND_INSTANCE_SIGNATURE-} ]] || exit 0    # not in a session (bootstrap)
+systemctl --user try-restart waybar.service

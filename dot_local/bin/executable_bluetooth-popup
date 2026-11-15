@@ -30,6 +30,7 @@ import sys
 
 sys.path.insert(0, os.path.expanduser("~/.local/lib/popup"))
 import resident  # noqa: E402
+from i18n import T  # noqa: E402
 
 APP = "popup.bluetooth"
 WIDTH = 360
@@ -86,7 +87,7 @@ def build():
         popup_width = WIDTH       # resident.place() puts it under the mouse
 
         def __init__(self):
-            super().__init__(title="Bluetooth")
+            super().__init__(title=T("bluetooth.title"))
             for c in ("popup", "menu", "bluetooth"):
                 self.add_css_class(c)
             self.set_decorated(False)
@@ -105,7 +106,7 @@ def build():
             box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2,
                           css_classes=["menu-box"])
             head = Gtk.CenterBox(css_classes=["head"])
-            head.set_center_widget(Gtk.Label(label="Bluetooth", css_classes=["menu-title"]))
+            head.set_center_widget(Gtk.Label(label=T("bluetooth.title"), css_classes=["menu-title"]))
             self.switch = Gtk.Switch(valign=Gtk.Align.CENTER)
             self.switch_handler = self.switch.connect("state-set", self.on_switch)
             head.set_end_widget(self.switch)
@@ -180,18 +181,18 @@ def build():
             dev = args[0] if args else None
             ours = dev is not None and dev == self.pairing
             if method == "DisplayPasskey":
-                self.busy[dev] = f"Type {args[1]:06d} + Enter on the device"
+                self.busy[dev] = T("bluetooth.type_code", code=f"{args[1]:06d}")
                 self.show_hint(dev)
                 inv.return_value(None)
             elif method == "DisplayPinCode":
-                self.busy[dev] = f"Type {args[1]} + Enter on the device"
+                self.busy[dev] = T("bluetooth.type_code", code=args[1])
                 self.show_hint(dev)
                 inv.return_value(None)
             elif method == "RequestConfirmation":
                 # Numeric comparison: we asked for this pairing, so say yes; the
                 # code is shown in case the device (a phone) asks to compare
                 if ours:
-                    self.busy[dev] = f"Confirm code {args[1]:06d} on the device"
+                    self.busy[dev] = T("bluetooth.confirm_code", code=f"{args[1]:06d}")
                     self.show_hint(dev)
                     inv.return_value(None)
                 else:
@@ -257,13 +258,13 @@ def build():
             if path in self.busy:
                 return
             if prop(obj, "org.bluez.Device1", "Connected"):
-                self.busy[path] = "Disconnecting..."
+                self.busy[path] = T("common.disconnecting")
                 self.call(path, "org.bluez.Device1", "Disconnect",
-                          done=lambda e: self.finished(path, e, f"Could not disconnect {name}"))
+                          done=lambda e: self.finished(path, e, T("bluetooth.disconnect_failed", name=name)))
             else:
-                self.busy[path] = "Connecting..."
+                self.busy[path] = T("common.connecting")
                 self.call(path, "org.bluez.Device1", "Connect",
-                          done=lambda e: self.finished(path, e, f"Could not connect to {name}"))
+                          done=lambda e: self.finished(path, e, T("common.connect_failed_to", name=name)))
             self.render()
 
         def pair_device(self, obj):
@@ -273,23 +274,23 @@ def build():
                 return
             self.stop_search()       # discovery disturbs pairing on many adapters
             self.pairing = path
-            self.busy[path] = "Pairing..."
+            self.busy[path] = T("bluetooth.pairing")
 
             def paired(err):
                 if err and "AlreadyExists" not in err:
                     self.pairing = None
-                    self.finished(path, err, f"Could not pair with {name}")
+                    self.finished(path, err, T("bluetooth.pair_failed", name=name))
                     return
                 self.set_prop(path, "org.bluez.Device1", "Trusted", GLib.Variant("b", True))
-                self.busy[path] = "Connecting..."
+                self.busy[path] = T("common.connecting")
                 self.soon()
                 self.call(path, "org.bluez.Device1", "Connect", done=connected)
 
             def connected(err):
                 self.pairing = None
-                self.finished(path, err, f"Paired {name}, but could not connect")
+                self.finished(path, err, T("bluetooth.paired_no_conn", name=name))
                 if not err and not self.get_visible():
-                    notify(f"Connected to {name}")
+                    notify(T("common.connected_to", name=name))
             # Pairable = bondable: without it BlueZ pairs but keeps no keys, and
             # the device has to be paired again after every disconnect
             ad = self.adapter()
@@ -338,7 +339,7 @@ def build():
             """A call is done: clear the row's status, show what went wrong."""
             self.busy.pop(path, None)
             if err:
-                self.busy[path] = "Failed: " + err.replace("org.bluez.Error.", "")
+                self.busy[path] = T("common.failed", err=err.replace("org.bluez.Error.", ""))
                 GLib.timeout_add_seconds(4, lambda: (self.busy.pop(path, None),
                                                      self.render(), False)[-1])
                 if not self.get_visible():
@@ -388,7 +389,7 @@ def build():
                         and not d("Paired", False) and not self.pairing):
                     self.repair = None              # it is back: pair it right away
                     GLib.idle_add(lambda o=obj: self.pair_device(o) and False)
-                    row["status"] = "Pairing..."
+                    row["status"] = T("bluetooth.pairing")
                 if d("Paired", False):
                     paired.append(row)
                 elif d("Name") and (self.searching or row["status"]):
@@ -411,30 +412,30 @@ def build():
             while child := self.body.get_first_child():
                 self.body.remove(child)
             if ad is None:
-                self.body.append(self.note("No Bluetooth adapter found"))
+                self.body.append(self.note(T("bluetooth.no_adapter")))
             elif not powered:
-                self.body.append(self.note("Bluetooth is off"))
+                self.body.append(self.note(T("bluetooth.is_off")))
             else:
                 if paired:
-                    self.body.append(self.section("My devices"))
+                    self.body.append(self.section(T("bluetooth.my_devices")))
                     for r in paired:
                         self.body.append(self.device_row(r, paired=True))
                 if self.searching:
-                    self.body.append(self.section("Searching for devices...", busy=True))
+                    self.body.append(self.section(T("bluetooth.searching"), busy=True))
                     if self.repair:
                         self.body.append(self.note(
-                            f"Put {self.repair[1]} in pairing mode, it pairs by itself"))
+                            T("bluetooth.repair_hint", name=self.repair[1])))
                     elif not found:
-                        self.body.append(self.note("Put your device in pairing mode"))
+                        self.body.append(self.note(T("bluetooth.pair_hint")))
                     if found:
                         self.body.append(self.found_list(found))
                 elif found:          # still pairing after the search stopped
-                    self.body.append(self.section("Pairing"))
+                    self.body.append(self.section(T("bluetooth.pairing_section")))
                     for r in found:
                         self.body.append(self.device_row(r, paired=False))
                 self.body.append(Gtk.Separator(css_classes=["sound-sep"]))
                 search = self.text_row(
-                    f"{I_SEARCH}  Stop searching" if self.searching else f"{I_ADD}  Add a device",
+                    f"{I_SEARCH}  " + T("bluetooth.stop_search") if self.searching else f"{I_ADD}  " + T("bluetooth.add_device"),
                     self.toggle_search, spin=bool(self.searching))
                 search.bt_key = "search"
                 self.body.append(search)
@@ -495,11 +496,11 @@ def build():
             if r["status"]:
                 status = r["status"]
             elif paired and r["connected"]:
-                status = "Connected" + (f"  ·  {r['battery']}%" if r["battery"] is not None else "")
+                status = T("common.connected") + (f"  ·  {r['battery']}%" if r["battery"] is not None else "")
             elif paired:
                 status = None
             else:
-                status = "Click to pair"
+                status = T("bluetooth.click_to_pair")
             inner = Gtk.Box(spacing=12)
             inner.append(Gtk.Label(label=r["icon"], css_classes=["row-icon"]))
             texts = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, valign=Gtk.Align.CENTER,
@@ -527,7 +528,7 @@ def build():
             top.append(button)
             more = Gtk.Button(label=I_LESS if self.open == path else I_MORE,
                               css_classes=["more", "flat"], valign=Gtk.Align.CENTER,
-                              tooltip_text="Manage this device")
+                              tooltip_text=T("bluetooth.manage"))
             more.bt_key = "more" + path
             more.connect("clicked", lambda _b: self.toggle_open(path))
             top.append(more)
@@ -542,7 +543,7 @@ def build():
                 self.opening = None
             card.append(top)
             card.append(Gtk.Label(
-                label=r["address"] + ("  ·  trusted" if r["trusted"] else ""),
+                label=r["address"] + (T("bluetooth.trusted") if r["trusted"] else ""),
                 xalign=0, css_classes=["item-info"]))
             actions = Gtk.Box(spacing=6, homogeneous=True, css_classes=["item-actions"])
 
@@ -551,11 +552,11 @@ def build():
                 b.bt_key = key + path
                 b.connect("clicked", lambda _b: on_click())
                 actions.append(b)
-            action("Disconnect" if r["connected"] else "Connect", "conn",
+            action(T("common.disconnect") if r["connected"] else T("common.connect"), "conn",
                    lambda: self.connect_device(obj))
-            action("Pair again", "repair", lambda: self.re_pair(obj))
+            action(T("bluetooth.pair_again"), "repair", lambda: self.re_pair(obj))
             sure = self.confirm == path
-            action("Sure?" if sure else "Forget", "forget", lambda: self.forget(obj),
+            action(T("common.sure") if sure else T("common.forget"), "forget", lambda: self.forget(obj),
                    ["danger"] if sure else [])
             card.append(actions)
             return card

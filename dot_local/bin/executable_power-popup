@@ -23,6 +23,7 @@ from pathlib import Path
 
 sys.path.insert(0, os.path.expanduser("~/.local/lib/popup"))
 import resident  # noqa: E402
+from i18n import T  # noqa: E402
 
 APP = "popup.power"
 WIDTH = 340
@@ -41,9 +42,9 @@ BATTERY_BOLT = ["\U000F089C", "\U000F0086", "\U000F0087", "\U000F0088", "\U000F0
                 "\U000F0089", "\U000F089E", "\U000F008A", "\U000F008B", "\U000F0085"]
 I_PLUG = "\U000F06A5"
 # left to right: most saving to fastest
-PROFILE_ROWS = [("power-saver", "\U000F032A", "Saver"),
-                ("balanced", "\U000F0F85", "Balanced"),
-                ("performance", "\U000F04C5", "Performance")]
+PROFILE_ROWS = [("power-saver", "\U000F032A", T("power.saver")),
+                ("balanced", "\U000F0F85", T("power.balanced")),
+                ("performance", "\U000F04C5", T("power.performance"))]
 I_SESSION = "\U000F0425"
 
 
@@ -94,7 +95,7 @@ def build():
         popup_width = WIDTH       # resident.place() puts it under the mouse
 
         def __init__(self):
-            super().__init__(title="Power")
+            super().__init__(title=T("power.title"))
             for c in ("popup", "menu", "power"):
                 self.add_css_class(c)
             self.set_decorated(False)
@@ -102,7 +103,7 @@ def build():
 
             box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2,
                           css_classes=["menu-box"])
-            box.append(Gtk.Label(label="Power", css_classes=["menu-title"]))
+            box.append(Gtk.Label(label=T("power.title"), css_classes=["menu-title"]))
 
             # battery: icon, level, state; a bar; draw / health / limit
             self.battery = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6,
@@ -125,7 +126,7 @@ def build():
             box.append(self.battery)
 
             # power profile: three buttons side by side
-            self.profile_label = Gtk.Label(label="Power profile", xalign=0,
+            self.profile_label = Gtk.Label(label=T("power.profile"), xalign=0,
                                            css_classes=["section"])
             box.append(self.profile_label)
             self.profile_box = Gtk.Box(spacing=6, homogeneous=True, css_classes=["segments"])
@@ -144,7 +145,7 @@ def build():
             box.append(Gtk.Separator(css_classes=["sound-sep"]))
             more = Gtk.Box(spacing=12)
             more.append(Gtk.Label(label=I_SESSION, css_classes=["row-icon"]))
-            more.append(Gtk.Label(label="Lock, reboot, shut down...", xalign=0, hexpand=True))
+            more.append(Gtk.Label(label=T("power.session"), xalign=0, hexpand=True))
             self.session_row = Gtk.Button(child=more, css_classes=["sound-row", "flat"])
             self.session_row.connect("clicked", lambda _b: self.open_session())
             box.append(self.session_row)
@@ -196,16 +197,16 @@ def build():
                 step = min(9, pct // 10)
                 if state == CHARGING:
                     left = get(up, "TimeToFull", 0)
-                    text = "Charging" + (f", full in {duration(left)}" if left else "")
+                    text = T("power.charging") + (T("power.full_in", time=duration(left)) if left else "")
                     icon = BATTERY_BOLT[step]
                 elif state in (FULL, HELD) or (state != DISCHARGING and rate < 0.5):
-                    text = ("Plugged in, held at the charge limit"
+                    text = (T("power.held")
                             if extra.get("limit") and pct >= extra["limit"] - 5 and state != FULL
-                            else "Plugged in, full")
+                            else T("power.full"))
                     icon = I_PLUG
                 else:
                     left = get(up, "TimeToEmpty", 0)
-                    text = "On battery" + (f", {duration(left)} left" if left else "")
+                    text = T("power.on_battery") + (T("power.left", time=duration(left)) if left else "")
                     icon = BATTERY[step]
                 self.bat_icon.set_text(icon)
                 self.bat_level.set_text(f"{pct}%")
@@ -223,9 +224,9 @@ def build():
                 if rate >= 0.5:
                     info.append(f"{rate:.1f} W")
                 if "health" in extra:
-                    info.append(f"health {extra['health']}%")
+                    info.append(T("power.health", pct=extra['health']))
                 if "limit" in extra:
-                    info.append(f"limit {extra['limit']}%")
+                    info.append(T("power.limit", pct=extra['limit']))
                 self.bat_info.set_text("  ·  ".join(info))
                 self.bat_info.set_visible(bool(info))
 

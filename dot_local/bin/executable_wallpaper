@@ -16,6 +16,8 @@ state="${XDG_STATE_HOME:-$HOME/.local/state}/wallpaper"
 thumbs="${XDG_CACHE_HOME:-$HOME/.cache}/wallpaper-thumbs"
 login_dir=/var/lib/login-wallpaper   # user-owned, read by the SDDM theme "slate"
 mkdir -p "$state" "$thumbs"
+# visible texts from the language file (.chezmoidata/locale.toml)
+t() { jq -r --arg k "$1" '.[$k] // $k' ~/.config/popups/strings.json 2>/dev/null || echo "$1"; }
 
 list_images() {
     find -L "${dirs[@]}" -type f \( -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' -o -iname '*.webp' \) \
@@ -72,12 +74,12 @@ pick() {
     } | rofi -dmenu -i -show-icons -format i -p "Wallpaper" -theme overlay \
         -kb-accept-alt "" -kb-accept-custom "" \
         -kb-custom-1 "Shift+Return" -kb-custom-2 "Control+Return" -theme-str '
-        entry    { placeholder: "Filter wallpapers..."; }
+        entry    { placeholder: "'"$(t rofi.wallpaper)"'"; }
         listview { columns: 4; lines: 3; flow: horizontal; fixed-columns: true; spacing: 6px; }
         element  { orientation: vertical; padding: 10px 8px 8px 8px; spacing: 6px; }
         element-icon { size: 140px; horizontal-align: 0.5; }
         element-text { font: @font-ui; horizontal-align: 0.5; }
-        textbox-hint { str: "Enter  desktop      ·      Shift+Enter  login screen      ·      Ctrl+Enter  both      ·      Esc  close"; }
+        textbox-hint { str: "'"$(t rofi.wallpaper_hint)"'"; }
     ')
     rc=$?   # rofi: 0 Enter, 10 Shift+Enter, 11 Ctrl+Enter, 1 Esc
     [[ -n $idx ]] || return 0

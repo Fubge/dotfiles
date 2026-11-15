@@ -8,7 +8,10 @@
 # Python and cost ~50 ms CPU per call every 5 s).
 set -uo pipefail
 profiles=(performance balanced power-saver)
-names=("Performance" "Balanced" "Power saver")
+# names and tooltip from the language file (.chezmoidata/locale.toml)
+mapfile -t names < <(jq -r '."power.performance", ."power.balanced", ."power.saver", ."power.bar_tip"' \
+    ~/.config/popups/strings.json 2>/dev/null)
+((${#names[@]} == 4)) || names=(performance balanced power-saver "{name}")
 icons=($'\U000F04C5' $'\U000F0F85' $'\U000F032A')
 bus=org.freedesktop.UPower.PowerProfiles
 path=/org/freedesktop/UPower/PowerProfiles
@@ -23,8 +26,8 @@ status() {
     if [[ -z $cur_idx ]]; then
         echo '{"text": "", "class": "unavailable"}'
     else
-        printf '{"text": "%s", "tooltip": "Power profile: %s", "class": "%s"}\n' \
-            "${icons[cur_idx]}" "${names[cur_idx]}" "$current"
+        printf '{"text": "%s", "tooltip": "%s", "class": "%s"}\n' \
+            "${icons[cur_idx]}" "${names[3]//\{name\}/${names[cur_idx]}}" "$current"
     fi
 }
 

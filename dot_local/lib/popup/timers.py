@@ -15,6 +15,8 @@ import re
 import time
 import uuid
 
+from i18n import T
+
 STATE = os.path.expanduser("~/.local/state/timer/timers.json")
 
 TIMER = "\U000F13AB"        # md-timer
@@ -24,12 +26,12 @@ BELL = "\U000F009E"         # md-bell_ring
 
 # label, minutes, icon, color name (palette) - the round preset buttons
 PRESETS = [
-    ("Ei", 7, "\U000F0AAF", "yellow"),
-    ("Tee", 4, "\U000F0D9E", "green"),
-    ("Nudeln", 9, "\U000F1160", "accent"),
-    ("Pizza", 12, "\U000F0409", "red"),
-    ("Pause", 5, "\U000F0176", "cyan"),
-    ("Fokus", 25, "\U000F09D1", "magenta"),
+    (T("timer.egg"), 7, "\U000F0AAF", "yellow"),
+    (T("timer.tea"), 4, "\U000F0D9E", "green"),
+    (T("timer.pasta"), 9, "\U000F1160", "accent"),
+    (T("timer.pizza"), 12, "\U000F0409", "red"),
+    (T("timer.break"), 5, "\U000F0176", "cyan"),
+    (T("timer.focus"), 25, "\U000F09D1", "magenta"),
 ]
 
 
@@ -117,17 +119,17 @@ def words(sec):
     m, s = divmod(rest, 60)
     out = []
     if h:
-        out.append(f"{h} Std")
+        out.append(T("timer.h", n=h))
     if m:
-        out.append(f"{m} Min")
+        out.append(T("timer.min", n=m))
     if s and not h:
-        out.append(f"{s} Sek")
-    return " ".join(out) or "0 Sek"
+        out.append(T("timer.sec", n=s))
+    return " ".join(out) or T("timer.sec", n=0)
 
 
-UNITS = {"h": 3600, "std": 3600, "stunde": 3600, "stunden": 3600,
-         "m": 60, "min": 60, "mins": 60, "minute": 60, "minuten": 60,
-         "s": 1, "sek": 1, "sec": 1, "sekunde": 1, "sekunden": 1}
+UNITS = {"h": 3600, "std": 3600, "stunde": 3600, "stunden": 3600, "hour": 3600, "hours": 3600,
+         "m": 60, "min": 60, "mins": 60, "minute": 60, "minuten": 60, "minutes": 60,
+         "s": 1, "sek": 1, "sec": 1, "sekunde": 1, "sekunden": 1, "second": 1, "seconds": 1}
 
 
 def parse(text):

@@ -23,6 +23,7 @@ import sys
 
 sys.path.insert(0, os.path.expanduser("~/.local/lib/popup"))
 import resident  # noqa: E402
+from i18n import T  # noqa: E402
 
 APP = "popup.task"
 WIDTH = 520
@@ -33,9 +34,9 @@ CLOSE_MS = 900        # the "saved" look stays this long
 
 # tag, alt key, icon, caption
 TAGS = [
-    ("bug", "b", "\U000F00E4", "Etwas ist kaputt"),
-    ("verbesserung", "v", "\U000F0068", "Geht noch besser"),
-    ("idee", "i", "\U000F0335", "Etwas ganz Neues"),
+    ("bug", "b", "\U000F00E4", T("task.bug")),
+    ("verbesserung", "v", "\U000F0068", T("task.better")),
+    ("idee", "i", "\U000F0335", T("task.idea")),
 ]
 DEFAULT_TAG = "verbesserung"   # chosen again after every saved task
 
@@ -87,7 +88,7 @@ def build():
         popup_width = WIDTH       # resident.place(center=True) on every show
 
         def __init__(self):
-            super().__init__(title="New task")
+            super().__init__(title=T("task.title"))
             for c in ("popup", "menu", "task"):
                 self.add_css_class(c)
             self.set_decorated(False)
@@ -97,15 +98,15 @@ def build():
 
             box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4,
                           css_classes=["task-box"])
-            self.hello = Gtk.Label(label="Neue Aufgabe für Claude",
+            self.hello = Gtk.Label(label=T("task.hello"),
                                    css_classes=["menu-title", "task-hello"])
             self.sub = Gtk.Label(css_classes=["task-sub"])
             box.append(self.hello)
             box.append(self.sub)
 
-            self.entry = Gtk.Entry(placeholder_text="Was soll ich mir anschauen?",
+            self.entry = Gtk.Entry(placeholder_text=T("task.what"),
                                    css_classes=["menu-search", "task-entry"])
-            self.details = Gtk.Entry(placeholder_text="Details (optional)",
+            self.details = Gtk.Entry(placeholder_text=T("task.details"),
                                      css_classes=["menu-search", "task-details"])
             for e in (self.entry, self.details):
                 e.connect("activate", lambda _e: self.save())
@@ -144,7 +145,7 @@ def build():
             for t, b in self.buttons.items():
                 (b.add_css_class if t == tag else b.remove_css_class)("chosen")
             self.caption.set_text(next(a[3] for a in TAGS if a[0] == tag)
-                                  + "  ·  Enter speichert")
+                                  + T("task.enter_saves"))
 
         def save(self):
             if self.close_timer:
@@ -160,14 +161,14 @@ def build():
             try:
                 add_task(text, self.tag, details)
             except OSError as e:
-                self.caption.set_text(f"Konnte nicht speichern: {e.strerror}")
+                self.caption.set_text(T("task.save_failed", err=e.strerror))
                 self.caption.add_css_class("error")
                 return
             self.entry.set_text("")
             self.details.set_text("")
             self.tag = DEFAULT_TAG        # the next task starts from the default again
             self.add_css_class("saved")
-            self.hello.set_text("Notiert ✓")
+            self.hello.set_text(T("task.saved"))
             resident.type_title(self.hello)       # stops the greeting still typing
             self.caption.set_text("/todo arbeitet sie ab")
             self.close_timer = GLib.timeout_add(CLOSE_MS, self.done)
@@ -184,8 +185,8 @@ def build():
                 self.close_timer = None
             self.remove_css_class("saved")
             self.caption.remove_css_class("error")
-            self.hello.set_text("Neue Aufgabe für Claude")
-            self.sub.set_text("Landet in Aufgaben.md")
+            self.hello.set_text(T("task.hello"))
+            self.sub.set_text(T("task.lands_in"))
             self.pick(self.tag)
             # restart the pop-in of the tag buttons: drop the class, add it once shown
             for b in self.buttons.values():

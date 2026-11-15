@@ -1,0 +1,12 @@
+{{- /* Every visible text of the desktop in the language picked at
+       `chezmoi init` (machine.lang), flat "area.key": "text". Source:
+       .chezmoidata/locale.toml; read by ~/.local/lib/popup/i18n.py. */ -}}
+{{- $lang := dig "machine" "lang" "en" . -}}
+{{- $out := dict -}}
+{{- range $area, $keys := .strings -}}
+{{-   range $key, $v := $keys -}}
+{{-     if kindIs "map" $v }}{{ $v = index $v $lang }}{{ end -}}
+{{-     $_ := set $out (printf "%s.%s" $area $key) $v -}}
+{{-   end -}}
+{{- end -}}
+{{ toPrettyJson $out }}

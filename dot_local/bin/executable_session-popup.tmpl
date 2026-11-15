@@ -23,6 +23,7 @@ import time
 
 sys.path.insert(0, os.path.expanduser("~/.local/lib/popup"))
 import resident  # noqa: E402
+from i18n import T, greeting  # noqa: E402
 
 APP = "popup.session"
 WIDTH = 500
@@ -34,20 +35,12 @@ CARET = "{{ .palette.accent }}"
 
 # key, letter, icon, label, caption, command, asks first
 ACTIONS = [
-    ("lock", "l", "\U000F033E", "Lock", "back in a sec", ["loginctl", "lock-session"], False),
-    ("suspend", "s", "\U000F0904", "Suspend", "nap time", ["systemctl", "suspend"], False),
-    ("logout", "e", "\U000F0343", "Log out", "see you soon", ["uwsm", "stop"], True),
-    ("reboot", "r", "\U000F0709", "Reboot", "fresh start", ["systemctl", "reboot"], True),
-    ("shutdown", "p", "\U000F0425", "Shut down", "lights out", ["systemctl", "poweroff"], True),
+    ("lock", "l", "\U000F033E", T("session.lock"), T("session.lock_c"), ["loginctl", "lock-session"], False),
+    ("suspend", "s", "\U000F0904", T("session.suspend"), T("session.suspend_c"), ["systemctl", "suspend"], False),
+    ("logout", "e", "\U000F0343", T("session.logout"), T("session.logout_c"), ["uwsm", "stop"], True),
+    ("reboot", "r", "\U000F0709", T("session.reboot"), T("session.reboot_c"), ["systemctl", "reboot"], True),
+    ("shutdown", "p", "\U000F0425", T("session.shutdown"), T("session.shutdown_c"), ["systemctl", "poweroff"], True),
 ]
-
-
-def greeting():
-    """Same words as the lock screen (~/.local/bin/lock-greeting)."""
-    hour = time.localtime().tm_hour
-    hello = ("Gute Nacht" if hour < 5 else "Guten Morgen" if hour < 11 else
-             "Guten Tag" if hour < 18 else "Guten Abend" if hour < 22 else "Gute Nacht")
-    return f"{hello}, {os.environ.get('USER', '').capitalize()}"
 
 
 def uptime():
@@ -58,7 +51,7 @@ def uptime():
     d, rest = divmod(int(seconds) // 60, 24 * 60)
     h, m = divmod(rest, 60)
     parts = ([f"{d} d"] if d else []) + ([f"{h} h"] if h or d else []) + [f"{m} min"]
-    return "up " + " ".join(parts)
+    return T("session.uptime", time=" ".join(parts))
 
 
 def build():
@@ -72,7 +65,7 @@ def build():
         popup_width = WIDTH       # resident.place(center=True) on every show
 
         def __init__(self):
-            super().__init__(title="Session")
+            super().__init__(title=T("session.title"))
             for c in ("popup", "menu", "session"):
                 self.add_css_class(c)
             self.set_decorated(False)
@@ -149,12 +142,12 @@ def build():
             self.confirm = key
             for k, b in self.buttons.items():
                 label = self.action(k)[3]
-                b.name_label.set_text("Sure?" if k == key else label)
+                b.name_label.set_text(T("common.sure") if k == key else label)
                 (b.add_css_class if k == key else b.remove_css_class)("confirm")
             if key:
                 self.confirm_timer = GLib.timeout_add_seconds(
                     CONFIRM_SECONDS, lambda: self.set_confirm(None) or False)
-                self.caption_label.set_text(f"click again to {self.action(key)[3].lower()}")
+                self.caption_label.set_text(T("session.again", action=self.action(key)[3].lower()))
             elif (f := self.get_focus()) is not None and getattr(f, "key", None):
                 self.caption(f.key)
             return False

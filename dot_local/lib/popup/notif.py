@@ -12,6 +12,8 @@ import os
 import re
 import time
 
+from i18n import T
+
 STATE = os.path.join(os.environ.get("XDG_STATE_HOME", os.path.expanduser("~/.local/state")),
                      "notifications")
 HISTORY = os.path.join(STATE, "history.json")       # {"dnd", "read_at", "items": [...]}
@@ -209,7 +211,7 @@ def day_label(when, now=None):
     today = time.localtime(now)
     midnight = time.mktime((today.tm_year, today.tm_mon, today.tm_mday, 0, 0, 0, 0, 0, -1))
     if when >= midnight:
-        return "Today"
+        return T("notif.today")
     if when >= midnight - 86400:
-        return "Yesterday"
-    return "Earlier"
+        return T("notif.yesterday")
+    return T("notif.earlier")

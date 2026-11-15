@@ -23,6 +23,7 @@ import time
 
 sys.path.insert(0, os.path.expanduser("~/.local/lib/popup"))
 import resident  # noqa: E402
+from i18n import T  # noqa: E402
 import notif  # noqa: E402
 from notif import G  # noqa: E402
 
@@ -43,7 +44,7 @@ def build():
         popup_width = WIDTH       # resident.place() puts it under the mouse
 
         def __init__(self):
-            super().__init__(title="Notifications")
+            super().__init__(title=T("notif.title"))
             for c in ("popup", "menu", "center"):
                 self.add_css_class(c)
             self.set_decorated(False)
@@ -54,13 +55,13 @@ def build():
             box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2,
                           css_classes=["menu-box"])
             head = Gtk.CenterBox(css_classes=["head"])
-            head.set_center_widget(Gtk.Label(label="Notifications", css_classes=["menu-title"]))
+            head.set_center_widget(Gtk.Label(label=T("notif.title"), css_classes=["menu-title"]))
             self.dnd = Gtk.Button(css_classes=["more", "dnd"], valign=Gtk.Align.CENTER)
             self.dnd.connect("clicked", lambda _b: self.call("SetDnd", GLib.Variant(
                 "(b)", (not self.state["dnd"],))))
             head.set_end_widget(self.dnd)
             box.append(head)
-            self.dnd_note = Gtk.Label(label="Do not disturb: only critical ones pop up",
+            self.dnd_note = Gtk.Label(label=T("notif.dnd_note"),
                                       css_classes=["note", "dnd-note"])
             box.append(self.dnd_note)
 
@@ -69,7 +70,7 @@ def build():
                                              hscrollbar_policy=Gtk.PolicyType.NEVER)
             box.append(self.scroll)
 
-            self.clear = Gtk.Button(label="Clear all", css_classes=["item-action", "clear-all"])
+            self.clear = Gtk.Button(label=T("notif.clear_all"), css_classes=["item-action", "clear-all"])
             self.clear.connect("clicked", self.clear_all)
             box.append(self.clear)
             self.set_child(box)
@@ -116,7 +117,7 @@ def build():
                 self.list.remove(child)
             dnd = self.state.get("dnd")
             self.dnd.set_label(G["bell-sleep"] if dnd else G["bell-outline"])
-            self.dnd.set_tooltip_text("Do not disturb: on" if dnd else "Do not disturb: off")
+            self.dnd.set_tooltip_text(T("notif.dnd_on") if dnd else T("notif.dnd_off"))
             (self.dnd.add_css_class if dnd else self.dnd.remove_css_class)("on")
             self.dnd_note.set_visible(bool(dnd))
 
@@ -126,7 +127,7 @@ def build():
                 empty = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6,
                                 css_classes=["center-empty", "note"])
                 empty.append(Gtk.Label(label=G["bell-sleep-outline"], css_classes=["center-empty-icon"]))
-                empty.append(Gtk.Label(label="All caught up"))
+                empty.append(Gtk.Label(label=T("notif.caught_up")))
                 self.list.append(empty)
                 self.fit()
                 return

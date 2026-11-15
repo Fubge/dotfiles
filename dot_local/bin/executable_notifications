@@ -54,6 +54,7 @@ if (len(sys.argv) == 1 and os.path.exists(LAYER_SHELL)
 
 sys.path.insert(0, os.path.expanduser("~/.local/lib/popup"))
 import resident  # noqa: E402
+from i18n import T  # noqa: E402
 import notif  # noqa: E402
 from notif import G, NAME, PATH  # noqa: E402
 
@@ -92,7 +93,7 @@ XML = """<node><interface name="org.freedesktop.Notifications">
 
 def tidy(app, summary, body, has_value):
     """No echoes: "Volume / Volume / 62 %" becomes the header plus the bar."""
-    app_name = app or "Notification"
+    app_name = app or T("notif.fallback_app")
     if app_name.islower():                  # "discord" -> "Discord"
         app_name = app_name[0].upper() + app_name[1:]
     lines = [t for t in (summary.strip(), body.strip()) if t]
@@ -180,7 +181,7 @@ def main():
         unread = sum(1 for i in state["items"] if i["time"] > state["read_at"])
         if state["dnd"]:
             text, cls = G["bell-sleep"], "dnd"
-            tip = "Do not disturb\nClick: notifications, right click: off"
+            tip = T("notif.bar_dnd")
         elif unread:
             # the bell with a cut out corner, an orange dot laid into the cut
             # (one label, so nothing covers anything): BADGE_DOT says where
@@ -188,10 +189,10 @@ def main():
                     'foreground="%s">●</span>' % (*BADGE_DOT[:1], G["bell-badge"],
                                                       *BADGE_DOT[1:], caret()))
             cls = "unread"
-            tip = f"{unread} new\nClick: notifications, right click: do not disturb"
+            tip = T("notif.bar_unread", n=unread)
         else:
             text, cls = G["bell"], "empty" if not state["items"] else "read"
-            tip = "Notifications\nClick: open, right click: do not disturb"
+            tip = T("notif.bar_idle")
         with open(notif.BAR_STATUS + ".tmp", "w") as f:
             f.write(json.dumps({"text": text, "class": cls, "tooltip": tip}) + "\n")
         os.replace(notif.BAR_STATUS + ".tmp", notif.BAR_STATUS)

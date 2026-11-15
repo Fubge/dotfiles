@@ -30,6 +30,7 @@ import sys
 
 sys.path.insert(0, os.path.expanduser("~/.local/lib/popup"))
 import resident  # noqa: E402
+from i18n import T  # noqa: E402
 
 APP = "popup.menu"
 RUN = resident.RUN
@@ -49,7 +50,7 @@ def build():
 
     class Menu(Gtk.Window):
         def __init__(self):
-            super().__init__(title="Menu")
+            super().__init__(title=T("menu.title"))
             self.add_css_class("popup")
             self.add_css_class("menu")
             self.add_css_class("list-menu")

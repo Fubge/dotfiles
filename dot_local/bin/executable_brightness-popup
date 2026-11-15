@@ -23,6 +23,7 @@ from pathlib import Path
 
 sys.path.insert(0, os.path.expanduser("~/.local/lib/popup"))
 import resident  # noqa: E402
+from i18n import T  # noqa: E402
 
 # first backlight device (intel_backlight, amdgpu_bl0, ...)
 DEVICE = next(Path("/sys/class/backlight").iterdir(), Path("/sys/class/backlight/none"))
@@ -76,7 +77,7 @@ def build():
         popup_width = WIDTH       # resident.place() puts it under the mouse
 
         def __init__(self):
-            super().__init__(title="Brightness")
+            super().__init__(title=T("brightness.title"))
             for c in ("popup", "menu", "brightness"):
                 self.add_css_class(c)
             self.set_decorated(False)
@@ -85,7 +86,7 @@ def build():
             self.loading = False
 
             box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8, css_classes=["menu-box"])
-            box.append(Gtk.Label(label="Brightness", css_classes=["menu-title"]))
+            box.append(Gtk.Label(label=T("brightness.title"), css_classes=["menu-title"]))
             row = Gtk.Box(spacing=12, css_classes=["slider-row"])
             self.icon = Gtk.Label(css_classes=["slider-icon"])
             self.scale = Gtk.Scale.new_with_range(Gtk.Orientation.HORIZONTAL, 1, 100, 1)
@@ -111,8 +112,8 @@ def build():
             row = Gtk.Box(spacing=12, css_classes=["slider-row", "kbd-row"])
             row.append(Gtk.Label(label=I_KEYBOARD, css_classes=["slider-icon"]))
             if top <= KBD_STEPS:
-                names = ["Off", "Low", "High"] if top == 2 else \
-                    ["Off"] + [str(i) for i in range(1, top + 1)]
+                names = [T("common.off"), T("brightness.low"), T("brightness.high")] if top == 2 else \
+                    [T("common.off")] + [str(i) for i in range(1, top + 1)]
                 seg = Gtk.Box(spacing=6, homogeneous=True, hexpand=True,
                               css_classes=["segments"])
                 for level, name in enumerate(names):
