@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+# osd WHAT [HOW]: change volume / brightness and show the pill (~/.local/bin/osd-pill)
+#   osd volume up|down|mute     default output (up also unmutes)
+#   osd mic mute                default input
+#   osd brightness up|down      screen, perceived steps like the slider (-e2)
+# The key binds (hypr/binds.lua) call this. The change itself happens here, so
+# the keys keep working when the pill daemon is not running; the daemon only
+# gets told what to show (one word into its FIFO, ~1 ms).
+set -uo pipefail
+run=${XDG_RUNTIME_DIR:-/tmp}
+sink=@DEFAULT_AUDIO_SINK@
+source=@DEFAULT_AUDIO_SOURCE@
+
+case "$1 ${2-}" in
+"volume up")      wpctl set-mute $sink 0; wpctl set-volume -l 1 $sink 5%+ ;;
+"volume down")    wpctl set-volume $sink 5%- ;;
+"volume mute")    wpctl set-mute $sink toggle ;;
+"mic mute")       wpctl set-mute $source toggle ;;
+"brightness up")  brightnessctl -q -e2 -n1 set 5%+ ;;
+"brightness down") brightnessctl -q -e2 -n1 set 5%- ;;
+*) sed -n '2,5s/^# \{0,1\}//p' "$0" >&2; exit 2 ;;
+esac
+
+pid=
+{ read -r pid <"$run/osd.pid"; } 2>/dev/null
+if [[ -p $run/osd.fifo && -n $pid ]] && kill -0 "$pid" 2>/dev/null; then
+    echo "$1" >"$run/osd.fifo"
+fi

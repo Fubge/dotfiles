@@ -20,6 +20,7 @@
 # {{ include "dot_local/bin/executable_notifications" | sha256sum }}
 # {{ include "dot_local/bin/executable_notification-center" | sha256sum }}
 # {{ include "dot_local/lib/popup/notif.py" | sha256sum }}
+# {{ include "dot_local/bin/executable_osd-pill" | sha256sum }}
 # {{ include "dot_local/bin/executable_task-popup" | sha256sum }}
 # {{ include "dot_local/bin/executable_calendar-popup" | sha256sum }}
 # {{ include "dot_local/bin/executable_event-popup" | sha256sum }}
@@ -53,6 +54,9 @@ done
 # dunst (until it is uninstalled) does not let go of it: stop it first
 systemctl --user stop dunst.service 2>/dev/null
 setsid -f "$HOME/.local/bin/notifications" >/dev/null 2>&1
+
+# Volume / brightness pill: a new one replaces the old
+setsid -f "$HOME/.local/bin/osd-pill" >/dev/null 2>&1
 
 # Calendar reminders: one instance, restarted with the new code
 pkill -f "^python3 $HOME/.local/bin/calendar-remind" 2>/dev/null

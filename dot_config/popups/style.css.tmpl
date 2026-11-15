@@ -1713,3 +1713,83 @@ entry.sys-test:focus-within { border-color: alpha({{ .palette.accent }}, 0.7); }
 button.sys-chip label, .segment-icon, .session-circle {
     font-family: "JetBrainsMono Nerd Font Propo", "Symbols Nerd Font";
 }
+
+/* ---------------------------------------------------------------- osd */
+/* volume / brightness pill near the bottom (~/.local/bin/osd-pill): dark like
+   the bar pills, orange chip and fill; slides up (Gtk.Revealer), the icon
+   bumps when it changes; muted: red chip, grey fill */
+window.osd-win { background: none; }
+.osd {
+    padding: 10px 18px 10px 10px;
+    margin: 12px;                    /* room for the shadow */
+    border-radius: 99px;
+    background-color: alpha({{ .palette.bg }}, 0.92);
+    border: 1px solid alpha({{ .palette.steel }}, 0.35);
+    box-shadow: 0 6px 18px alpha(black, 0.4);
+    color: {{ .palette.fg }};
+    font-family: "{{ .design.font_ui }}";
+    transition: background-color 150ms ease;
+}
+.osd:hover { background-color: mix({{ .palette.bg }}, {{ .palette.steel }}, 0.25); }
+.osd-icon {
+    font-family: "JetBrainsMono Nerd Font Propo", "Symbols Nerd Font";
+    font-size: 15pt;
+    min-width: 40px;
+    min-height: 40px;
+    border-radius: 99px;
+    background-color: {{ .palette.accent }};
+    color: {{ .palette.bg }};
+    transition: background-color 200ms ease, color 200ms ease;
+}
+.osd-name { font-size: 9.5pt; color: {{ .palette.fg_muted }}; }
+.osd-value { font-size: 10.5pt; font-weight: 800; color: {{ .palette.accent }}; }
+progressbar.osd-bar trough {
+    min-height: 6px;
+    border-radius: 99px;
+    background-color: alpha({{ .palette.steel }}, 0.35);
+}
+progressbar.osd-bar progress {
+    min-height: 6px;
+    border-radius: 99px;
+    background-color: {{ .palette.accent }};
+    transition: background-color 200ms ease;
+}
+.osd-step {
+    min-height: 6px;
+    border-radius: 99px;
+    background-color: alpha({{ .palette.steel }}, 0.35);
+    transition: background-color 200ms ease;
+}
+.osd-step.on { background-color: {{ .palette.accent }}; animation: seg-pop 260ms ease-out 1; }
+.osd.muted .osd-icon { background-color: {{ .palette.red }}; }
+.osd.muted .osd-value { color: {{ .palette.comment }}; }
+.osd.muted progressbar.osd-bar progress { background-color: {{ .palette.comment }}; }
+/* two copies of each: GTK restarts an animation only when its name changes */
+@keyframes osd-bump0 {
+    0%   { transform: scale(1); }
+    40%  { transform: scale(1.18) rotate(-8deg); }
+    70%  { transform: scale(0.96) rotate(4deg); }
+    100% { transform: none; }
+}
+@keyframes osd-bump1 {
+    0%   { transform: scale(1); }
+    40%  { transform: scale(1.18) rotate(-8deg); }
+    70%  { transform: scale(0.96) rotate(4deg); }
+    100% { transform: none; }
+}
+@keyframes osd-shake0 {
+    0%, 100% { transform: none; }
+    25% { transform: rotate(-14deg); }
+    50% { transform: rotate(10deg); }
+    75% { transform: rotate(-5deg); }
+}
+@keyframes osd-shake1 {
+    0%, 100% { transform: none; }
+    25% { transform: rotate(-14deg); }
+    50% { transform: rotate(10deg); }
+    75% { transform: rotate(-5deg); }
+}
+.osd-icon.bump0 { animation: osd-bump0 300ms ease-out 1; }
+.osd-icon.bump1 { animation: osd-bump1 300ms ease-out 1; }
+.osd.muted .osd-icon.bump0 { animation: osd-shake0 320ms ease-in-out 1; }
+.osd.muted .osd-icon.bump1 { animation: osd-shake1 320ms ease-in-out 1; }

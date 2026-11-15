@@ -1,0 +1,422 @@
+#!/usr/bin/env python3
+"""On-screen pill for volume, microphone, screen and keyboard brightness.
+
+    osd-pill          run it (login autostart; a new one replaces the old)
+    osd-pill demo     show each kind once (for trying the look)
+    osd-pill quit     stop the running one
+
+The keys go through ~/.local/bin/osd, which changes the value and writes one
+word (volume / mic / brightness) into $XDG_RUNTIME_DIR/osd.fifo. The keyboard
+light is changed by the firmware (Fn+Space): its LED's brightness_hw_changed
+file wakes us up (poll PRI), so only real key presses show, not the slider in
+the brightness popup.
+
+Look (style: ~/.config/popups/style.css, section "osd"): a dark pill near the
+bottom of the focused screen (layer surface "osd", above fullscreen games,
+hypr/rules.lua): round icon chip, the device name, the value, a fill that
+glides to the new value. It slides up, the icon bumps when it changes (level
+icon, mute), and it slides away 1.5 s after the last change. Muted: red chip,
+grey fill. Hover keeps it, click opens the full popup, scrolling changes it.
+"""
+import os
+import signal
+import subprocess
+import sys
+from pathlib import Path
+
+LAYER_SHELL = "/usr/lib/libgtk4-layer-shell.so"
+# gtk4-layer-shell must be loaded before libwayland: restart with it preloaded
+if (sys.argv[1:] in ([], ["demo"]) and os.path.exists(LAYER_SHELL)
+        and LAYER_SHELL not in os.environ.get("LD_PRELOAD", "")):
+    os.environ["LD_PRELOAD"] = (LAYER_SHELL + " " + os.environ.get("LD_PRELOAD", "")).strip()
+    os.execv(sys.executable, [sys.executable] + sys.argv)
+
+sys.path.insert(0, os.path.expanduser("~/.local/lib/popup"))
+import resident  # noqa: E402
+from i18n import T  # noqa: E402
+
+RUN = Path(os.environ.get("XDG_RUNTIME_DIR", "/tmp"))
+FIFO, PIDFILE = RUN / "osd.fifo", RUN / "osd.pid"
+BIN = Path.home() / ".local/bin"
+CSS = os.path.expanduser("~/.config/popups/style.css")
+BOTTOM = 72          # px above the screen's lower edge
+WIDTH = 320
+HOLD_MS = 1500       # stays this long after the last change
+SLIDE_MS = 220
+
+# Nerd Font icons as in the bar and the popups (escapes: editors drop them)
+I_VOL = ["\U000F057F", "\U000F0580", "\U000F057E"]       # low / medium / high
+I_MUTED = "\U000F075F"
+I_HEADPHONES = "\U000F02CB"
+I_MIC, I_MIC_OFF = "\U000F036C", "\U000F036D"
+I_SUN = ["\U000F0594", "\U000F0595", "\U000F05A8"]       # moon / cloud / sun
+I_KEYBOARD, I_KEYBOARD_OFF = "\U000F030C", "\U000F030F"
+
+BACKLIGHT = next(Path("/sys/class/backlight").glob("*"), None)
+KBD = next(Path("/sys/class/leds").glob("*kbd_backlight"), None)
+
+
+# ------------------------------------------------------------------ readings
+def wpctl_volume(node):
+    """(percent, muted) of a wpctl node."""
+    out = subprocess.run(["wpctl", "get-volume", node], capture_output=True, text=True).stdout
+    parts = out.split()
+    try:
+        return round(float(parts[1]) * 100), "[MUTED]" in out
+    except (IndexError, ValueError):
+        return 0, False
+
+
+def sink_name():
+    """Short name of the default output, as the sound popup shows it, and
+    whether it is a headset / headphones."""
+    out = subprocess.run(["wpctl", "inspect", "@DEFAULT_AUDIO_SINK@"],
+                         capture_output=True, text=True).stdout
+    props = {}
+    for line in out.splitlines():
+        key, sep, val = line.strip(" *").partition(" = ")
+        if sep:
+            props[key] = val.strip('"')
+    usb = props.get("device.bus") == "usb"
+    bt = props.get("node.name", "").startswith("bluez")
+    if usb or bt:
+        name = props.get("device.product.name") or props.get("node.nick") or props.get("node.description")
+    else:
+        name = props.get("device.profile.description") or props.get("node.description")
+    head = usb or bt or "Headphone" in (name or "")
+    return name or T("sound.output"), head
+
+
+def screen_percent():
+    c = int((BACKLIGHT / "brightness").read_text())
+    m = int((BACKLIGHT / "max_brightness").read_text())
+    # same curve as the bar and the slider (brightness, brightness-popup)
+    return 0 if c < 1 else int(((c - 1) / (m - 1)) ** 0.5 * 99 + 1.5)
+
+
+def kbd_level():
+    return int((KBD / "brightness").read_text()), int((KBD / "max_brightness").read_text())
+
+
+def reading(kind):
+    """What the pill shows: dict(icon, name, value, fraction, muted, steps)."""
+    if kind == "volume":
+        pct, muted = wpctl_volume("@DEFAULT_AUDIO_SINK@")
+        name, head = sink_name()
+        icon = I_MUTED if muted or pct == 0 else (
+            I_HEADPHONES if head else I_VOL[0 if pct < 34 else 1 if pct < 67 else 2])
+        return dict(icon=icon, name=name, value=T("osd.muted") if muted else f"{pct}%",
+                    fraction=pct / 100, muted=muted, steps=0)
+    if kind == "mic":
+        pct, muted = wpctl_volume("@DEFAULT_AUDIO_SOURCE@")
+        return dict(icon=I_MIC_OFF if muted else I_MIC, name=T("osd.mic"),
+                    value=T("osd.muted") if muted else f"{pct}%",
+                    fraction=pct / 100, muted=muted, steps=0)
+    if kind == "brightness" and BACKLIGHT:
+        pct = screen_percent()
+        return dict(icon=I_SUN[0 if pct <= 33 else 1 if pct <= 66 else 2],
+                    name=T("brightness.title"), value=f"{pct}%",
+                    fraction=pct / 100, muted=False, steps=0)
+    if kind == "kbd" and KBD:
+        level, top = kbd_level()
+        words = {0: T("common.off")}
+        if top == 2:
+            words.update({1: T("brightness.low"), 2: T("brightness.high")})
+        return dict(icon=I_KEYBOARD if level else I_KEYBOARD_OFF, name=T("osd.keyboard"),
+                    value=words.get(level, f"{level}/{top}"),
+                    fraction=level / top if top else 0, muted=level == 0, steps=top)
+    return None
+
+
+# ------------------------------------------------------------------ the pill
+def build():
+    import gi
+
+    gi.require_version("Gtk", "4.0")
+    gi.require_version("Gdk", "4.0")
+    gi.require_version("Gtk4LayerShell", "1.0")
+    from gi.repository import Gdk, GLib, Gtk
+    from gi.repository import Gtk4LayerShell as Layer
+
+    def label(text="", classes=(), **kw):
+        return Gtk.Label(label=text, css_classes=list(classes), **kw)
+
+    class Pill(Gtk.Window):
+        def __init__(self):
+            super().__init__(css_classes=["osd-win"], resizable=False)
+            Layer.init_for_window(self)
+            Layer.set_namespace(self, "osd")
+            Layer.set_layer(self, Layer.Layer.OVERLAY)       # above fullscreen games
+            Layer.set_anchor(self, Layer.Edge.BOTTOM, True)
+            Layer.set_margin(self, Layer.Edge.BOTTOM, BOTTOM)
+            Layer.set_exclusive_zone(self, -1)
+            Layer.set_keyboard_mode(self, Layer.KeyboardMode.NONE)
+
+            self.rev = Gtk.Revealer(transition_type=Gtk.RevealerTransitionType.SLIDE_UP,
+                                    transition_duration=SLIDE_MS)
+            box = Gtk.Box(spacing=12, css_classes=["osd"], width_request=WIDTH)
+            self.box = box
+            self.icon = label("", ("osd-icon",), valign=Gtk.Align.CENTER)
+            box.append(self.icon)
+            right = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6,
+                            hexpand=True, valign=Gtk.Align.CENTER)
+            top = Gtk.Box(spacing=8)
+            self.name = label("", ("osd-name",), xalign=0, hexpand=True,
+                              ellipsize=3, max_width_chars=20)
+            self.value = label("", ("osd-value",), xalign=1)
+            top.append(self.name)
+            top.append(self.value)
+            right.append(top)
+            self.bar = Gtk.ProgressBar(css_classes=["osd-bar"])
+            right.append(self.bar)
+            self.segs = Gtk.Box(spacing=5, homogeneous=True, css_classes=["osd-steps"])
+            right.append(self.segs)
+            box.append(right)
+            self.rev.set_child(box)
+            self.set_child(self.rev)
+
+            self.kind = None
+            self.shown = None             # last reading on screen
+            self.frac = 0.0               # where the fill is drawn now
+            self.target = 0.0
+            self.ticking = False
+            self.hide_id = 0
+            self.hovered = False
+            self.bump = 0
+
+            motion = Gtk.EventControllerMotion()
+            motion.connect("enter", lambda *_a: self.hover(True))
+            motion.connect("leave", lambda *_a: self.hover(False))
+            box.add_controller(motion)
+            click = Gtk.GestureClick()
+            click.connect("released", self.on_click)
+            box.add_controller(click)
+            scroll = Gtk.EventControllerScroll(flags=Gtk.EventControllerScrollFlags.VERTICAL)
+            scroll.connect("scroll", self.on_scroll)
+            box.add_controller(scroll)
+            self.rev.connect("notify::child-revealed", self.on_revealed)
+
+        # -- placement: the screen Hyprland has focused
+        def follow_focus(self):
+            import json
+            try:
+                mons = json.loads(resident.hypr("j/monitors") or "[]")
+            except ValueError:
+                return
+            name = next((m["name"] for m in mons if m.get("focused")), None)
+            gmons = Gdk.Display.get_default().get_monitors()
+            for i in range(gmons.get_n_items()):
+                m = gmons.get_item(i)
+                if m.get_connector() == name:
+                    Layer.set_monitor(self, m)
+                    return
+
+        # -- showing a value
+        def show(self, kind):
+            try:
+                r = reading(kind)
+            except (OSError, ValueError):
+                r = None
+            if not r:
+                return
+            fresh = not self.get_visible() or not self.rev.get_reveal_child()
+            if fresh:
+                self.follow_focus()
+            same_kind = kind == self.kind and not fresh
+            if not same_kind or r["icon"] != (self.shown or {}).get("icon") \
+                    or r["muted"] != (self.shown or {}).get("muted"):
+                if not fresh:
+                    # alternate two equal animations: re-adding one class
+                    # does not restart it
+                    self.icon.remove_css_class(f"bump{self.bump}")
+                    self.bump ^= 1
+                    self.icon.add_css_class(f"bump{self.bump}")
+            self.kind, self.shown = kind, r
+            self.icon.set_text(r["icon"])
+            self.name.set_text(r["name"])
+            self.value.set_text(r["value"])
+            (self.box.add_css_class if r["muted"] else self.box.remove_css_class)("muted")
+            steps = r["steps"]
+            self.bar.set_visible(not steps)
+            self.segs.set_visible(bool(steps))
+            if steps:
+                self.fill_steps(steps, round(r["fraction"] * steps))
+            if fresh or not same_kind:
+                self.frac = r["fraction"] if not fresh else 0.0
+            self.target = r["fraction"]
+            self.glide()
+            if fresh:
+                self.set_visible(True)
+                self.rev.set_reveal_child(True)
+            self.schedule_hide()
+
+        def fill_steps(self, n, level):
+            kids = []
+            c = self.segs.get_first_child()
+            while c:
+                kids.append(c)
+                c = c.get_next_sibling()
+            if len(kids) != n:
+                for k in kids:
+                    self.segs.remove(k)
+                kids = [Gtk.Box(css_classes=["osd-step"], hexpand=True) for _ in range(n)]
+                for k in kids:
+                    self.segs.append(k)
+            for i, k in enumerate(kids):
+                (k.add_css_class if i < level else k.remove_css_class)("on")
+
+        def glide(self):
+            """The fill eases towards the new value (~120 ms)."""
+            if self.ticking:
+                return
+            self.ticking = True
+
+            def tick(_w, _clock):
+                d = self.target - self.frac
+                if abs(d) < 0.003:
+                    self.frac = self.target
+                else:
+                    self.frac += d * 0.3
+                self.bar.set_fraction(max(0.0, min(1.0, self.frac)))
+                if self.frac == self.target:
+                    self.ticking = False
+                    return GLib.SOURCE_REMOVE
+                return GLib.SOURCE_CONTINUE
+            self.bar.add_tick_callback(tick)
+
+        # -- going away
+        def schedule_hide(self):
+            if self.hide_id:
+                GLib.source_remove(self.hide_id)
+                self.hide_id = 0
+            if not self.hovered:
+                self.hide_id = GLib.timeout_add(HOLD_MS, self.hide)
+
+        def hide(self):
+            self.hide_id = 0
+            self.rev.set_reveal_child(False)
+            return GLib.SOURCE_REMOVE
+
+        def on_revealed(self, *_a):
+            # unmap once it slid away: an empty mapped surface catches clicks
+            if not self.rev.get_reveal_child() and not self.rev.get_child_revealed():
+                self.set_visible(False)
+                self.kind = self.shown = None
+
+        def hover(self, inside):
+            self.hovered = inside
+            self.schedule_hide()
+
+        # -- mouse
+        def on_click(self, *_a):
+            popup = {"volume": "sound-popup", "mic": "sound-popup"}.get(self.kind, "brightness-popup")
+            self.hide()
+            subprocess.Popen([str(BIN / "popup-cmd"), popup, "toggle", "--center"],
+                             start_new_session=True)
+
+        def on_scroll(self, _c, _dx, dy):
+            if self.kind in ("volume", "brightness"):
+                subprocess.Popen([str(BIN / "osd"), self.kind, "down" if dy > 0 else "up"])
+            return True
+
+    provider = Gtk.CssProvider()
+    provider.load_from_path(CSS)
+    Gtk.StyleContext.add_provider_for_display(
+        Gdk.Display.get_default(), provider, Gtk.STYLE_PROVIDER_PRIORITY_USER)
+    return Pill()
+
+
+def watch_fifo(pill, GLib):
+    if FIFO.exists() and not FIFO.is_fifo():
+        FIFO.unlink()
+    if not FIFO.exists():
+        os.mkfifo(FIFO, 0o600)
+    # read + write: the FIFO never reports end of file between writers, and a
+    # writer never blocks while we run
+    fd = os.open(FIFO, os.O_RDWR | os.O_NONBLOCK)
+
+    def on_data(*_a):
+        try:
+            words = os.read(fd, 4096).decode(errors="replace").split()
+        except BlockingIOError:
+            return GLib.SOURCE_CONTINUE
+        # key repeat may pile up a few: read each kind once
+        for w in dict.fromkeys(words):
+            pill.show(w)
+        return GLib.SOURCE_CONTINUE
+    GLib.unix_fd_add_full(GLib.PRIORITY_DEFAULT, fd, GLib.IOCondition.IN, on_data)
+
+
+def watch_kbd(pill, GLib):
+    """The firmware's keyboard light key: brightness_hw_changed signals with
+    POLLPRI (sysfs_notify) after every hardware change."""
+    path = KBD and KBD / "brightness_hw_changed"
+    if not path or not path.exists():
+        return
+    fd = os.open(path, os.O_RDONLY)
+    os.read(fd, 64)               # arm it: sysfs only notifies after a read
+
+    def on_change(*_a):
+        os.lseek(fd, 0, os.SEEK_SET)
+        os.read(fd, 64)
+        pill.show("kbd")
+        return GLib.SOURCE_CONTINUE
+    GLib.unix_fd_add_full(GLib.PRIORITY_DEFAULT, fd,
+                          GLib.IOCondition.PRI | GLib.IOCondition.ERR, on_change)
+
+
+def stop_old():
+    try:
+        old = int(PIDFILE.read_text())
+        if old != os.getpid():
+            os.kill(old, signal.SIGTERM)
+    except (OSError, ValueError):
+        pass
+
+
+def main():
+    args = sys.argv[1:]
+    if args == ["quit"]:
+        stop_old()
+        return
+    if args not in ([], ["demo"]):
+        print(__doc__.split("\n\n")[1], file=sys.stderr)
+        sys.exit(2)
+    import gi
+
+    gi.require_version("Gtk", "4.0")
+    from gi.repository import GLib, Gtk
+
+    demo = args == ["demo"]
+    if not demo:              # a demo runs next to the real one
+        stop_old()
+        PIDFILE.write_text(str(os.getpid()))
+    GLib.set_prgname("osd")
+    Gtk.init()
+    pill = build()
+    if not demo:
+        watch_fifo(pill, GLib)
+        watch_kbd(pill, GLib)
+    loop = GLib.MainLoop()
+
+    def bye(*_a):
+        try:
+            if not demo and PIDFILE.read_text().strip() == str(os.getpid()):
+                PIDFILE.unlink()
+        except OSError:
+            pass
+        loop.quit()
+        return GLib.SOURCE_REMOVE
+    GLib.unix_signal_add(GLib.PRIORITY_DEFAULT, signal.SIGTERM, bye)
+    GLib.unix_signal_add(GLib.PRIORITY_DEFAULT, signal.SIGINT, bye)
+
+    if demo:
+        kinds = ["volume", "volume", "mic", "brightness", "kbd"]
+        for i, k in enumerate(kinds):
+            GLib.timeout_add(400 + i * 900, lambda k=k: pill.show(k) or False)
+        GLib.timeout_add(400 + len(kinds) * 900 + HOLD_MS + 600, bye)
+    loop.run()
+
+
+if __name__ == "__main__":
+    main()

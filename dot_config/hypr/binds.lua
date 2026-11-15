@@ -177,14 +177,15 @@ group(S.group_apps)
 bind("code:49", hl.dsp.global("discord:discord-push-to-talk"), S.ptt,
     { non_consuming = true })
 
--- Media and brightness keys (work on the lock screen too)
+-- Media and brightness keys (work on the lock screen too); osd changes the
+-- value and shows the pill (~/.local/bin/osd-pill)
 local held = { locked = true, repeating = true }
-hl.bind("XF86AudioRaiseVolume", hl.dsp.exec_cmd("wpctl set-volume -l 1 @DEFAULT_AUDIO_SINK@ 5%+"), held)
-hl.bind("XF86AudioLowerVolume", hl.dsp.exec_cmd("wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%-"), held)
-hl.bind("XF86AudioMute", hl.dsp.exec_cmd("wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle"), { locked = true })
-hl.bind("XF86AudioMicMute", hl.dsp.exec_cmd("wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle"), { locked = true })
-hl.bind("XF86MonBrightnessUp", hl.dsp.exec_cmd("brightnessctl -e2 -n1 set 5%+"), held)
-hl.bind("XF86MonBrightnessDown", hl.dsp.exec_cmd("brightnessctl -e2 -n1 set 5%-"), held)
+hl.bind("XF86AudioRaiseVolume", hl.dsp.exec_cmd(v.bin .. "osd volume up"), held)
+hl.bind("XF86AudioLowerVolume", hl.dsp.exec_cmd(v.bin .. "osd volume down"), held)
+hl.bind("XF86AudioMute", hl.dsp.exec_cmd(v.bin .. "osd volume mute"), { locked = true })
+hl.bind("XF86AudioMicMute", hl.dsp.exec_cmd(v.bin .. "osd mic mute"), { locked = true })
+hl.bind("XF86MonBrightnessUp", hl.dsp.exec_cmd(v.bin .. "osd brightness up"), held)
+hl.bind("XF86MonBrightnessDown", hl.dsp.exec_cmd(v.bin .. "osd brightness down"), held)
 hl.bind("XF86AudioPlay", hl.dsp.exec_cmd("playerctl play-pause"), { locked = true })
 hl.bind("XF86AudioPause", hl.dsp.exec_cmd("playerctl play-pause"), { locked = true })
 hl.bind("XF86AudioNext", hl.dsp.exec_cmd("playerctl next"), { locked = true })

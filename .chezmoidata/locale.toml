@@ -94,6 +94,11 @@ low   = { de = "Schwach", en = "Low" }
 high  = { de = "Hell", en = "High" }
 bar_tip = { de = "Helligkeit {pct} %\nKlick: Regler, Scrollen: ändern", en = "Brightness {pct}%\nClick for a slider, scroll to change" }
 
+[strings.osd]
+muted    = { de = "Stumm", en = "Muted" }
+mic      = { de = "Mikrofon", en = "Microphone" }
+keyboard = { de = "Tastaturlicht", en = "Keyboard light" }
+
 [strings.power]
 title          = { de = "Energie", en = "Power" }
 saver          = { de = "Sparen", en = "Saver" }
