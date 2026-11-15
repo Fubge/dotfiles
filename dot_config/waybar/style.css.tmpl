@@ -166,21 +166,22 @@ tooltip {
 
 #cpu, #temperature, #memory { padding: 0 9px; }
 
-/* Icon-only modules: one fixed 30 px slot each, glyph centered, so every icon
-   sits the same distance from the next (padding alone gave 27-57 px gaps, the
-   glyphs differ in width). Tight enough that the three pills keep air between
-   them. The Propo font makes each glyph as wide as it looks (the mono one lets
-   wide icons hang out to the right). The battery grows past its slot while
-   the plug shows. */
+/* Icon-only modules: the same padding on both sides, in the Propo font, where
+   each glyph is exactly as wide as its ink. So the visible gap between two
+   icons is the same everywhere (fixed slots centered the glyphs instead, but
+   a wide cup next to a slim leaf then still looked further apart; the mono
+   font let wide icons hang out to the right, 27-57 px gaps). */
 #idle_inhibitor, #custom-power-profile, #custom-brightness, #custom-battery,
 #wireplumber, #network, #bluetooth,
 #custom-notifications, #custom-power {
     font-family: "JetBrainsMono Nerd Font Propo", "Symbols Nerd Font";
-    padding: 0;
-    min-width: 30px;
+    padding: 0 9px;
 }
-/* tray icons on the same 30 px grid: 17 px icon + 13 px spacing */
-#tray { padding: 0 6px; }
+/* the speaker is drawn larger (Pango size) and brings its own room on the
+   left: without this it stood further from the steel pill than the rest */
+#wireplumber { padding-left: 0; }
+/* tray icons: 17 px icons, 18 px apart like the others */
+#tray { padding: 0 9px; }
 #custom-wifi-name { padding: 0 6px 0 0; margin-left: -4px; }
 
 /* bell and power belong together: no fixed slots, just a small gap between
