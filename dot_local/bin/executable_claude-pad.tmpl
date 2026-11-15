@@ -23,6 +23,8 @@ and what the pet does (frames from ~/.local/lib/pet/pet.py):
   busy      working              mines, types on a laptop, thinks
   waiting   needs you (permission, question)  jumps with a "!"
   done      finished while the pad was hidden  cheers, then shows off a gem
+Opening the pad any way (or sending a prompt) takes its open notifications
+away again (ids in $RUN/notes), so no stale "Claude is done" stays behind.
 The last answer (first paragraph) is kept in $RUN/last: the notification and the
 quick prompt show it, so a reply can go straight back from the prompt pill.
 """
@@ -44,6 +46,7 @@ SOCK = os.path.join(RUN, "kitty.sock")
 STATE = os.path.join(RUN, "state")
 LAST = os.path.join(RUN, "last")
 FIFO = os.path.join(RUN, "events")
+NOTES = os.path.join(RUN, "notes")   # ids of our open notifications
 HOME = os.path.expanduser("~")
 BIN = os.path.join(HOME, ".local/bin")
 # Claude Code never remembers the trust prompt for the home folder itself, so the
@@ -201,6 +204,7 @@ def show():
     hypr("hl.dsp.focus(" + lua_table(window="address:" + win["address"]) + ")")
     if read_state() == "done":   # seen now
         set_state("idle")
+    clear_notes()
 
 
 def hide():
@@ -368,12 +372,35 @@ def last_answer(event):
 
 
 def notify(title, body):
-    """Notification whose click opens the pad (waits in its own process)."""
+    """Notification whose click opens the pad (waits in its own process). Its id
+    goes into NOTES, so clear_notes() can take it away again."""
     subprocess.Popen(
-        ["sh", "-c", 'a=$(notify-send -a Claude -i "$3" -A open=Open "$1" "$2"); '
-                     '[ "$a" = open ] && exec "$4" show',
-         "sh", title, body, "utilities-terminal", os.path.join(BIN, "claude-pad")],
+        ["sh", "-c", 'notify-send -p -a Claude -i "$3" -A open=Open "$1" "$2" | '
+                     '{ read id; echo "$id" >> "$5"; read a; '
+                     '[ "$a" = open ] && exec "$4" show; }',
+         "sh", title, body, "utilities-terminal", os.path.join(BIN, "claude-pad"), NOTES],
         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+
+
+def clear_notes():
+    """The pad was opened some other way (SUPER+C, bar, a prompt): our "done" /
+    "needs you" notifications are stale now. Off the screen, out of the
+    notification center and off the bell (~/.local/bin/notifications)."""
+    try:
+        with open(NOTES) as f:
+            ids = [int(x) for x in f.read().split() if x.isdigit()]
+        os.remove(NOTES)
+    except OSError:
+        return
+    for nid in ids:
+        try:
+            subprocess.run(["gdbus", "call", "--session",
+                            "--dest", "org.freedesktop.Notifications",
+                            "--object-path", "/org/freedesktop/Notifications",
+                            "--method", "dotfiles.Notifications.Center.Remove", str(nid)],
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=3)
+        except subprocess.TimeoutExpired:
+            pass
 
 
 def hook(name):
@@ -386,6 +413,7 @@ def hook(name):
         set_state("idle")
     elif name == "prompt":
         set_state("busy")
+        clear_notes()            # you are on it, whatever way you came in
     elif name == "tool" and state != "busy":
         # permission given and it works on; also heals a state that went wrong
         # (e.g. "off" from a missed window check), so the pet never naps mid-work
