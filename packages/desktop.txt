@@ -25,6 +25,7 @@ rofi
 gtk4-layer-shell         # notification cards (~/.local/bin/notifications)
 hyprpaper
 hypridle
+hyprsunset
 hyprlock
 hyprpolkitagent
 gnome-keyring            # password store (Secret Service) for Nextcloud and co., unlocked at login by PAM

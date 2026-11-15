@@ -1,0 +1,104 @@
+#!/usr/bin/env python3
+"""Night light: warmer screen colors in the evening, through hyprsunset.
+
+    nightlight watch        daemon (hypr/vars.lua M.background): starts
+                            hyprsunset and sets the temperature every 30 s
+    nightlight refresh      the settings changed: set it now
+    nightlight preview K    show K Kelvin until the next refresh (menu slider)
+    nightlight now          print the wanted temperature and the night times
+
+Set up in the system menu (SUPER+ALT+Space -> night light); the logic (modes,
+sunset times, fading) is in ~/.local/lib/popup/nightlight.py.
+"""
+import os
+import shutil
+import signal
+import subprocess
+import sys
+import time
+
+sys.path.insert(0, os.path.expanduser("~/.local/lib/popup"))
+import nightlight as nl  # noqa: E402
+
+RUN = os.environ.get("XDG_RUNTIME_DIR", "/tmp")
+PID = os.path.join(RUN, "nightlight.pid")
+TICK = 30
+
+
+def send(*args):
+    """One hyprsunset command through hyprctl; False if hyprsunset is not up."""
+    r = subprocess.run(["hyprctl", "hyprsunset", *map(str, args)],
+                       capture_output=True, text=True)
+    return r.returncode == 0 and "error" not in r.stdout.lower() and "couldn't" not in r.stdout.lower()
+
+
+def set_temp(k):
+    return send("identity") if k >= nl.DAY_K else send("temperature", k)
+
+
+def daemon_pid():
+    try:
+        pid = int(open(PID).read())
+        if open(f"/proc/{pid}/cmdline").read().find("nightlight") >= 0:
+            return pid
+    except (OSError, ValueError):
+        pass
+    return None
+
+
+def watch():
+    if daemon_pid():
+        return
+    if not shutil.which("hyprsunset"):
+        sys.exit("nightlight: hyprsunset is not installed (sudo pacman -S hyprsunset)")
+    with open(PID, "w") as f:
+        f.write(str(os.getpid()))
+    sunset = None
+    last = [None]
+    wake = [False]
+
+    def on_usr1(*_a):
+        wake[0] = True
+        last[0] = None          # set it again even if unchanged (after a preview)
+    signal.signal(signal.SIGUSR1, on_usr1)
+
+    while True:
+        if sunset is None or sunset.poll() is not None:
+            # start at neutral; our first tick sets the real value
+            sunset = subprocess.Popen(["hyprsunset", "--identity"],
+                                      stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            time.sleep(0.5)
+            last[0] = None
+        k = nl.target()
+        if k != last[0] and set_temp(k):
+            last[0] = k
+        for _ in range(TICK * 4):
+            if wake[0]:
+                break
+            time.sleep(0.25)
+        wake[0] = False
+
+
+def main():
+    args = sys.argv[1:]
+    if args == ["watch"]:
+        watch()
+    elif args == ["refresh"]:
+        pid = daemon_pid()
+        if pid:
+            os.kill(pid, signal.SIGUSR1)
+        else:
+            set_temp(nl.target())
+    elif len(args) == 2 and args[0] == "preview" and args[1].isdigit():
+        set_temp(int(args[1]))
+    elif args == ["now"]:
+        c = nl.config()
+        span = nl.night(c)
+        print(f"mode {c['mode']}, now {nl.target(c)} K, night "
+              + (f"{nl.hhmm(span[0])}-{nl.hhmm(span[1])}" if span else "-"))
+    else:
+        sys.exit(__doc__)
+
+
+if __name__ == "__main__":
+    main()

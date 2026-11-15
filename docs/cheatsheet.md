@@ -58,6 +58,7 @@ exit
 | Get changes from GitHub (other machine) | `chezmoi update` |
 | Anything out of sync? | `dots-check` / `chezmoi status` |
 | New machine | see [install.md](install.md) |
+| Displays, mouse, keyboard, night light, idle times | `SUPER+ALT+Space` (system menu), see below |
 | Change machine settings (keyboard, GPU, monitor, ...) | edit `[data.machine]` in `~/.config/chezmoi/chezmoi.toml`, then `chezmoi apply` |
 | Changed something outside `$HOME` (`/etc`, ...) | note it in `docs/system-changes.md` |
 | Roll back the system after a broken update | see `docs/system-changes.md` |
@@ -100,6 +101,31 @@ Files ending in `.tmpl` are generated from these values.
   the middle of the screen: the greeting types itself like on the lock screen, round
   buttons for Lock, Suspend, Log out, Reboot, Shut down (keys L S E R P). The last three
   turn red and ask for a second click.
+- **System menu** (`SUPER+ALT+Space`), centered: a grid of round tiles with a live
+  status each. Wi-Fi, Bluetooth, Sound, Power and Shortcuts open their popups,
+  Wallpaper the picker, Updates runs `sudo pacman -Syu` in a terminal (the tile counts
+  pending updates via `checkupdates`). The rest are pages in the menu itself; Escape
+  goes back. Everything applies at once:
+  - *Displays*: the screens to scale (click one), main screen (gets workspaces 1-8,
+    the laptop gets 9), arrangement left / right / above / below / mirror / off,
+    resolution, refresh rate, scale, adaptive sync, laptop panel off while a screen is
+    attached. Changes to the picture ask "keep?" and undo themselves after 15 s.
+    Screens are remembered by their description, so port or dock do not matter; a new
+    screen sits right of the laptop with its preferred mode until set up.
+  - *Mouse & touchpad*: speed, acceleration, scroll speed and direction (mice and
+    touchpad apart), left-handed, tap to click, off while typing, right click by two
+    fingers or by the bottom right corner.
+  - *Keyboard*: layout, repeat delay and rate (with a field to try them), Caps/Escape
+    and Alt/Super swaps.
+  - *Night light* (`nightlight`, drives `hyprsunset`): off, from sunset (times from the
+    time zone's city, 45 min fade), own times, always; warmth slider previews live.
+  - *Lock & idle*: when to dim, lock, turn the screen off and suspend, separately for
+    charger and battery (`idle-config` writes hypridle's config and switches it when the
+    charger comes or goes).
+
+  These settings are machine-local: `~/.local/state/slate/settings.json` (chezmoi never
+  touches it; Hyprland reads the `settings.lua` next to it through `hypr/settings.lua`).
+  Delete a key there to get the repo default back.
 - The right click menus of the Claude pet and the music icon go through `list-menu`,
   a resident list window (`list-menu-popup`); typing filters.
 - **Bluetooth** (`SUPER+SHIFT+B` or a click on the Bluetooth icon; right click opens

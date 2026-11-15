@@ -1,54 +1,151 @@
--- Monitor setup.
--- 1. Fallback: any screen gets its preferred mode and an automatic scale,
---    so the laptop works on its own and with unknown displays.
--- 2. Known monitors are matched by description ("desc:..."), not by port,
---    so it does not matter which port or dock they are plugged into.
---    Find the description with: hyprctl monitors
+-- Monitor setup. Works out of the box, fine-tuned in the system menu
+-- (SUPER+ALT+Space -> displays), which stores per monitor, by its description
+-- (so the port or dock does not matter), in ~/.local/state/slate/settings.json:
+--     displays = {
+--         main = "<description>" | "internal",    -- gets workspaces 1-8
+--         internal = { mode, scale, vrr, off_with_external },
+--         screens = { ["<description>"] = { mode, scale, vrr,
+--                     position = right|left|above|below|mirror|off|"XxY" } },
+--     }
+-- A monitor that was never set up gets its preferred mode, an automatic
+-- scale and sits right of the laptop, vertically centered on it.
 
-hl.monitor({ output = "", mode = "preferred", position = "auto", scale = "auto" })
+local s = require("settings")
 
--- Internal panel (mode and scale come from `chezmoi init`, see
--- ~/.config/chezmoi/chezmoi.toml [data.machine])
 local internal = "eDP-1"
+local positions = {
+    right = "auto-center-right",
+    left = "auto-center-left",
+    above = "auto-center-up",
+    below = "auto-center-down",
+}
+
+-- everything not set up: preferred mode, automatic scale, right of the laptop
+hl.monitor({ output = "", mode = "preferred", position = "auto-center-right", scale = "auto" })
+
+-- Internal panel (default mode and scale come from `chezmoi init`, see
+-- ~/.config/chezmoi/chezmoi.toml [data.machine])
 local function internal_on()
-    hl.monitor({ output = internal, mode = "{{ .machine.monitor_mode }}", position = "auto", scale = {{ if eq .machine.monitor_scale "auto" }}"auto"{{ else }}{{ .machine.monitor_scale }}{{ end }} })
-end
-internal_on()
-
--- Known external monitors
-local dell = "desc:Dell Inc. DELL P2725DE"
--- stands right of the laptop, vertically centered on it (the laptop panel
--- is lower, so the mouse crosses over in the middle, not at the top)
-hl.monitor({ output = dell, mode = "2560x1440@99.95", position = "auto-center-right", scale = 1 })
-
--- An external monitor is the main screen: workspaces 1-8 live on it, the
--- laptop panel (if open) shows workspace 9. Unplugging hands everything back
--- to the laptop on its own.
--- The rules keep 1-8 alive (persistent, so the bar always shows all eight)
--- and on the Dell; without the Dell they live on the laptop.
-for i = 1, 8 do
-    hl.workspace_rule({ workspace = tostring(i), monitor = dell, persistent = true })
+    local d = s.get("displays").internal or {}
+    hl.monitor({
+        output = internal,
+        mode = d.mode or "{{ .machine.monitor_mode }}",
+        position = "0x0",
+        scale = d.scale or {{ if eq .machine.monitor_scale "auto" }}"auto"{{ else }}{{ .machine.monitor_scale }}{{ end }},
+        vrr = d.vrr or 0,
+    })
 end
 
-local function externals_main()
-    local main
+local function externals()
+    local list = {}
     for _, m in ipairs(hl.get_monitors()) do
-        if m.name ~= internal then main = m.name end
+        if m.name ~= internal and not m.is_mirror then table.insert(list, m) end
     end
-    if not main then return end
-    hl.dispatch(hl.dsp.focus({ monitor = internal }))
-    hl.dispatch(hl.dsp.focus({ workspace = "9" }))    -- laptop needs one of its own
+    return list
+end
+
+-- Monitor rules of every screen ever set up (connected or not: a rule for a
+-- missing screen does nothing until it shows up)
+local function screen_rules()
+    for desc, d in pairs(s.get("displays").screens or {}) do
+        local rule = { output = "desc:" .. desc }
+        if d.position == "off" then
+            rule.disabled = true
+        else
+            rule.mode = d.mode or "preferred"
+            rule.scale = d.scale or "auto"
+            rule.vrr = d.vrr or 0
+            if d.position == "mirror" then
+                rule.position = "auto"
+                rule.mirror = internal
+            else
+                -- a side, or exact "XxY" (dragged in the menu, logical px)
+                local exact = type(d.position) == "string" and d.position:match("^%-?%d+x%-?%d+$")
+                rule.position = positions[d.position] or (exact and d.position) or positions.right
+            end
+        end
+        hl.monitor(rule)
+    end
+end
+
+-- The main screen: the one chosen in the menu if it is there, else the first
+-- external one, else the laptop
+local function main_monitor()
+    local want = s.get("displays").main
+    local list = externals()
+    if want == "internal" or #list == 0 then return internal end
+    for _, m in ipairs(list) do
+        if m.description == want then return m.name end
+    end
+    return list[1].name
+end
+
+-- Workspaces 1-8 live on the main screen (persistent, so the bar always shows
+-- all eight); the laptop panel, when it is not the main one, gets workspace 9.
+-- Unplugging hands everything back to the laptop on its own.
+local current_main
+local function arrange()
+    local main = main_monitor()
+    current_main = main
+    for i = 1, 8 do
+        hl.workspace_rule({ workspace = tostring(i), monitor = main, persistent = true })
+    end
+    local has_internal = hl.get_monitor(internal) ~= nil
+    if main ~= internal and has_internal then
+        hl.dispatch(hl.dsp.focus({ monitor = internal }))
+        hl.dispatch(hl.dsp.focus({ workspace = "9" }))    -- laptop needs one of its own
+    end
     for i = 1, 8 do
         hl.dispatch(hl.dsp.workspace.move({ workspace = tostring(i), monitor = main }))
     end
     hl.dispatch(hl.dsp.focus({ workspace = "1" }))
 end
 
+-- Laptop panel off while an external screen is on (menu switch), back on as
+-- soon as it is alone. The lid does the same below.
+local function internal_needed()
+    local d = s.get("displays").internal or {}
+    return not (d.off_with_external and #externals() > 0)
+end
+
+local function setup()
+    internal_on()
+    screen_rules()
+end
+setup()
+
+local function refresh()
+    if not internal_needed() then
+        hl.monitor({ output = internal, disabled = true })
+    elseif not hl.get_monitor(internal) then
+        internal_on()
+    end
+    arrange()
+end
+
+-- The menu changed something: new rules apply at once. Workspaces only move
+-- when the main screen changed (otherwise every scale tweak would jump to 1).
+s.on_apply("displays", function()
+    setup()
+    hl.timer(function()
+        if not internal_needed() then
+            hl.monitor({ output = internal, disabled = true })
+        end
+        if main_monitor() ~= current_main then arrange() end
+    end, { timeout = 400, type = "oneshot" })
+end)
+
 hl.on("monitor.added", function()
     -- give the new output a moment to finish its mode switch
-    hl.timer(externals_main, { timeout = 500, type = "oneshot" })
+    hl.timer(refresh, { timeout = 500, type = "oneshot" })
 end)
-hl.on("hyprland.start", externals_main)
+hl.on("monitor.removed", function()
+    hl.timer(function()
+        if not hl.get_monitor(internal) and #externals() == 0 then internal_on() end
+        current_main = main_monitor()
+    end, { timeout = 300, type = "oneshot" })
+end)
+hl.on("hyprland.start", refresh)
 
 -- Lid switch: with an external monitor connected, closing the lid only turns
 -- off the internal panel. Without one, logind suspends as usual.
@@ -59,5 +156,5 @@ hl.bind("switch:on:Lid Switch", function()
 end, { locked = true })
 
 hl.bind("switch:off:Lid Switch", function()
-    internal_on()
+    if internal_needed() then internal_on() end
 end, { locked = true })

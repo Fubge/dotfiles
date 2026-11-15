@@ -3,7 +3,9 @@
 # the uwsm session; images live in ~/Pictures/Wallpapers).
 # units: {{ include "dot_config/systemd/user/wallpaper-random.service" | sha256sum }}
 # {{ include "dot_config/systemd/user/vdirsyncer.timer.d/interval.conf" | sha256sum }}
+# {{ include "dot_config/systemd/user/hypridle.service.d/override.conf" | sha256sum }}
 set -euo pipefail
+systemctl --user daemon-reload
 services=(hyprpaper hypridle hyprpolkitagent waybar)
 systemctl --user enable "${services[@]}"
 systemctl --user enable --now wallpaper-shuffle.timer

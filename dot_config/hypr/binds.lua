@@ -76,6 +76,7 @@ bind(mod .. " + SHIFT + T", menu(v.bin .. "popup-cmd timer-popup toggle --center
 
 -- Menus (the same menus open under the mouse when clicked in the bar)
 group("Menus")
+bind(mod .. " + ALT + space", menu(v.bin .. "popup-cmd system-menu toggle --center"), "System menu: displays, mouse, keyboard, night light, idle")
 bind(mod .. " + Escape", menu(v.bin .. "popup-cmd session-popup toggle --center"), "Lock, suspend, log out, reboot, shut down")
 bind(mod .. " + I", menu(v.bin .. "popup-cmd notification-center toggle"), "Notification center")
 bind(mod .. " + P", menu(v.bin .. "popup-cmd power-popup toggle --center"), "Power profile, battery")

@@ -1,0 +1,1125 @@
+#!/usr/bin/env python3
+"""System menu (SUPER+ALT+Space): one place for everything one usually
+adjusts, in the spirit of Omarchy's menu. Centered, resident like the other
+popups (~/.local/lib/popup/resident.py).
+
+    system-menu toggle [--center] [PAGE]   show it (on PAGE), or hide it
+    system-menu --hidden                   login autostart, opens instantly
+    system-menu quit                       stop it (reloads on the next press)
+
+The hub is a grid of round tiles with a live status line each. Some open the
+existing popups (Wi-Fi, Bluetooth, sound, power, shortcuts) or tools
+(wallpapers, updates); the others are pages in this window:
+
+    displays    arrangement (sides, or drag the screens), main screen (workspaces 1-8), resolution, refresh
+                rate, scale, adaptive sync, laptop panel off with a screen
+                attached. Risky changes ask "keep?" and undo themselves after
+                CONFIRM_SECONDS, like other systems do.
+    mouse       pointer speed, acceleration, scrolling (mice and touchpad apart),
+                tap to click, right click by two fingers or by the corner
+    keyboard    layout, repeat delay and rate (with a field to try it), swaps
+    nightlight  warmer colors: off, from sunset, own times, always (nightlight)
+    idle        dim / lock / screen off / suspend, for charger and battery
+
+Everything applies at once and is kept in ~/.local/state/slate/settings.json
+(machine-local, never touched by chezmoi; ~/.local/lib/popup/settings.py).
+Hyprland reads it through hypr/settings.lua; the menu tells it to re-apply a
+section with `hyprctl eval Slate.apply(...)`.
+
+Keys: arrows / Tab move, Enter picks, Escape goes back (on the hub: closes).
+"""
+import json
+import os
+import shutil
+import subprocess
+import sys
+import threading
+
+sys.path.insert(0, os.path.expanduser("~/.local/lib/popup"))
+import resident  # noqa: E402
+import settings  # noqa: E402
+import nightlight as nl  # noqa: E402
+
+APP = "popup.system"
+WIDTH = 600
+CSS = os.path.expanduser("~/.config/popups/style.css")
+BIN = os.path.expanduser("~/.local/bin/")
+INTERNAL = "eDP-1"
+TOUCHPAD = "gxtp5400:00-27c6:0f96-touchpad"   # as hypr/vars.lua M.touchpad
+CONFIRM_SECONDS = 15
+COLS = 4
+
+# id, icon, name, what it does: ("page", name) / ("popup", script) / ("run", argv)
+TILES = [
+    ("wifi", "\U000F05A9", "WLAN", ("popup", "wifi-popup")),
+    ("bluetooth", "\U000F00AF", "Bluetooth", ("popup", "bluetooth-popup")),
+    ("sound", "\U000F057E", "Sound", ("popup", "sound-popup")),
+    ("power", "\U000F12A3", "Energie", ("popup", "power-popup")),
+    ("displays", "\U000F037A", "Bildschirme", ("page", "displays")),
+    ("mouse", "\U000F037D", "Maus & Touchpad", ("page", "mouse")),
+    ("keyboard", "\U000F030C", "Tastatur", ("page", "keyboard")),
+    ("nightlight", "\U000F0594", "Nachtlicht", ("page", "nightlight")),
+    ("idle", "\U000F04B2", "Sperre & Ruhe", ("page", "idle")),
+    ("wallpaper", "\U000F02E9", "Hintergrund", ("run", [BIN + "wallpaper", "pick"])),
+    ("keybinds", "\U000F097B", "Tastenkürzel", ("popup", "keybinds")),
+    ("updates", "\U000F06B0", "Updates", ("run", ["uwsm", "app", "--", "kitty", "--class",
+                                                  "system_update", "-e", "sh", "-c",
+                                                  "sudo pacman -Syu; echo; read -n1 -rsp 'Done, press any key '"])),
+]
+
+PAGES = {
+    "displays": ("Bildschirme", "Anordnen, schärfen, schneller machen"),
+    "mouse": ("Maus & Touchpad", "Tempo, Scrollen, Klicken"),
+    "keyboard": ("Tastatur", "Layout und Tastenwiederholung"),
+    "nightlight": ("Nachtlicht", "Abends wärmere Farben, schont die Augen"),
+    "idle": ("Sperre & Ruhe", "Wann dimmen, sperren, schlafen"),
+}
+
+SCALES = [1.0, 1.25, 1.5, 1.75, 2.0]
+VRR = [(0, "Aus"), (2, "Nur Spiele"), (1, "Immer")]
+POSITIONS = [("left", "Links"), ("right", "Rechts"), ("above", "Oben"), ("below", "Unten"),
+             ("mirror", "Spiegeln"), ("off", "Aus")]
+LAYOUTS = [("de", "Deutsch"), ("us", "US"), ("gb", "UK"), ("fr", "Français")]
+SWAPS = [("caps:swapescape", "Caps Lock ist Escape", "und Escape ist Caps Lock (gut für Neovim)"),
+         ("altwin:swap_lalt_lwin", "Alt und Super tauschen", "linke Alt- und Windows-Taste")]
+IDLE_STEPS = [("dim", "\U000F00DF", "Dimmen"), ("lock", "\U000F0341", "Sperren"),
+              ("off", "\U000F0D90", "Bildschirm aus"), ("suspend", "\U000F0904", "Ruhezustand")]
+IDLE_VALUES = [0, 30, 60, 90, 120, 150, 180, 240, 270, 300, 330, 360, 600, 900, 1200,
+               1800, 2700, 3600, 5400, 7200]
+NIGHT_MODES = [("off", "\U000F0599", "Aus"), ("sunset", "\U000F059A", "Abends"),
+               ("schedule", "\U000F0150", "Zeitplan"), ("always", "\U000F0594", "Immer")]
+PROFILES = {"performance": "Leistung", "balanced": "Ausgewogen", "power-saver": "Sparen"}
+
+
+# ------------------------------------------------------------------ helpers
+def hypr_json(request, default):
+    try:
+        return json.loads(resident.hypr(request))
+    except ValueError:
+        return default
+
+
+def option(name, default):
+    d = hypr_json("j/getoption " + name, {})
+    for key in ("int", "float", "str", "bool"):
+        if key in d:
+            return d[key]
+    return default
+
+
+def apply(section, values):
+    settings.update(section, values)
+    resident.hypr(f"eval Slate.apply('{section}')")
+
+
+def run(argv):
+    try:
+        return subprocess.run(argv, capture_output=True, text=True, timeout=4).stdout
+    except (OSError, subprocess.TimeoutExpired):
+        return ""
+
+
+def idle_text(s):
+    if s <= 0:
+        return "nie"
+    if s < 60:
+        return f"{s} s"
+    if s >= 3600 and s % 1800 == 0:
+        h = s / 3600
+        return (f"{h:.0f} h" if h == int(h) else f"{h:.1f} h".replace(".", ","))
+    m = s / 60
+    return f"{m:.0f} min" if m == int(m) else f"{m:.1f} min".replace(".", ",")
+
+
+def on_ac():
+    for ps in os.listdir("/sys/class/power_supply"):
+        base = os.path.join("/sys/class/power_supply", ps)
+        try:
+            if (open(base + "/type").read().strip() == "Mains"
+                    and open(base + "/online").read().strip() == "1"):
+                return True
+        except OSError:
+            pass
+    return False
+
+
+def idle_steps(source):
+    defaults = {"ac": {"dim": 150, "lock": 300, "off": 330, "suspend": 1800},
+                "battery": {"dim": 120, "lock": 240, "off": 270, "suspend": 900}}[source]
+    saved = settings.get("idle").get(source, {})
+    return {k: int(saved.get(k, v)) for k, v in defaults.items()}
+
+
+# ------------------------------------------------------------------ monitors
+def monitors():
+    return [m for m in hypr_json("j/monitors all", []) if isinstance(m, dict)]
+
+
+def short_name(m):
+    if m["name"] == INTERNAL:
+        return "Laptop"
+    return m.get("model") or m["description"]
+
+
+def mode_table(m):
+    """{(w, h): {rounded Hz: "99.95"}} from the monitor's available modes."""
+    table = {}
+    for s in m.get("availableModes", []):
+        try:
+            res, hz = s.removesuffix("Hz").split("@")
+            w, h = map(int, res.split("x"))
+        except ValueError:
+            continue
+        rates = table.setdefault((w, h), {})
+        r = round(float(hz))
+        if r not in rates or float(hz) > float(rates[r]):
+            rates[r] = hz
+    return table
+
+
+def current_mode(m):
+    table = mode_table(m)
+    rates = table.get((m["width"], m["height"]), {})
+    hz = rates.get(round(m["refreshRate"]), f"{m['refreshRate']:.2f}")
+    return f"{m['width']}x{m['height']}@{hz}"
+
+
+def derive_position(m, mons):
+    """Where an external screen sits now, relative to the laptop panel."""
+    if m.get("disabled"):
+        return "off"
+    if m.get("mirrorOf", "none") not in ("none", "", None):
+        return "mirror"
+    lap = next((x for x in mons if x["name"] == INTERNAL and not x.get("disabled")), None)
+    if not lap:
+        return "right"
+    lw = lap["width"] / lap["scale"]
+    lh = lap["height"] / lap["scale"]
+    w = m["width"] / m["scale"]
+    h = m["height"] / m["scale"]
+    if m["x"] >= lap["x"] + lw:
+        return "right"
+    if m["x"] + w <= lap["x"]:
+        return "left"
+    if m["y"] + h <= lap["y"]:
+        return "above"
+    return "below"
+
+
+def geo(m):
+    """x, y, width, height in layout (logical) pixels."""
+    return m["x"], m["y"], m["width"] / m["scale"], m["height"] / m["scale"]
+
+
+def snap(m, x, y, on, near):
+    """Nearest spot for screen m dropped at (x, y): touching an edge of
+    another screen, sharing at least MIN_SHARE px of it, overlapping none.
+    Within `near` px it lines up with the other's top, middle or bottom
+    (left, middle, right). None if nothing fits."""
+    MIN_SHARE = 100
+    _x, _y, w, h = geo(m)
+    others = [geo(o) for o in on if o["name"] != m["name"]]
+
+    def line_up(v, lo, size, own):
+        for t in (lo, lo + (size - own) / 2, lo + size - own):
+            if abs(v - t) <= near:
+                return t
+        return v
+
+    def overlaps(cx, cy):
+        return any(cx < ox + ow and cx + w > ox and cy < oy + oh and cy + h > oy
+                   for ox, oy, ow, oh in others)
+    best = None
+    for ox, oy, ow, oh in others:
+        spots = []
+        for cx in (ox + ow, ox - w):                       # right of it / left of it
+            cy = min(max(y, oy - h + MIN_SHARE), oy + oh - MIN_SHARE)
+            spots.append((cx, line_up(cy, oy, oh, h)))
+        for cy in (oy - h, oy + oh):                       # above / below
+            cx = min(max(x, ox - w + MIN_SHARE), ox + ow - MIN_SHARE)
+            spots.append((line_up(cx, ox, ow, w), cy))
+        for cx, cy in spots:
+            if overlaps(cx, cy):
+                continue
+            d = (cx - x) ** 2 + (cy - y) ** 2
+            if best is None or d < best[0]:
+                best = (d, (round(cx), round(cy)))
+    return best and best[1]
+
+
+def main_of(mons, saved):
+    """Description of the main screen ("internal" for the laptop), as
+    hypr/monitors.lua picks it."""
+    want = saved.get("main")
+    ext = [m for m in mons if m["name"] != INTERNAL and not m.get("disabled")
+           and m.get("mirrorOf", "none") in ("none", "", None)]
+    if want == "internal" or not ext:
+        return "internal"
+    for m in ext:
+        if m["description"] == want:
+            return want
+    return ext[0]["description"]
+
+
+# ------------------------------------------------------------------ GTK
+def build():
+    import gi
+
+    gi.require_version("Gtk", "4.0")
+    gi.require_version("Gdk", "4.0")
+    from gi.repository import Gdk, GLib, Gtk
+
+    def lbl(text="", *classes, **kw):
+        kw.setdefault("xalign", 0)
+        return Gtk.Label(label=text, css_classes=list(classes), **kw)
+
+    def clear(box):
+        while (c := box.get_first_child()) is not None:
+            box.remove(c)
+
+    def card(icon, title, *rows, extra=None):
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2, css_classes=["sys-card"])
+        head = Gtk.Box(spacing=8, css_classes=["sys-card-head"])
+        head.append(lbl(icon, "sys-card-icon"))
+        head.append(lbl(title, "sys-card-title", hexpand=True))
+        if extra:
+            head.append(extra)
+        box.append(head)
+        for r in rows:
+            if r is not None:
+                box.append(r)
+        return box
+
+    def row(title, control, sub=None, stacked=False):
+        """A labelled line in a card; stacked: the control goes below."""
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL if stacked else Gtk.Orientation.HORIZONTAL,
+                      spacing=4 if stacked else 12, css_classes=["sys-row"])
+        text = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, hexpand=True, valign=Gtk.Align.CENTER)
+        text.append(lbl(title, "sys-label"))
+        if sub:
+            text.append(lbl(sub, "sys-sub", wrap=True))
+        box.append(text)
+        if control is not None:
+            if not stacked:
+                control.set_valign(Gtk.Align.CENTER)
+            box.append(control)
+        return box
+
+    def switch(active, on_change):
+        sw = Gtk.Switch(active=bool(active))
+        sw.connect("notify::active", lambda s, _p: on_change(s.get_active()))
+        return sw
+
+    def segments(options, current, on_pick, small=True):
+        """options: [(value, label) or (value, icon, label)]"""
+        box = Gtk.Box(spacing=6, homogeneous=True, css_classes=["sys-segments"])
+        for opt in options:
+            value, *text = opt
+            b = Gtk.Button(css_classes=["segment"] + (["small"] if small else []))
+            if len(text) == 2:
+                inner = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
+                inner.append(Gtk.Label(label=text[0], css_classes=["segment-icon"]))
+                inner.append(Gtk.Label(label=text[1], css_classes=["segment-label"]))
+                b.set_child(inner)
+            else:
+                b.set_label(text[0])
+            if value == current:
+                b.add_css_class("active")
+            b.connect("clicked", lambda _b, v=value: on_pick(v))
+            box.append(b)
+        return box
+
+    def stepper(values, current, fmt, on_change):
+        """‹ value ›: steps through a list; the ends stop."""
+        box = Gtk.Box(spacing=4, css_classes=["sys-stepper"])
+        idx = [values.index(current) if current in values else
+               min(range(len(values)), key=lambda i: abs(values[i] - current)
+                   if isinstance(current, (int, float)) else 0)]
+        minus = Gtk.Button(label="\U000F0374", css_classes=["sys-step"])
+        value = Gtk.Label(label=fmt(values[idx[0]]), css_classes=["sys-step-value"])
+        plus = Gtk.Button(label="\U000F0415", css_classes=["sys-step"])
+
+        def move(d):
+            i = max(0, min(len(values) - 1, idx[0] + d))
+            if i == idx[0]:
+                box.remove_css_class("bump")
+                GLib.timeout_add(10, lambda: box.add_css_class("bump") and False)
+                return
+            idx[0] = i
+            value.set_text(fmt(values[i]))
+            value.remove_css_class("tick")
+            GLib.timeout_add(10, lambda: value.add_css_class("tick") and False)
+            minus.set_sensitive(i > 0)
+            plus.set_sensitive(i < len(values) - 1)
+            on_change(values[i])
+        minus.connect("clicked", lambda _b: move(-1))
+        plus.connect("clicked", lambda _b: move(1))
+        minus.set_sensitive(idx[0] > 0)
+        plus.set_sensitive(idx[0] < len(values) - 1)
+        for w in (minus, value, plus):
+            box.append(w)
+        return box
+
+    class Popup(Gtk.Window):
+        popup_width = WIDTH
+
+        def __init__(self):
+            super().__init__(title="System")
+            for c in ("popup", "menu", "system"):
+                self.add_css_class(c)
+            self.set_decorated(False)
+            self.set_default_size(WIDTH, 1)
+            self.page = "hub"
+            self.start_page = None
+            self.timers = {}
+            self.confirm = None          # (old settings, seconds left, timer)
+            self.tiles = {}
+            self.mon_sel = None
+            self.night_src = None
+            self.idle_src = None
+            self.anchor_top = None       # top edge kept while paging (fit)
+
+            root = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, css_classes=["sys-box"])
+            head = Gtk.Box(spacing=8, css_classes=["sys-head"])
+            self.back_btn = Gtk.Button(label="\U000F0141", css_classes=["sys-back"],
+                                       tooltip_text="zurück (Esc)")
+            self.back_btn.connect("clicked", lambda _b: self.go("hub"))
+            self.title = Gtk.Label(css_classes=["menu-title", "sys-title"], hexpand=True)
+            ghost = Gtk.Box(css_classes=["sys-back-ghost"])
+            head.append(self.back_btn)
+            head.append(self.title)
+            head.append(ghost)
+            root.append(head)
+            self.sub = Gtk.Label(css_classes=["sys-subtitle"])
+            root.append(self.sub)
+
+            self.stack = Gtk.Stack(vhomogeneous=False, hhomogeneous=True,
+                                   transition_duration=180)
+            self.stack.connect("notify::transition-running", self.on_transition)
+            self.hub = self.build_hub()
+            self.stack.add_named(self.hub, "hub")
+            self.boxes = {}
+            for name in PAGES:
+                box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10,
+                              css_classes=["sys-page"])
+                self.boxes[name] = box
+                self.stack.add_named(box, name)
+            root.append(self.stack)
+
+            # "keep these display settings?" bar
+            self.confirm_rev = Gtk.Revealer(transition_type=Gtk.RevealerTransitionType.SLIDE_UP,
+                                            transition_duration=160)
+            cbox = Gtk.Box(spacing=10, css_classes=["sys-confirm"])
+            cbox.append(lbl("\U000F0DDC", "sys-confirm-icon"))
+            self.confirm_lbl = lbl("", "sys-confirm-text", hexpand=True)
+            cbox.append(self.confirm_lbl)
+            undo = Gtk.Button(label="Zurück", css_classes=["item-action"])
+            undo.connect("clicked", lambda _b: self.revert())
+            keep = Gtk.Button(label="Behalten", css_classes=["item-action", "sys-keep"])
+            keep.connect("clicked", lambda _b: self.keep())
+            cbox.append(undo)
+            cbox.append(keep)
+            self.confirm_rev.set_child(cbox)
+            root.append(self.confirm_rev)
+
+            self.hint = Gtk.Label(css_classes=["sys-hint"])
+            root.append(self.hint)
+            self.set_child(root)
+
+            keys = Gtk.EventControllerKey()
+            keys.set_propagation_phase(Gtk.PropagationPhase.CAPTURE)
+            keys.connect("key-pressed", self.on_key)
+            self.add_controller(keys)
+            self.connect("notify::visible", self.on_visible)
+
+        # ================================================================ hub
+        def build_hub(self):
+            grid = Gtk.Grid(column_spacing=6, row_spacing=10, column_homogeneous=True,
+                            css_classes=["sys-grid"])
+            for i, (key, icon, name, _act) in enumerate(TILES):
+                b = Gtk.Button(css_classes=["sys-tile", "flat"])
+                inner = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+                inner.append(Gtk.Label(label=icon, css_classes=["sys-circle"],
+                                       halign=Gtk.Align.CENTER))
+                inner.append(Gtk.Label(label=name, css_classes=["sys-tile-name"]))
+                status = Gtk.Label(label=" ", css_classes=["sys-tile-status"],
+                                   ellipsize=3, max_width_chars=16)
+                inner.append(status)
+                b.set_child(inner)
+                b.status = status
+                b.connect("clicked", lambda _b, k=key: self.pick(k))
+                hover = Gtk.EventControllerMotion()
+                hover.connect("enter", lambda _c, _x, _y, b=b: b.grab_focus())
+                b.add_controller(hover)
+                self.tiles[key] = b
+                grid.attach(b, i % COLS, i // COLS, 1, 1)
+            return grid
+
+        def pick(self, key):
+            _k, _i, _n, (kind, what) = next(t for t in TILES if t[0] == key)
+            self.last_tile = key
+            if kind == "page":
+                self.go(what)
+                return
+            self.close()
+            if kind == "popup":
+                # --from-menu: Escape there brings this menu back (resident.py)
+                argv = [BIN + "popup-cmd", what, "show", "--center", "--from-menu"]
+            else:
+                argv = what
+            # after this window is gone, or the new one closes with it
+            GLib.timeout_add(90, lambda: subprocess.Popen(argv, start_new_session=True,
+                                                          stdout=subprocess.DEVNULL,
+                                                          stderr=subprocess.DEVNULL) and False)
+
+        def refresh_hub(self):
+            """Status lines: the quick ones now, the slow ones from a thread."""
+            mons = [m for m in monitors() if not m.get("disabled")]
+            ext = [m for m in mons if m["name"] != INTERNAL]
+            quick = {
+                "displays": (f"{len(mons)} Bildschirme" if len(mons) > 1 else
+                             "nur Laptop" if mons and not ext else short_name(mons[0]) if mons else ""),
+                "mouse": f"Tempo {float(option('input:sensitivity', 0)):+.1f}",
+                "keyboard": f"{str(option('input:kb_layout', 'de')).upper()} · "
+                            f"{option('input:repeat_rate', 25)}/s",
+                "nightlight": nl.status(),
+                "idle": f"sperrt nach {idle_text(idle_steps('ac' if on_ac() else 'battery')['lock'])}",
+                "wallpaper": "Super + W",
+                "keybinds": "Super + H",
+            }
+            for k, text in quick.items():
+                self.tiles[k].status.set_text(text)
+            threading.Thread(target=self.slow_status, daemon=True).start()
+
+        def slow_status(self):
+            out = {}
+            wifi = run(["nmcli", "-t", "-f", "TYPE,NAME", "connection", "show", "--active"])
+            names = [ln.split(":", 1)[1] for ln in wifi.splitlines()
+                     if ln.startswith("802-11-wireless:")]
+            wired = any(ln.startswith("802-3-ethernet:") for ln in wifi.splitlines())
+            out["wifi"] = names[0] if names else ("Kabel" if wired else "nicht verbunden")
+            bt = run(["busctl", "get-property", "org.bluez", "/org/bluez/hci0",
+                      "org.bluez.Adapter1", "Powered"])
+            out["bluetooth"] = "an" if "true" in bt else "aus"
+            vol = run(["wpctl", "get-volume", "@DEFAULT_AUDIO_SINK@"])
+            try:
+                v = round(float(vol.split()[1]) * 100)
+                out["sound"] = "stumm" if "MUTED" in vol else f"{v} %"
+            except (IndexError, ValueError):
+                out["sound"] = ""
+            try:
+                cap = open("/sys/class/power_supply/BAT0/capacity").read().strip()
+            except OSError:
+                cap = ""
+            prof = PROFILES.get(run(["powerprofilesctl", "get"]).strip(), "")
+            out["power"] = " · ".join(x for x in (cap and cap + " %", prof) if x)
+            GLib.idle_add(self.set_status, out)
+            # updates last: checkupdates needs the network (a few seconds)
+            ups = run(["checkupdates"])
+            n = len([ln for ln in ups.splitlines() if ln.strip()])
+            GLib.idle_add(self.set_status, {"updates": f"{n} neu" if n else "alles aktuell"})
+
+        def set_status(self, out):
+            for k, text in out.items():
+                self.tiles[k].status.set_text(text)
+                if k == "updates":
+                    (self.tiles[k].add_css_class if text != "alles aktuell"
+                     else self.tiles[k].remove_css_class)("news")
+            return False
+
+        # ================================================================ navigation
+        def go(self, page, animate=True):
+            if self.page == "nightlight" and page != "nightlight":
+                subprocess.Popen([BIN + "nightlight", "refresh"])   # end a preview
+            back = page == "hub"
+            self.stack.set_transition_type(
+                Gtk.StackTransitionType.NONE if not animate else
+                Gtk.StackTransitionType.SLIDE_RIGHT if back else Gtk.StackTransitionType.SLIDE_LEFT)
+            self.page = page
+            if back:
+                self.title.set_text(self.greeting())
+                self.sub.set_text("Was möchtest du einstellen?")
+                self.hint.set_text("Pfeile wählen · Enter öffnet · Esc schließt")
+                self.back_btn.set_opacity(0)
+                self.back_btn.set_sensitive(False)
+                self.refresh_hub()
+            else:
+                title, sub = PAGES[page]
+                self.title.set_text(title)
+                self.sub.set_text(sub)
+                self.hint.set_text("Änderungen gelten sofort · Esc zurück")
+                self.back_btn.set_opacity(1)
+                self.back_btn.set_sensitive(True)
+                self.render(page)
+            self.stack.set_visible_child_name(page)
+            if animate:
+                resident.type_title(self.title)
+            if back:
+                last = getattr(self, "last_tile", None)
+                (self.tiles.get(last) or self.tiles["wifi"]).grab_focus()
+            else:
+                self.last_tile = page
+                self.set_focus(None)
+            if not self.stack.get_transition_running():
+                self.fit()
+
+        def render(self, page):
+            box = self.boxes[page]
+            clear(box)
+            getattr(self, "page_" + page)(box)
+            if self.stack.get_visible_child_name() == page:
+                self.fit()
+
+        def fit(self):
+            """Window height = page height. GTK only grows a shown window by
+            itself (Hyprland keeps its size otherwise), so it is resized
+            through Hyprland once the new page has its layout. The top edge
+            stays where the hub put it (the title does not jump), unless the
+            page would reach out of the screen."""
+            self.set_default_size(WIDTH, 1)
+            if self.get_visible():
+                self.later("fit", 30, self.fit_now)
+
+        def fit_now(self):
+            h = self.get_child().measure(Gtk.Orientation.VERTICAL, WIDTH)[1]
+            try:
+                c = next(c for c in json.loads(resident.hypr("j/clients")) if c["class"] == APP)
+                mon = next(m for m in json.loads(resident.hypr("j/monitors"))
+                           if m["id"] == c["monitor"])
+            except (ValueError, StopIteration, KeyError):
+                return
+            if self.anchor_top is None:
+                self.anchor_top = c["at"][1]
+            bottom = mon["y"] + mon["height"] / mon["scale"] - resident.EDGE
+            y = int(max(mon["y"] + resident.EDGE, min(self.anchor_top, bottom - h)))
+            if c["size"][1] != h:
+                resident.hypr(f'dispatch hl.dsp.window.resize({{ window = "class:{APP}", '
+                              f'x = {WIDTH}, y = {h} }})')
+            if c["at"][1] != y:
+                resident.hypr(f'dispatch hl.dsp.window.move({{ window = "class:{APP}", '
+                              f'x = {c["at"][0]}, y = {y} }})')
+
+        def on_transition(self, *_a):
+            if not self.stack.get_transition_running():
+                self.fit()
+
+        @staticmethod
+        def greeting():
+            import time
+            h = time.localtime().tm_hour
+            return ("Na, Nachteule?" if h < 5 else "Guten Morgen" if h < 11 else
+                    "Hallo" if h < 18 else "Guten Abend" if h < 22 else "Na, Nachteule?")
+
+        def later(self, key, ms, fn):
+            """Run fn after ms; a newer call with the same key replaces it
+            (sliders: apply once they rest)."""
+            if key in self.timers:
+                GLib.source_remove(self.timers[key])
+
+            def fire():
+                del self.timers[key]
+                fn()
+                return False
+            self.timers[key] = GLib.timeout_add(ms, fire)
+
+        def slider(self, key, lo, hi, step, value, fmt, on_change, ms=120, marks=None):
+            """Label row with the value, then the slider; on_change once it rests."""
+            box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
+            val = lbl(fmt(value), "sys-value", xalign=1)
+            scale = Gtk.Scale.new_with_range(Gtk.Orientation.HORIZONTAL, lo, hi, step)
+            scale.set_draw_value(False)
+            scale.set_value(value)
+            scale.set_hexpand(True)
+            for v, text in (marks or []):
+                scale.add_mark(v, Gtk.PositionType.BOTTOM, text)
+
+            def changed(s):
+                v = round(s.get_value() / step) * step
+                val.set_text(fmt(v))
+                self.later(key, ms, lambda: on_change(v))
+            scale.connect("value-changed", changed)
+            box.append(scale)
+            box.val = val
+            return box, val
+
+        # ================================================================ displays
+        def page_displays(self, box):
+            mons = monitors()
+            saved = settings.get("displays")
+            screens = saved.get("screens", {})
+            main = main_of(mons, saved)
+            if not mons:
+                box.append(lbl("Keine Bildschirme gefunden.", "note"))
+                return
+            descs = [m["description"] for m in mons]
+            if self.mon_sel not in descs:
+                ext = [m for m in mons if m["name"] != INTERNAL]
+                self.mon_sel = (ext or mons)[0]["description"]
+            m = next(x for x in mons if x["description"] == self.mon_sel)
+            is_int = m["name"] == INTERNAL
+
+            box.append(self.screens_preview(mons, main))
+
+            # main screen chip in the card head
+            key = "internal" if is_int else m["description"]
+            is_main = key == main
+            chip = Gtk.Button(css_classes=["sys-chip"] + (["on"] if is_main else []))
+            chip.set_child(lbl(("\U000F04CE  Hauptbildschirm" if is_main else
+                                "\U000F04D2  zum Hauptbildschirm machen")))
+            chip.set_tooltip_text("bekommt die Workspaces 1-8")
+            chip.connect("clicked", lambda _b: self.set_main(key))
+            if m.get("disabled") or derive_position(m, mons) == "mirror":
+                chip = None
+
+            rows = []
+            pos = None if is_int else screens.get(m["description"], {}).get(
+                "position", derive_position(m, mons))
+            if pos is not None and pos not in dict(POSITIONS):
+                pos = derive_position(m, mons)        # dragged: exact coordinates
+            if not is_int:
+                rows.append(row("Anordnung", None, "oder oben im Bild an seinen Platz ziehen",
+                                stacked=True))
+                rows.append(segments(POSITIONS, pos, lambda v: self.set_screen(m, mons, position=v)))
+            if not m.get("disabled") and pos != "mirror":
+                table = mode_table(m)
+                sizes = sorted(table, key=lambda s: (s[0] * s[1], s[0]), reverse=True)
+                cur = (m["width"], m["height"])
+                if cur in sizes and len(sizes) > 1:
+                    rows.append(row("Auflösung", stepper(
+                        sizes, cur, lambda s: f"{s[0]} × {s[1]}",
+                        lambda s: self.set_screen(m, mons, mode=self.best_mode(table, s, m)))))
+                rates = table.get(cur, {})
+                if len(rates) > 1:
+                    now = round(m["refreshRate"])
+                    rows.append(row("Bildrate", segments(
+                        [(r, f"{r} Hz") for r in sorted(rates)], now,
+                        lambda r: self.set_screen(m, mons, mode=f"{cur[0]}x{cur[1]}@{rates[r]}"))))
+                logical = f"wirkt wie {round(m['width'] / m['scale'])} × {round(m['height'] / m['scale'])}"
+                rows.append(row("Skalierung", None, logical, stacked=True))
+                rows.append(segments([(s, f"{s:g}".replace(".", ",") + "×") for s in SCALES],
+                                     min(SCALES, key=lambda s: abs(s - m["scale"])),
+                                     lambda s: self.set_screen(m, mons, scale=s)))
+                vrr = (saved.get("internal", {}) if is_int else screens.get(m["description"], {})).get("vrr", 0)
+                rows.append(row("Adaptive Sync", segments(VRR, vrr,
+                                                          lambda v: self.set_screen(m, mons, vrr=v)),
+                                "gegen Ruckeln, wenn Spiele schwanken"))
+            if is_int:
+                off = saved.get("internal", {}).get("off_with_external", False)
+                rows.append(row("Aus, solange ein Bildschirm dran ist", switch(
+                    off, lambda v: self.set_internal(off_with_external=v)),
+                    "Zuklappen macht das sowieso"))
+            elif m.get("disabled"):
+                rows.append(lbl("Ausgeschaltet. Wähle oben, wo er stehen soll, dann geht er wieder an.",
+                                "sys-sub", wrap=True))
+            title = short_name(m) + ("" if is_int else f"  ·  {m['name']}")
+            box.append(card("\U000F0322" if is_int else "\U000F0379", title, *rows, extra=chip))
+
+        def screens_preview(self, mons, main):
+            """The screens to scale, as they stand. Click one to set it up,
+            drag an external one to where it stands on the desk: on release it
+            snaps to the nearest edge of another screen (top, middle or bottom
+            aligned when close) and is stored with exact coordinates."""
+            W, H, PAD = WIDTH - 52, 132, 14
+            frame = Gtk.Fixed(css_classes=["sys-screens"])
+            frame.set_size_request(W, H)
+            on = [m for m in mons if not m.get("disabled")]
+            off = [m for m in mons if m.get("disabled")]
+            if on:
+                x0 = min(geo(m)[0] for m in on)
+                y0 = min(geo(m)[1] for m in on)
+                x1 = max(geo(m)[0] + geo(m)[2] for m in on)
+                y1 = max(geo(m)[1] + geo(m)[3] for m in on)
+                room_w = W - 2 * PAD - (90 if off else 0)
+                # room around the layout, so a screen can be dragged past the others
+                k = 0.8 * min(room_w / max(1, x1 - x0), (H - 2 * PAD) / max(1, y1 - y0))
+                ox = PAD + (room_w - (x1 - x0) * k) / 2
+                oy = PAD + (H - 2 * PAD - (y1 - y0) * k) / 2
+                view = dict(k=k, ox=ox, oy=oy, x0=x0, y0=y0, frame=frame, on=on, mons=mons)
+                for m in on:
+                    x, y, w, h = geo(m)
+                    tile = self.screen_tile(m, main, int(w * k) - 4, int(h * k) - 4, view)
+                    frame.put(tile, ox + (x - x0) * k + 2, oy + (y - y0) * k + 2)
+            for i, m in enumerate(off):
+                tile = self.screen_tile(m, main, 80, 46, None)
+                frame.put(tile, W - PAD - 80, PAD + i * 54)
+            return frame
+
+        def screen_tile(self, m, main, w, h, view):
+            key = "internal" if m["name"] == INTERNAL else m["description"]
+            tile = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, valign=Gtk.Align.CENTER,
+                           css_classes=["sys-screen"])
+            if m["description"] == self.mon_sel:
+                tile.add_css_class("selected")
+            if m.get("disabled"):
+                tile.add_css_class("off")
+            tile.set_size_request(max(w, 40), max(h, 30))
+            star = "\U000F04CE " if key == main and not m.get("disabled") else ""
+            tile.append(Gtk.Label(label=star + short_name(m), css_classes=["sys-screen-name"],
+                                  ellipsize=3, vexpand=True, valign=Gtk.Align.END))
+            info = ("aus" if m.get("disabled") else
+                    f"{m['width']}×{m['height']} · {round(m['refreshRate'])} Hz" if h > 44 else "")
+            tile.append(Gtk.Label(label=info, css_classes=["sys-screen-info"], ellipsize=3,
+                                  vexpand=True, valign=Gtk.Align.START))
+            movable = (view is not None and m["name"] != INTERNAL and len(view["on"]) > 1)
+            tile.set_cursor_from_name("grab" if movable else "pointer")
+            drag = Gtk.GestureDrag()
+            state = {}
+
+            def begin(_g, _x, _y):
+                p = view["frame"].get_child_position(tile) if view else (0, 0)
+                state.update(home=p, moved=False)
+
+            def update(_g, dx, dy):
+                if not movable or (not state["moved"] and abs(dx) + abs(dy) < 5):
+                    return
+                if not state["moved"]:
+                    state["moved"] = True
+                    tile.add_css_class("dragging")
+                    tile.set_cursor_from_name("grabbing")
+                hx, hy = state["home"]
+                view["frame"].move(tile, hx + dx, hy + dy)
+
+            def end(_g, dx, dy):
+                if not state.get("moved"):
+                    self.mon_sel = m["description"]
+                    self.render("displays")
+                    return
+                k = view["k"]
+                hx, hy = state["home"]
+                # preview pixels -> layout coordinates (logical px)
+                x = view["x0"] + (hx + dx - 2 - view["ox"]) / k
+                y = view["y0"] + (hy + dy - 2 - view["oy"]) / k
+                spot = snap(m, x, y, view["on"], 14 / k)
+                self.mon_sel = m["description"]
+                if spot is None or spot == (m["x"], m["y"]):
+                    self.render("displays")          # back to where it was
+                    return
+                self.set_screen(m, view["mons"], position=f"{spot[0]}x{spot[1]}")
+                self.render("displays")
+            drag.connect("drag-begin", begin)
+            drag.connect("drag-update", update)
+            drag.connect("drag-end", end)
+            tile.add_controller(drag)
+            return tile
+
+        @staticmethod
+        def best_mode(table, size, m):
+            """Mode string for a new resolution: keep the refresh rate if it
+            exists there, else take the fastest."""
+            rates = table[size]
+            r = round(m["refreshRate"])
+            hz = rates.get(r) or rates[max(rates)]
+            return f"{size[0]}x{size[1]}@{hz}"
+
+        def set_screen(self, m, mons, **change):
+            """Change one screen; risky changes (all but vrr) ask to keep."""
+            old = settings.load()
+            saved = settings.get("displays")
+            if m["name"] == INTERNAL:
+                self.set_internal(**change)
+                return
+            screens = saved.get("screens", {})
+            cur = screens.get(m["description"]) or {}
+            if not cur:
+                # store the whole current state, so it stays as it is now
+                cur = {"position": derive_position(m, mons)}
+                if not m.get("disabled") and cur["position"] != "mirror":
+                    cur.update(mode=current_mode(m), scale=m["scale"])
+            if change.get("position") not in (None, "off", "mirror") and "mode" not in cur:
+                cur.update(mode="preferred", scale="auto")
+            cur.update(change)
+            screens[m["description"]] = cur
+            apply("displays", {"screens": screens})
+            self.after_display_change(old, risky=set(change) != {"vrr"})
+
+        def set_internal(self, **change):
+            old = settings.load()
+            saved = settings.get("displays")
+            cur = saved.get("internal", {})
+            if not cur:
+                lap = next((x for x in monitors() if x["name"] == INTERNAL), None)
+                if lap and not lap.get("disabled"):
+                    cur = {"mode": current_mode(lap), "scale": lap["scale"]}
+            cur.update(change)
+            apply("displays", {"internal": cur})
+            self.after_display_change(old, risky=bool(set(change) & {"mode", "scale",
+                                                                     "off_with_external"}))
+
+        def set_main(self, key):
+            apply("displays", {"main": key})
+            # moving the workspaces focuses workspace 1, which closes popups:
+            # come back to this page if that happened
+            self.after_display_change(None, risky=False, comeback=True)
+
+        def after_display_change(self, old, risky, comeback=False):
+            def redraw():
+                if self.get_visible():
+                    self.render("displays")
+                elif comeback:
+                    self.start_page = "displays"
+                    self.bring_up(center=True)
+                return False
+            GLib.timeout_add(700, redraw)
+            if risky and old is not None:
+                if self.confirm is None:
+                    self.confirm = [old, CONFIRM_SECONDS, None]
+                    self.confirm[2] = GLib.timeout_add_seconds(1, self.confirm_tick)
+                else:
+                    self.confirm[1] = CONFIRM_SECONDS     # keep the oldest state to go back to
+                self.confirm_lbl.set_text(f"Alles gut so? Sonst geht's in {self.confirm[1]} s zurück")
+                self.confirm_rev.set_reveal_child(True)
+
+        def confirm_tick(self):
+            if self.confirm is None:
+                return False
+            self.confirm[1] -= 1
+            if self.confirm[1] <= 0:
+                self.revert()
+                return False
+            self.confirm_lbl.set_text(f"Alles gut so? Sonst geht's in {self.confirm[1]} s zurück")
+            return True
+
+        def end_confirm(self):
+            if self.confirm and self.confirm[2]:
+                GLib.source_remove(self.confirm[2])
+            self.confirm = None
+            self.confirm_rev.set_reveal_child(False)
+
+        def keep(self):
+            self.end_confirm()
+
+        def revert(self):
+            if self.confirm is None:
+                return
+            old = self.confirm[0]
+            self.confirm[2] = None          # the tick that called us ends itself
+            self.end_confirm()
+            settings.save(old)
+            resident.hypr("eval Slate.apply('displays')")
+            GLib.timeout_add(700, lambda: self.get_visible() and self.page == "displays"
+                             and self.render("displays") and False)
+
+        # ================================================================ mouse
+        def page_mouse(self, box):
+            m, t = settings.get("mouse"), settings.get("touchpad")
+
+            def setm(**v):
+                apply("mouse", v)
+
+            def sett(**v):
+                apply("touchpad", v)
+
+            sens, _ = self.slider("m-sens", -1, 1, 0.05, float(m.get("sensitivity", option("input:sensitivity", 0))),
+                                  lambda v: f"{v:+.2f}", lambda v: setm(sensitivity=round(v, 2)),
+                                  marks=[(0, None)])
+            scroll, _ = self.slider("m-scroll", 0.2, 3, 0.1, float(m.get("scroll", option("input:scroll_factor", 1.0))),
+                                    lambda v: f"{v:.1f}×", lambda v: setm(scroll=round(v, 2)),
+                                    marks=[(1, None)])
+            mouse = card(
+                "\U000F037D", "Maus",
+                self.slider_row("Tempo", sens), self.slider_row("Scrollen", scroll),
+                row("Beschleunigung", switch(m.get("accel", option("input:accel_profile", "flat")) == "adaptive",
+                                             lambda v: setm(accel="adaptive" if v else "flat")),
+                    "schnelle Bewegung = weiter"),
+                row("Natürlich scrollen", switch(m.get("natural", option("input:natural_scroll", False)),
+                                                 lambda v: setm(natural=v)), "wie am Handy"),
+                row("Linkshänder", switch(m.get("left_handed", option("input:left_handed", False)),
+                                          lambda v: setm(left_handed=v)), "Tasten getauscht"),
+            )
+            tsens, _ = self.slider("t-sens", -1, 1, 0.05, float(t.get("sensitivity", 0)),
+                                   lambda v: f"{v:+.2f}", lambda v: sett(sensitivity=round(v, 2)),
+                                   marks=[(0, None)])
+            tscroll, _ = self.slider("t-scroll", 0.1, 1.5, 0.05,
+                                     float(t.get("scroll", option("input:touchpad:scroll_factor", 0.5))),
+                                     lambda v: f"{v:.2f}×", lambda v: sett(scroll=round(v, 2)))
+            click = t.get("clickfinger", option("input:touchpad:clickfinger_behavior", True))
+            pad = card(
+                "\U000F0741", "Touchpad",
+                self.slider_row("Tempo", tsens), self.slider_row("Scrollen", tscroll),
+                row("Antippen klickt", switch(t.get("tap", option("input:touchpad:tap_to_click", True)),
+                                              lambda v: sett(tap=v))),
+                row("Natürlich scrollen", switch(t.get("natural", option("input:touchpad:natural_scroll", True)),
+                                                 lambda v: sett(natural=v))),
+                row("Aus beim Tippen", switch(t.get("dwt", option("input:touchpad:disable_while_typing", True)),
+                                              lambda v: sett(dwt=v))),
+                row("Rechtsklick", None, stacked=True),
+                segments([(True, "Zwei Finger"), (False, "Ecke rechts unten")], bool(click),
+                         lambda v: (sett(clickfinger=v), self.render("mouse"))),
+            )
+            cols = Gtk.Box(spacing=10, homogeneous=True)
+            cols.append(mouse)
+            cols.append(pad)
+            box.append(cols)
+
+        @staticmethod
+        def axis(left, right):
+            """Small words under a slider's two ends."""
+            box = Gtk.Box(css_classes=["sys-axis"])
+            box.append(lbl(left, "sys-sub", hexpand=True))
+            box.append(lbl(right, "sys-sub", xalign=1))
+            return box
+
+        def slider_row(self, title, slider):
+            box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, css_classes=["sys-row"])
+            top = Gtk.Box()
+            top.append(lbl(title, "sys-label", hexpand=True))
+            top.append(slider.val)
+            box.append(top)
+            box.append(slider)
+            return box
+
+        # ================================================================ keyboard
+        def page_keyboard(self, box):
+            k = settings.get("keyboard")
+            layout = k.get("layout", option("input:kb_layout", "de"))
+            opts = [o for o in str(k.get("options", option("input:kb_options", ""))).split(",") if o]
+            layouts = list(LAYOUTS)
+            if layout not in [x[0] for x in layouts]:
+                layouts.insert(0, (layout, layout.upper()))
+
+            def set_opt(name, on):
+                new = [o for o in opts if o != name] + ([name] if on else [])
+                apply("keyboard", {"options": ",".join(new)})
+                opts[:] = new
+
+            delay, _ = self.slider("k-delay", 150, 1000, 25, int(k.get("repeat_delay", option("input:repeat_delay", 600))),
+                                   lambda v: f"{v:.0f} ms", lambda v: apply("keyboard", {"repeat_delay": int(v)}),
+                                   marks=[(600, None)])
+            rate, _ = self.slider("k-rate", 10, 60, 1, int(k.get("repeat_rate", option("input:repeat_rate", 25))),
+                                  lambda v: f"{v:.0f} pro s", lambda v: apply("keyboard", {"repeat_rate": int(v)}),
+                                  marks=[(25, None)])
+            test = Gtk.Entry(placeholder_text="hier ausprobieren: eine Taste festhalten …",
+                             css_classes=["sys-test"])
+            box.append(card(
+                "\U000F030C", "Tippen",
+                row("Layout", None, stacked=True),
+                segments(layouts, layout, lambda v: (apply("keyboard", {"layout": v}),
+                                                     self.render("keyboard"))),
+                self.slider_row("Wiederholen nach", delay),
+                self.slider_row("Wiederholtempo", rate),
+                test,
+            ))
+            box.append(card("\U000F04E1", "Tasten tauschen", *[
+                row(title, switch(name in opts, lambda v, n=name: set_opt(n, v)), sub)
+                for name, title, sub in SWAPS]))
+
+        # ================================================================ night light
+        def page_nightlight(self, box):
+            c = nl.config()
+            have = shutil.which("hyprsunset") is not None
+
+            def set_mode(mode):
+                settings.update("nightlight", {"mode": mode})
+                subprocess.Popen([BIN + "nightlight", "refresh"])
+                self.render("nightlight")
+
+            def preview(v):
+                subprocess.Popen([BIN + "nightlight", "preview", str(int(v))])
+
+            def save_temp(v):
+                settings.update("nightlight", {"temp": int(v)})
+
+            temp, val = self.slider("n-temp", nl.TEMP_RANGE[0], nl.TEMP_RANGE[1], 100, int(c["temp"]),
+                                    lambda v: f"{v:.0f} K", save_temp, ms=250)
+            # preview while dragging (fast), saved once it rests (slider())
+            scale = temp.get_first_child()
+            scale.connect("value-changed", lambda s: self.later("n-prev", 40,
+                                                               lambda: preview(round(s.get_value() / 100) * 100)))
+            rows = [segments(NIGHT_MODES, c["mode"], set_mode, small=False),
+                    self.slider_row("Wärme", temp),
+                    self.axis("\u2190 wärmer", "neutraler \u2192")]
+            if c["mode"] == "schedule":
+                times = list(range(0, 1440, 15))
+                rows.append(row("Warm ab", stepper(times, nl.parse(c["start"]), nl.hhmm,
+                                                   lambda v: (settings.update("nightlight", {"start": nl.hhmm(v)}),
+                                                              subprocess.Popen([BIN + "nightlight", "refresh"])))))
+                rows.append(row("Neutral ab", stepper(times, nl.parse(c["end"]), nl.hhmm,
+                                                      lambda v: (settings.update("nightlight", {"end": nl.hhmm(v)}),
+                                                                 subprocess.Popen([BIN + "nightlight", "refresh"])))))
+            if c["mode"] == "sunset":
+                sun = nl.sun_times()
+                z = nl.zone()
+                if sun:
+                    rows.append(lbl(f"heute {nl.hhmm(sun[1])} bis {nl.hhmm(sun[0])}  ·  "
+                                    f"{z[0].split('/')[-1].replace('_', ' ')}  ·  {nl.FADE_MIN} min Übergang",
+                                    "sys-sub", xalign=0.5))
+            if not have:
+                rows.append(lbl("hyprsunset fehlt noch:  sudo pacman -S hyprsunset", "note", "error"))
+            box.append(card("\U000F0594", "Nachtlicht", *rows))
+
+        # ================================================================ idle
+        def page_idle(self, box):
+            ac = on_ac()
+            src = self.idle_src or ("ac" if ac else "battery")
+            self.idle_src = src
+            steps = idle_steps(src)
+
+            def pick_src(s):
+                self.idle_src = s
+                self.render("idle")
+
+            def set_step(key, v):
+                saved = settings.get("idle")
+                cur = dict(saved.get(src, {}))
+                cur.update({k: steps[k] for k in steps})
+                cur[key] = v
+                steps[key] = v
+                settings.update("idle", {src: cur})
+                subprocess.Popen([BIN + "idle-config", "apply"])
+
+            now = "  ·  jetzt"
+            box.append(segments([("ac", "\U000F06A5", "Am Netzteil" + (now if ac else "")),
+                                 ("battery", "\U000F0080", "Mit Akku" + ("" if ac else now))],
+                                src, pick_src, small=False))
+            rows = [row(title, stepper(IDLE_VALUES, steps[key], idle_text,
+                                       lambda v, k=key: set_step(k, v)))
+                    for key, _icon, title in IDLE_STEPS]
+            box.append(card("\U000F0341", "Am Netzteil" if src == "ac" else "Mit Akku", *rows))
+            box.append(lbl("Tipp: Bildschirm aus kurz nach dem Sperren spart Strom, "
+                           "eine Taste weckt ihn ohne zu tippen.", "sys-sub", wrap=True, xalign=0.5))
+
+        # ================================================================ window
+        def take_opts(self, opts):
+            pages = [o for o in opts if o in PAGES]
+            self.start_page = pages[0] if pages else self.start_page
+
+        def show_up(self):
+            page = self.start_page or "hub"
+            self.start_page = None
+            self.idle_src = None
+            self.anchor_top = None
+            self.go("hub", animate=False)
+            if page != "hub":
+                self.go(page, animate=False)
+            self.fit()
+            self.present()
+            if page == "hub":
+                (self.tiles.get(getattr(self, "last_tile", None)) or self.tiles["wifi"]).grab_focus()
+
+        def on_visible(self, *_a):
+            if not self.get_visible() and self.page == "nightlight":
+                subprocess.Popen([BIN + "nightlight", "refresh"])
+
+        def on_key(self, _ctrl, keyval, _code, state):
+            if keyval == Gdk.KEY_Escape:
+                if self.confirm:
+                    self.revert()
+                elif self.page != "hub":
+                    self.go("hub")
+                else:
+                    self.close()
+                return True
+            if keyval == Gdk.KEY_Left and state & Gdk.ModifierType.ALT_MASK and self.page != "hub":
+                self.go("hub")
+                return True
+            return False
+
+    provider = Gtk.CssProvider()
+    provider.load_from_path(CSS)
+    Gtk.StyleContext.add_provider_for_display(
+        Gdk.Display.get_default(), provider, Gtk.STYLE_PROVIDER_PRIORITY_USER)
+    return Popup()
+
+
+if __name__ == "__main__":
+    resident.main(APP, build, __doc__)

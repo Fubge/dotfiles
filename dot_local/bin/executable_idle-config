@@ -1,0 +1,149 @@
+#!/usr/bin/env python3
+"""Idle steps (dim, lock, screen off, suspend) for hypridle, separate for
+charger and battery, set in the system menu (SUPER+ALT+Space -> lock & idle).
+
+    idle-config write   write the hypridle config for the current power source
+    idle-config apply   write it and restart hypridle if it changed
+    idle-config watch   keep doing that whenever the charger comes or goes
+    idle-config show    print the steps in use (seconds, 0 = never)
+
+hypridle cannot switch timeouts by power source, so it gets a generated
+config: ~/.local/state/slate/hypridle.conf. Its systemd unit runs `write`
+before it starts (systemd/user/hypridle.service.d/override.conf); `watch`
+runs in the background (hypr/vars.lua M.background) and restarts hypridle
+when the power source changes. Times come from settings.json (section
+"idle", seconds, 0 = never) on top of DEFAULTS.
+"""
+import os
+import subprocess
+import sys
+
+sys.path.insert(0, os.path.expanduser("~/.local/lib/popup"))
+import settings  # noqa: E402
+
+CONF = os.path.join(settings.DIR, "hypridle.conf")
+STEPS = ("dim", "lock", "off", "suspend")
+DEFAULTS = {
+    "ac": {"dim": 150, "lock": 300, "off": 330, "suspend": 1800},
+    "battery": {"dim": 120, "lock": 240, "off": 270, "suspend": 900},
+}
+
+HEAD = """\
+# Written by ~/.local/bin/idle-config ({source}), do not edit:
+# change the times in the system menu (SUPER+ALT+Space -> lock & idle)
+general {{
+    lock_cmd         = pidof hyprlock || hyprlock
+    before_sleep_cmd = loginctl lock-session; hyprctl dispatch 'hl.dsp.submap("wake")'
+    # the key that woke the laptop is swallowed by the "wake" submap (binds.lua);
+    # after 2 s keys go to the lock screen again (woken by opening the lid)
+    after_sleep_cmd  = hyprctl dispatch 'hl.dsp.dpms({{action = "on"}})'; sleep 2; hyprctl dispatch 'hl.dsp.submap("reset")'
+}}
+"""
+LISTENERS = {
+    # dim the screen (not to 0, OLED) and turn the keyboard backlight off
+    "dim": """
+listener {{
+    timeout    = {t}
+    on-timeout = brightnessctl -s set 10 && brightnessctl -sd tpacpi::kbd_backlight set 0
+    on-resume  = brightnessctl -r && brightnessctl -rd tpacpi::kbd_backlight
+}}
+""",
+    "lock": """
+listener {{
+    timeout    = {t}
+    on-timeout = loginctl lock-session
+}}
+""",
+    # in the submap "wake" (binds.lua) the key that wakes it only turns the
+    # screen on and is not typed into the password field
+    "off": """
+listener {{
+    timeout    = {t}
+    on-timeout = hyprctl dispatch 'hl.dsp.submap("wake")'; hyprctl dispatch 'hl.dsp.dpms({{action = "off"}})'
+    on-resume  = hyprctl dispatch 'hl.dsp.dpms({{action = "on"}})'; hyprctl dispatch 'hl.dsp.submap("reset")'
+}}
+""",
+    "suspend": """
+listener {{
+    timeout    = {t}
+    on-timeout = systemctl suspend
+}}
+""",
+}
+
+
+def on_ac():
+    for ps in os.listdir("/sys/class/power_supply"):
+        base = os.path.join("/sys/class/power_supply", ps)
+        try:
+            if (open(os.path.join(base, "type")).read().strip() == "Mains"
+                    and open(os.path.join(base, "online")).read().strip() == "1"):
+                return True
+        except OSError:
+            pass
+    return False
+
+
+def steps(source):
+    """Seconds per step for "ac" or "battery" (0 = never)."""
+    saved = settings.get("idle").get(source, {})
+    return {k: int(saved.get(k, DEFAULTS[source][k])) for k in STEPS}
+
+
+def render(source):
+    out = HEAD.format(source="charger" if source == "ac" else "battery")
+    for k, t in steps(source).items():
+        if t > 0:
+            out += LISTENERS[k].format(t=t)
+    return out
+
+
+def write():
+    """Write the config for the current source; True if it changed."""
+    text = render("ac" if on_ac() else "battery")
+    try:
+        if open(CONF).read() == text:
+            return False
+    except OSError:
+        pass
+    os.makedirs(settings.DIR, exist_ok=True)
+    with open(CONF + ".tmp", "w") as f:
+        f.write(text)
+    os.replace(CONF + ".tmp", CONF)
+    return True
+
+
+def apply(force=False):
+    if write() or force:
+        subprocess.run(["systemctl", "--user", "try-restart", "hypridle.service"])
+
+
+def watch():
+    apply()
+    last = on_ac()
+    proc = subprocess.Popen(["udevadm", "monitor", "--udev", "--subsystem-match=power_supply"],
+                            stdout=subprocess.PIPE, text=True)
+    for _line in proc.stdout:
+        now = on_ac()
+        if now != last:
+            last = now
+            apply()
+
+
+def main():
+    cmd = sys.argv[1:2] or ["write"]
+    if cmd == ["write"]:
+        write()
+    elif cmd == ["apply"]:
+        apply()
+    elif cmd == ["watch"]:
+        watch()
+    elif cmd == ["show"]:
+        for source in ("ac", "battery"):
+            print(source, steps(source))
+    else:
+        sys.exit(__doc__)
+
+
+if __name__ == "__main__":
+    main()

@@ -10,6 +10,9 @@ function; the same script then works as server and as client:
     SCRIPT toggle [--center]  show it, or hide it when it is open (bar icon clicks)
     SCRIPT quit             stop the running popup (e.g. after its code changed)
 
+show/toggle also take --from-menu (the system menu opens the popup): closing
+it with Escape then brings the system menu back.
+
 Commands go over a datagram socket $XDG_RUNTIME_DIR/<class>.sock. The client
 side never imports GTK, so it starts fast. Still, a Python client costs ~80 ms
 per press (interpreter, imports, compiling the whole script: executables without
@@ -44,6 +47,7 @@ import signal
 import socket
 import subprocess
 import sys
+import time
 
 RUN = os.environ.get("XDG_RUNTIME_DIR", "/tmp")
 BAR_TOOLTIPS = os.path.expanduser("~/.local/bin/bar-tooltips")
@@ -58,7 +62,8 @@ BLINKS = 3          # caret blinks after typing, then it goes away
 # widgets that slide in on their own (their children move with them)
 ROW_CLASSES = ("sound-row", "slider-row", "item-card", "section", "note", "app-name",
                "segment", "battery", "more", "pet-card", "sound-sep", "menu-search",
-               "menu-info", "card", "center-entry", "center-empty")
+               "menu-info", "card", "center-entry", "center-empty",
+               "sys-tile", "sys-card", "sys-screens", "sys-segments")
 
 
 def sock_path(app_id):
@@ -123,6 +128,31 @@ def keep_top(app_id):
     if at:
         hypr('dispatch hl.dsp.window.move({ window = "class:%s", x = %d, y = %d })'
              % (app_id, *at))
+
+
+def fit(win, app_id, width):
+    """Resize a SHOWN popup to its content. GTK grows a shown window by
+    itself but never shrinks it under Hyprland (the configured size wins), so
+    the new height goes through Hyprland. Bar popups keep their top edge,
+    centered ones their middle. Call it once the new content has its layout
+    (a short timeout after changing it)."""
+    from gi.repository import Gtk
+
+    if not win.get_visible():
+        return
+    h = win.get_child().measure(Gtk.Orientation.VERTICAL, width)[1]
+    try:
+        c = next(c for c in json.loads(hypr("j/clients")) if c["class"] == app_id)
+    except (ValueError, StopIteration, KeyError):
+        return
+    if c["size"][1] == h:
+        return
+    hypr('dispatch hl.dsp.window.resize({ window = "class:%s", x = %d, y = %d })'
+         % (app_id, width, h))
+    at = PLACED.get(app_id)
+    y = at[1] if at else c["at"][1] + (c["size"][1] - h) // 2
+    hypr('dispatch hl.dsp.window.move({ window = "class:%s", x = %d, y = %d })'
+         % (app_id, c["at"][0], y))
 
 
 def animate_in(win):
@@ -228,9 +258,25 @@ def serve(app_id, build, show):
     win.set_hide_on_close(True)
     tag = str(os.getpid())
 
+    # Opened from the system menu (--from-menu): Escape leads back to it, a
+    # click elsewhere closes both. Escape is noted here (capture phase, not
+    # consumed), the popup itself closes on it as usual.
+    win.came_from_menu = False
+    win.escaped_at = 0.0
+    from gi.repository import Gdk
+    keys = Gtk.EventControllerKey()
+    keys.set_propagation_phase(Gtk.PropagationPhase.CAPTURE)
+    keys.connect("key-pressed", lambda _c, keyval, *_a: setattr(win, "escaped_at", time.monotonic())
+                 if keyval == Gdk.KEY_Escape else None)
+    win.add_controller(keys)
+
     def visible_changed(*_a):
         if not win.get_visible():
             subprocess.Popen([BAR_TOOLTIPS, "on", tag])
+            if win.came_from_menu and time.monotonic() - win.escaped_at < 0.5:
+                subprocess.Popen([os.path.expanduser("~/.local/bin/popup-cmd"), "system-menu",
+                                  "show", "--center"], start_new_session=True)
+            win.came_from_menu = False
     win.connect("notify::visible", visible_changed)
 
     def show_up(center=False):
@@ -266,6 +312,10 @@ def serve(app_id, build, show):
     def handle(line):
         cmd, *opts = line.split() or [""]
         center = "--center" in opts
+        from_menu = "--from-menu" in opts
+        opts = [o for o in opts if o != "--from-menu"]
+        if cmd in ("show", "toggle"):
+            win.came_from_menu = from_menu
         # extra options (e.g. --date 2026-11-20) for popups that take them
         if cmd in ("show", "toggle") and hasattr(win, "take_opts"):
             win.take_opts([o for o in opts if o != "--center"])

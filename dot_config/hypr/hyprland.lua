@@ -4,6 +4,7 @@
 -- vars is only required by the other modules, so a config reload kept the old
 -- copy cached: drop it, every reload then sees changed vars
 package.loaded["vars"] = nil
+package.loaded["settings"] = nil   -- same for the system menu settings
 
 require("env")
 require("monitors")

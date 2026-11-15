@@ -63,6 +63,9 @@ M.background = {
     M.bin .. "calendar-popup --hidden",   -- calendar (bar date, SUPER+K), same
     M.bin .. "event-popup --hidden",      -- new event (SUPER+SHIFT+K), same
     M.bin .. "timer-popup --hidden",      -- kitchen timers (SUPER+SHIFT+T); also rings them
+    M.bin .. "system-menu --hidden",      -- system menu / settings (SUPER+ALT+Space), same
+    M.bin .. "idle-config watch",         -- idle times follow the power source (charger / battery)
+    M.bin .. "nightlight watch",          -- warmer colors in the evening (hyprsunset)
     M.bin .. "calendar-remind",           -- calendar reminders as notifications
     "nextcloud --background",           -- file sync, tray icon only
 }
@@ -96,6 +99,7 @@ M.floating = {
     ["[Bb]itwarden"] = { 1000, 780 },
     ["nm-connection-editor"] = { 900, 620 },   -- "Network settings" (Wi-Fi popup)
     ["com\\.nextcloud\\.desktopclient\\.nextcloud"] = { 900, 700 },  -- sync client: wizard, settings
+    ["system_update"] = { 1000, 640 },   -- pacman -Syu from the system menu
 }
 
 -- Popups opened from the bar: float under the mouse, just below the bar, and
@@ -122,6 +126,7 @@ M.popup = {
         "popup.calendar", -- month + day agenda (~/.local/bin/calendar-popup)
         "popup.event",   -- new event in one line; centered (~/.local/bin/event-popup)
         "popup.timer",   -- kitchen timers; centered (~/.local/bin/timer-popup)
+        "popup.system",  -- system menu / settings; centered (~/.local/bin/system-menu)
     },
     top = 46,   -- bar margin (8) + bar height (30) + gap (8), also in resident.py
 }

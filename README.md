@@ -167,6 +167,7 @@ walks through a full LUKS + btrfs + UKI setup.
 | `SUPER+F` | Float / tile | `SUPER+SHIFT+F` | Fullscreen |
 | `SUPER+1..0` | Workspace | `SUPER+SHIFT+1..0` | Send window |
 | `SUPER+L` | Lock | `SUPER+Escape` | Session (lock, reboot, off) |
+| `SUPER+ALT+Space` | System menu (displays, mouse, keyboard, night light, idle) | | |
 | `Home` | Area screenshot to clipboard | `SUPER+G` | Mark window as game |
 | `SUPER+K` | Calendar | `SUPER+SHIFT+K` | New event ("Kino morgen 20 Uhr") |
 | `SUPER+SHIFT+T` | Timer ("Pizza 12") | Right click timer tab | Quiet / pause |
@@ -179,6 +180,7 @@ Change one file, and the whole system follows, down to the boot menu.
 |---|---|
 | Colors | [`.chezmoidata/palette.toml`](.chezmoidata/palette.toml) |
 | Rounding, gaps, borders, fonts, overlay sizes | [`.chezmoidata/design.toml`](.chezmoidata/design.toml) |
+| Displays, mouse, keyboard, night light, idle times | the system menu (`SUPER+ALT+Space`), kept per machine |
 | Keyboard, GPU, display, optional groups | `[data.machine]` in `~/.config/chezmoi/chezmoi.toml` |
 | Apps, workspaces, autostart, window sizes | [`dot_config/hypr/vars.lua.tmpl`](dot_config/hypr/vars.lua.tmpl) |
 | Shortcuts | [`dot_config/hypr/binds.lua`](dot_config/hypr/binds.lua) |
