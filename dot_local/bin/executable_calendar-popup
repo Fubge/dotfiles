@@ -1,15 +1,17 @@
 #!/usr/bin/env python3
-"""Calendar popup (click on the bar date or agenda, SUPER+K): the two shared
+"""Calendar popup (click on the bar date, SUPER+K): the two shared
 Nextcloud calendars (~/.local/lib/popup/cal.py, synced by vdirsyncer).
 
     calendar-popup toggle [--center]  show it, or hide it when open
     calendar-popup --hidden           login autostart: waits hidden
     calendar-popup quit               stop it (it reloads on the next press)
 
-Left a month: the title types itself, the days pop in as a diagonal wave,
-today is the orange pill, each day carries a dot per event in the owner's
-calendar color (Flauschebär blue, Pia green, the colors set in Nextcloud).
-Paging months slides the grid sideways. Right the chosen day: a date tile,
+Left a month in the style of Google's month view: every day shows its
+events as lines, in the owner's calendar color (Flauschebär blue, Pia green,
+the colors set in Nextcloud): all-day and multi-day events as filled bars
+that run on across the days, timed ones as tinted pills with the time. Today
+is the orange circle, the month name sits centered between the arrows.
+Paging months slides the grid sideways; opening fades it in quickly. Right the chosen day: a date tile,
 the events as cards with a color stripe (a running one fills a progress bar,
 the next one counts down), an empty day gets a friendly line, below what
 comes after. A card's trash can asks first (it pulses red), then deletes the
@@ -33,12 +35,13 @@ import cal  # noqa: E402
 import resident  # noqa: E402
 
 APP = "popup.calendar"
-WIDTH = 780
+WIDTH = 1090
 CSS = os.path.expanduser("~/.config/popups/style.css")
 EVENT_POPUP = os.path.expanduser("~/.local/bin/popup-cmd")
 SYNC_EVERY = 120          # s: opening the popup syncs when the last one is older
 AFTER_DAYS = 60           # "Danach": look this far ahead
 AFTER_MAX = 3
+LINES = 3                 # event lines per day cell (the last one may say "+2 weitere")
 CARDS_MAX = 4
 
 G = {
@@ -92,13 +95,13 @@ def build():
 
             root = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, css_classes=["cal-box"])
 
-            # header: < November 2026 >   Heute   ● Flauschebär ● Pia
-            head = Gtk.Box(spacing=6, css_classes=["cal-head"])
+            # header over the month: Heute | < November 2026 > | legend
+            head = Gtk.CenterBox(css_classes=["cal-head"])
             self.prev = Gtk.Button(label=G["prev"], css_classes=["cal-nav", "flat"],
                                    focusable=False)
             self.prev.connect("clicked", lambda _b: self.page(-1))
-            self.title = label("", ("menu-title", "cal-title"), xalign=0)
-            self.title.set_size_request(210, -1)
+            # fixed width, centered: the arrows stay put while it types
+            self.title = label("", ("menu-title", "cal-title"), xalign=0.5, width_chars=14)
             self.next = Gtk.Button(label=G["next"], css_classes=["cal-nav", "flat"],
                                    focusable=False)
             self.next.connect("clicked", lambda _b: self.page(1))
@@ -108,23 +111,24 @@ def build():
             tb.append(label("Heute"))
             today.set_child(tb)
             today.connect("clicked", lambda _b: self.go(dt.date.today()))
-            head.append(self.prev)
-            head.append(self.title)
-            head.append(self.next)
-            head.append(Gtk.Box(hexpand=True))
-            self.legend = Gtk.Box(spacing=14, css_classes=["cal-legend"])
-            head.append(self.legend)
-            head.append(today)
-            root.append(head)
+            nav = Gtk.Box(spacing=4)
+            nav.append(self.prev)
+            nav.append(self.title)
+            nav.append(self.next)
+            head.set_center_widget(nav)
+            today.set_valign(Gtk.Align.CENTER)
+            head.set_start_widget(today)
+            self.legend = Gtk.Box(spacing=14, css_classes=["cal-legend"], valign=Gtk.Align.CENTER)
+            head.set_end_widget(self.legend)
 
             body = Gtk.Box(spacing=22, css_classes=["cal-body"])
-            # month: weekday header + a stack that slides between months
+            # month: header, weekday names, a stack that slides between months
             left = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, css_classes=["cal-month"])
+            left.append(head)
             wd = Gtk.Grid(column_homogeneous=True, css_classes=["cal-weekdays"])
-            wd.attach(label("KW", ("cal-wd", "cal-kw-head")), 0, 0, 1, 1)
             for i, name in enumerate(cal.DAYS_SHORT):
-                wd.attach(label(name, ("cal-wd",) + (("weekend",) if i >= 5 else ())),
-                          i + 1, 0, 1, 1)
+                wd.attach(label(name.upper(), ("cal-wd",) + (("weekend",) if i >= 5 else ())),
+                          i, 0, 1, 1)
             left.append(wd)
             self.stack = Gtk.Stack(transition_duration=320, vhomogeneous=False,
                                    interpolate_size=True)
@@ -202,7 +206,8 @@ def build():
                         f".cal-bg-c{i} {{ background-color: {c.color}; }}\n"
                         f".cal-card.cal-c{i} {{ border-left-color: {c.color}; }}\n"
                         f".cal-card.cal-c{i}:hover {{ background-color: alpha({c.color}, 0.12); }}\n"
-                        f".cal-c{i} progressbar progress {{ background-color: {c.color}; }}\n")
+                        f".cal-c{i} progressbar progress {{ background-color: {c.color}; }}\n"
+                        f".cal-tint-c{i} {{ color: {c.color}; background-color: alpha({c.color}, 0.14); }}\n")
             try:
                 self.color_css.load_from_string(css)
             except AttributeError:
@@ -256,17 +261,19 @@ def build():
 
             today = dt.date.today()
             grid = Gtk.Grid(column_homogeneous=True, row_homogeneous=True,
-                            css_classes=["cal-grid"] + (["wave"] if wave else []))
+                            css_classes=["cal-grid"] + (["enter"] if wave else []))
             self.cells = {}
+            covers = lambda o, day: o.bounds()[0].date() <= day < (
+                o.bounds()[1] - dt.timedelta(seconds=1)).date() + dt.timedelta(days=1)
             for r in range(6):
                 monday = grid_start + dt.timedelta(days=7 * r)
                 if r == 5 and monday.month != first.month and monday > first:
                     break
-                grid.attach(label(str(monday.isocalendar().week), ("cal-kw",)), 0, r, 1, 1)
                 for c in range(7):
                     d = monday + dt.timedelta(days=c)
-                    events = per_day.get(d, [])
-                    classes = ["cal-day", "flat", f"cd-{min(r + c, 11)}"]
+                    events = sorted(per_day.get(d, []), key=lambda o: (
+                        not self.long(o), o.bounds()[0], not o.allday, o.event.uid))
+                    classes = ["cal-day", "flat"]
                     if d.month != first.month:
                         classes.append("other")
                     if c >= 5:
@@ -275,38 +282,26 @@ def build():
                         classes.append("today")
                     if d < today:
                         classes.append("past")
-                    if events:
-                        classes.append("has-events")
                     if d == self.selected:
                         classes.append("selected")
                     b = Gtk.Button(css_classes=classes, focusable=False)
                     box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2,
-                                  valign=Gtk.Align.CENTER)
-                    box.append(label(str(d.day), ("cal-num",)))
-                    dots = Gtk.Box(spacing=3, halign=Gtk.Align.CENTER, css_classes=["cal-dots"])
-                    seen = []
-                    for o in events:
-                        i = self.cindex(o.cal)
-                        if len(seen) < 4:
-                            seen.append(i)
-                    for i in seen:
-                        dots.append(Gtk.Box(css_classes=["cal-dot", f"cal-bg-c{i}"],
-                                            valign=Gtk.Align.CENTER))
-                    if len(events) > 4:
-                        dots.append(label("+", ("cal-more",)))
-                    box.append(dots)
+                                  valign=Gtk.Align.START)
+                    box.append(label(str(d.day), ("cal-num",), halign=Gtk.Align.CENTER))
+                    shown = events if len(events) <= LINES else events[:LINES - 1]
+                    for o in shown:
+                        box.append(self.chip(o, d, covers))
+                    if len(events) > len(shown):
+                        box.append(label(f"+{len(events) - len(shown)} weitere",
+                                         ("cal-more",), xalign=0))
                     b.set_child(box)
                     b.connect("clicked", lambda _b, day=d: self.pick(day))
                     dbl = Gtk.GestureClick()
                     dbl.connect("pressed", lambda g, n, _x, _y, day=d:
                                 n == 2 and self.new_event(day))
                     b.add_controller(dbl)
-                    tip = [f"{cal.day_name(d)} · {cal.date_text(d)}"] + [
-                        f"{'ganztägig' if o.allday else o.start.strftime('%H:%M')}  {o.summary}"
-                        for o in events[:6]]
-                    b.set_tooltip_text("\n".join(tip))
                     self.cells[d] = b
-                    grid.attach(b, c + 1, r, 1, 1)
+                    grid.attach(b, c, r, 1, 1)
 
             self.grid_n += 1
             name = f"m{self.grid_n}"
@@ -324,6 +319,36 @@ def build():
                 resident.type_title(self.title)
             self.prev.set_tooltip_text(cal.MONTHS[(first.month - 2) % 12])
             self.next.set_tooltip_text(cal.MONTHS[first.month % 12])
+
+        @staticmethod
+        def long(o):
+            """all-day or longer than a day: drawn as a filled bar"""
+            s, e = o.bounds()
+            return o.allday or (e - s) >= dt.timedelta(days=1)
+
+        def chip(self, o, d, covers):
+            """One event line in a day cell, like Google's month view: all-day
+            and multi-day events as filled bars that run on into the next
+            day, timed ones as a tinted pill with the time in front."""
+            i = self.cindex(o.cal)
+            if self.long(o):
+                classes = ["cal-chip", "bar", f"cal-bg-c{i}"]
+                before = covers(o, d - dt.timedelta(days=1))
+                after = covers(o, d + dt.timedelta(days=1))
+                if before and d.weekday() != 0:
+                    classes.append("cont-left")
+                if after and d.weekday() != 6:
+                    classes.append("cont-right")
+                # a continued bar shows its title again only on Mondays
+                text = o.summary if not before or d.weekday() == 0 else " "
+                return label(text, classes, xalign=0, ellipsize=3, max_width_chars=1,
+                             hexpand=True, tooltip_text=o.summary)
+            classes = ["cal-chip", "timed", f"cal-tint-c{i}"]
+            if o.bounds()[1] <= cal.now():
+                classes.append("done")
+            return label(f"{o.start:%H:%M} {o.summary}", classes, xalign=0, ellipsize=3,
+                         max_width_chars=1, hexpand=True,
+                         tooltip_text=f"{o.time_text()}  {o.summary}")
 
         def page(self, delta):
             m = self.month.month - 1 + delta

@@ -1,7 +1,7 @@
 """Shared calendar bits: the two Nextcloud calendars that vdirsyncer keeps in
 ~/.local/share/calendars (one folder per calendar, one .ics per event, plus
 `displayname` and `color` files). Used by the calendar popup, the quick-add
-popup, the bar agenda and the reminder daemon.
+popup and the reminder daemon.
 
     cal.calendars()              -> [Calendar], own calendar first
     cal.occurrences(a, b)        -> [Occurrence] overlapping [a, b) (datetimes)

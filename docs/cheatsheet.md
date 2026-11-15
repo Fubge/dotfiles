@@ -133,9 +133,8 @@ Files ending in `.tmpl` are generated from these values.
 - **Calendar** (the two shared Nextcloud calendars, Flauschebär = own, Pia): vdirsyncer
   syncs them every 5 min both ways into `~/.local/share/calendars` (password in the
   keyring: `secret-tool lookup service nextcloud-caldav`).
-  - Bar: after the date the next event (dot in the calendar's color), hover = next 7 days.
-  - **`SUPER+K`** or click on date / event = calendar popup: month left (dots per event),
-    the chosen day right (cards, trash asks first), arrows / PgUp / PgDn / T, N = new event.
+  - **`SUPER+K`** or click on the bar date = calendar popup:
+    Google-style month (event bars / pills), the chosen day right (cards, trash asks first), arrows / PgUp / PgDn / T, N = new event.
   - **`SUPER+SHIFT+K`** or right click = new event in one line: "Kino morgen 20 Uhr",
     "Zahnarzt 24.11. 14:30 für 30 min", "Fr 18-20 Grillen", "Urlaub 10.12.-14.12.";
     Alt+F / Alt+P whose calendar, Alt+R reminder.

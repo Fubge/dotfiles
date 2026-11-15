@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Quick add (SUPER+SHIFT+K, N in the calendar popup, right click on the bar
-agenda): a new event in one line, the way you would say it.
+date): a new event in one line, the way you would say it.
 
     event-popup show [--center] [--date 2026-11-20]
     event-popup --hidden / quit       like every resident popup

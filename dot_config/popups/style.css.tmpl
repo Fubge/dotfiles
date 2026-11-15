@@ -517,14 +517,14 @@ window.task.saved .task-hello { color: {{ .palette.green }}; animation: hop 420m
 window.task.saved button.task-tag.chosen .task-circle { animation: hop 420ms ease-out 1; }
 
 /* ---------------------------------------------------------------- calendar */
-/* ~/.local/bin/calendar-popup (bar date / agenda, SUPER+K): month left, the
+/* ~/.local/bin/calendar-popup (bar date, SUPER+K): month left, the
    chosen day right. Colors per calendar (Nextcloud's own) come from the popup
    at runtime as classes cal-c<i> (text), cal-bg-c<i> (dots); the rest is here. */
-/* nearly opaque: a busy window behind (browser text) must not shine through */
-window.popup.calendar, window.popup.event { background-color: alpha({{ .palette.bg }}, 0.985); }
+/* opaque: a busy window behind (browser text) must not shine through */
+window.popup.calendar, window.popup.event { background-color: {{ .palette.bg }}; }
 .cal-box { padding: 18px 22px 14px 22px; }
 .cal-head { margin-bottom: 14px; }
-.cal-title { font-size: 17pt; font-weight: 700; margin: 0 6px; }
+.cal-title { font-size: 16pt; font-weight: 700; margin: 0 4px; }
 button.cal-nav {
     min-width: 34px;
     min-height: 34px;
@@ -537,7 +537,7 @@ button.cal-nav {
 }
 button.cal-nav:hover { background-color: alpha({{ .palette.steel }}, 0.5); color: {{ .palette.accent }}; }
 button.cal-nav:active { transform: scale(0.85); }
-.cal-legend { margin-right: 14px; }
+.cal-legend { margin-left: 8px; }
 .cal-legend-glyph { font-size: 12pt; }
 .cal-legend-name { font-size: 10pt; color: {{ .palette.fg_muted }}; }
 button.cal-today-btn {
@@ -552,84 +552,89 @@ button.cal-today-btn {
 }
 button.cal-today-btn:hover { background-color: {{ .palette.accent }}; color: {{ .palette.bg }}; }
 
-/* the month */
-.cal-month { min-width: 380px; }
-.cal-weekdays { margin-bottom: 4px; }
+/* the month, like Google's month view: a quiet grid of cells, each day with
+   its events as lines (filled bars: all-day / several days, tinted pills:
+   with a time); today = the number in an orange circle */
+.cal-month { min-width: 700px; }
+.cal-head { margin-bottom: 10px; }
+.cal-weekdays { margin-bottom: 2px; }
 .cal-wd {
-    font-size: 9pt;
-    font-weight: 700;
-    letter-spacing: 1px;
-    color: {{ .palette.yellow }};
+    font-size: 8pt;
+    font-weight: 800;
+    letter-spacing: 2px;
+    color: {{ .palette.comment }};
     padding: 4px 0;
 }
-.cal-wd.weekend { color: {{ .palette.magenta }}; }
-.cal-wd.cal-kw-head, .cal-kw {
-    color: alpha({{ .palette.comment }}, 0.7);
-    font-size: 8pt;
-    font-weight: normal;
-}
-.cal-grid { margin-top: 2px; }
-button.cal-day {
-    min-width: 46px;
-    min-height: 48px;
-    margin: 2px;
-    padding: 0;
+.cal-wd.weekend { color: alpha({{ .palette.magenta }}, 0.8); }
+.cal-grid {
     border-radius: 14px;
-    border: 1px solid transparent;
-    background: none;
+    background-color: alpha({{ .palette.steel }}, 0.28);   /* shows as the grid lines */
+    padding: 1px;
+}
+button.cal-day {
+    min-width: 96px;
+    min-height: 88px;
+    margin: 1px;
+    padding: 4px 4px 3px 4px;
+    border-radius: 3px;
+    border: none;
+    background-color: {{ .palette.bg }};
     box-shadow: none;
-    transition: background-color 160ms ease, border-color 160ms ease, transform 160ms ease;
+    transition: background-color 140ms ease;
 }
-.cal-num { font-size: 12pt; color: {{ .palette.fg }}; }
-button.cal-day.weekend .cal-num { color: {{ .palette.magenta_bright }}; }
-button.cal-day.past .cal-num { color: {{ .palette.fg_muted }}; }
-/* other months: dimmed text and dots (not opacity: the pop-in animation owns it) */
-button.cal-day.other .cal-num { color: alpha({{ .palette.comment }}, 0.45); }
-button.cal-day.other .cal-dot { opacity: 0.35; }
-button.cal-day:hover {
-    background-color: alpha({{ .palette.steel }}, 0.35);
-    transform: scale(1.08);
-}
+button.cal-day.weekend { background-color: mix({{ .palette.bg }}, {{ .palette.bg_alt }}, 0.45); }
+.cal-grid > button.cal-day:nth-child(1) { border-top-left-radius: 13px; }
+button.cal-day:hover { background-color: mix({{ .palette.bg }}, {{ .palette.steel }}, 0.18); }
 button.cal-day.selected {
-    background-color: alpha({{ .palette.steel }}, 0.55);
-    border-color: alpha({{ .palette.fg }}, 0.25);
+    background-color: mix({{ .palette.bg }}, {{ .palette.steel }}, 0.3);
+    box-shadow: inset 0 0 0 1px alpha({{ .palette.accent }}, 0.55);
 }
-button.cal-day.today {
-    background-color: {{ .palette.accent }};
-    box-shadow: 0 0 16px alpha({{ .palette.accent }}, 0.45);
-}
-button.cal-day.today .cal-num { color: {{ .palette.bg }}; font-weight: 800; }
-button.cal-day.today .cal-dot { box-shadow: 0 0 0 1px {{ .palette.bg }}; }
-button.cal-day.today.selected { border-color: {{ .palette.fg }}; }
-.cal-dots { min-height: 7px; }
-.cal-dot {
-    min-width: 6px;
-    min-height: 6px;
+.cal-num {
+    min-width: 24px;
+    min-height: 24px;
     border-radius: 99px;
+    font-size: 10pt;
+    font-weight: 700;
+    color: {{ .palette.fg }};
+    margin-bottom: 1px;
 }
-.cal-more { font-size: 7pt; color: {{ .palette.comment }}; margin-top: -3px; }
-@keyframes cal-bounce {
-    0%   { transform: scale(1); }
-    40%  { transform: scale(0.86); }
-    75%  { transform: scale(1.1); }
-    100% { transform: scale(1); }
+button.cal-day.past .cal-num { color: {{ .palette.fg_muted }}; font-weight: normal; }
+button.cal-day.today .cal-num {
+    background-color: {{ .palette.accent }};
+    color: {{ .palette.bg }};
+    font-weight: 800;
 }
-button.cal-day.bounce { animation: cal-bounce 300ms ease-out 1; }
-/* entrance: the days pop in as a diagonal wave from the top left */
-@keyframes cal-pop {
-    0%   { opacity: 0; transform: scale(0.4) translateY(6px); }
-    70%  { opacity: 1; transform: scale(1.12); }
+button.cal-day.other .cal-num { color: alpha({{ .palette.comment }}, 0.5); font-weight: normal; }
+button.cal-day.other .cal-chip { opacity: 0.4; }
+
+.cal-chip {
+    font-size: 8pt;
+    padding: 1px 6px;
+    border-radius: 6px;
+    min-height: 15px;
+}
+.cal-chip.bar { color: {{ .palette.bg }}; font-weight: 700; }
+/* a bar that goes on: square ends that reach into the neighbour cell */
+.cal-chip.bar.cont-left  { border-top-left-radius: 0; border-bottom-left-radius: 0; margin-left: -6px; }
+.cal-chip.bar.cont-right { border-top-right-radius: 0; border-bottom-right-radius: 0; margin-right: -6px; }
+.cal-chip.timed { font-weight: 600; }
+.cal-chip.timed.done { opacity: 0.55; }
+.cal-more { font-size: 8pt; color: {{ .palette.comment }}; padding-left: 6px; }
+/* the small color dot in the "Danach" rows */
+.cal-dot { min-width: 8px; min-height: 8px; border-radius: 99px; }
+
+/* entrance: quick, the whole month at once (a staggered wave felt slow) */
+@keyframes cal-in {
+    0%   { opacity: 0; transform: translateY(6px) scale(0.985); }
     100% { opacity: 1; transform: none; }
 }
-{{- range $i := until 12 }}
-.cal-grid.wave button.cal-day.cd-{{ $i }} { animation: cal-pop 360ms ease-out {{ add 60 (mul $i 32) }}ms both; }
-{{- end }}
-/* today glows softly, forever (steps: cheap redraws, see waybar style) */
-@keyframes cal-glow {
-    from { box-shadow: 0 0 10px alpha({{ .palette.accent }}, 0.3); }
-    to   { box-shadow: 0 0 20px alpha({{ .palette.accent }}, 0.6); }
+.cal-grid.enter { animation: cal-in 170ms ease-out both; }
+@keyframes cal-bounce {
+    0%   { transform: scale(1); }
+    40%  { transform: scale(0.96); }
+    100% { transform: scale(1); }
 }
-.cal-grid:not(.wave) button.cal-day.today { animation: cal-glow 1.6s steps(8) infinite alternate; }
+button.cal-day.bounce .cal-num { animation: hop 260ms ease-out 1; }
 
 /* the chosen day */
 .cal-day-pane {
@@ -729,7 +734,7 @@ button.cal-trash.danger, .cal-card:hover button.cal-trash.danger {
     100% { opacity: 1; transform: none; }
 }
 {{- range $i := until 8 }}
-.cal-card.pop.cp-{{ $i }} { animation: cal-card-in 280ms cubic-bezier(0.2, 0.9, 0.3, 1.2) {{ mul $i 55 }}ms both; }
+.cal-card.pop.cp-{{ $i }} { animation: cal-card-in 220ms cubic-bezier(0.2, 0.9, 0.3, 1.2) {{ mul $i 35 }}ms both; }
 {{- end }}
 
 .cal-empty { padding: 18px 0 14px 0; }

@@ -13,7 +13,7 @@
     "spacing": 0,
 
     "modules-left":   ["hyprland/workspaces", "custom/claude", "custom/window"],
-    "modules-center": ["custom/prompt", "clock#hours", "custom/colon", "clock#minutes", "clock#date", "custom/agenda", "custom/caret", "group/music"],
+    "modules-center": ["custom/prompt", "clock#hours", "custom/colon", "clock#minutes", "clock#date", "custom/caret", "group/music"],
     "modules-right":  ["group/hardware", "group/system", "group/connect", "group/session"],
 
     // ---------------------------------------------------------------- groups
@@ -87,16 +87,7 @@
         "on-click": "~/.local/bin/popup-cmd calendar-popup toggle",
         "on-click-right": "~/.local/bin/popup-cmd event-popup toggle --center"
     },
-    // The next event right after the date (~/.local/bin/calendar-bar): a dot in
-    // the owner's calendar color, time, title; blinks when it starts soon.
-    // Hover: the next seven days. Hidden when nothing is coming.
-    "custom/agenda": {
-        "exec": "~/.local/bin/calendar-bar",
-        "return-type": "json",
-        "escape": false,
-        "on-click": "~/.local/bin/popup-cmd calendar-popup toggle",
-        "on-click-right": "~/.local/bin/popup-cmd event-popup toggle --center"
-    },
+
     "custom/caret": {
         "format": "\u258d",
         "tooltip": false
