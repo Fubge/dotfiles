@@ -912,6 +912,29 @@ button.cal-add:hover .cal-add-icon { animation: spin 500ms ease-out 1; }
 .event-t-title.placeholder { color: {{ .palette.comment }}; }
 .event-t-when { font-size: 10pt; color: {{ .palette.fg_muted }}; }
 .event-t-until { font-size: 9pt; color: {{ .palette.accent }}; }
+/* the week preview: a strip of the month view, the new event glows in it */
+.event-week { margin-top: 10px; }
+.event-day {
+    min-height: 74px;
+    margin: 1px;
+    padding: 4px 3px 3px 3px;
+    border-radius: 3px;
+    background-color: {{ .palette.bg }};
+}
+.event-day.weekend { background-color: mix({{ .palette.bg }}, {{ .palette.bg_alt }}, 0.45); }
+.event-week > .event-day:first-child { border-top-left-radius: 13px; border-bottom-left-radius: 13px; }
+.event-week > .event-day:last-child { border-top-right-radius: 13px; border-bottom-right-radius: 13px; }
+.event-day.selected { background-color: mix({{ .palette.bg }}, {{ .palette.steel }}, 0.3); }
+.event-wd { font-size: 7pt; font-weight: 800; color: {{ .palette.comment }}; }
+.event-day .cal-num { min-width: 20px; min-height: 20px; font-size: 9pt; }
+.event-day.past .cal-num { color: {{ .palette.fg_muted }}; font-weight: normal; }
+.event-day.today .cal-num { background-color: {{ .palette.accent }}; color: {{ .palette.bg }}; }
+.event-day .cal-chip { font-size: 7pt; padding: 1px 4px; min-height: 13px; }
+.event-day .cal-chip.bar.cont-left  { margin-left: -5px; }
+.event-day .cal-chip.bar.cont-right { margin-right: -5px; }
+.event-day .cal-chip:not(.new) { opacity: 0.75; }
+.event-day .cal-chip.timed.done { opacity: 0.45; }
+.event-week.enter { animation: cal-in 170ms ease-out both; }
 .event-row { margin-top: 16px; }
 button.event-cal {
     min-height: 0;

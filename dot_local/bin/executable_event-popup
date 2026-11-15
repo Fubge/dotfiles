@@ -19,7 +19,9 @@ date): a new event in two fields, "Was?" and "Wann?".
 its words light up as chips, words it does not know show up struck through.
 With "Wann?" empty the one-liner still works: date words in "Was?" are found
 and cut out of the title (the examples below). A ticket shows what will be
-saved and counts down.
+saved and counts down; under it the event's week, drawn like the month view
+of the calendar popup, shows the new event glowing between the ones already
+there.
 Two round buttons pick the calendar (Flauschebär = own, preselected; Pia),
 the chips below the reminder. Enter saves (~/.local/lib/popup/cal.py writes
 the .ics and starts vdirsyncer), the title turns green and the popup closes.
@@ -374,6 +376,12 @@ def build():
             self.ticket = ticket
             box.append(ticket)
 
+            # the preview: the event's week the way the calendar popup draws it,
+            # the new event glowing between the ones already there
+            self.week = Gtk.Grid(column_homogeneous=True, css_classes=["cal-grid", "event-week"])
+            self.week_key = None
+            box.append(self.week)
+
             # whose calendar
             row = Gtk.Box(spacing=34, halign=Gtk.Align.CENTER, css_classes=["event-row"])
             self.cal_buttons = {}
@@ -421,7 +429,12 @@ def build():
                         f"button.event-cal.ec-{i}.chosen .event-circle {{ background-color: {c.color}; "
                         f"color: #1c2029; box-shadow: 0 0 18px alpha({c.color}, 0.5); }}\n"
                         f"button.event-cal.ec-{i}.chosen .event-label {{ color: {c.color}; }}\n"
-                        f"window.event.cal-{i} .event-ticket {{ border-left-color: {c.color}; }}\n")
+                        f"window.event.cal-{i} .event-ticket {{ border-left-color: {c.color}; }}\n"
+                        f".cal-bg-c{i} {{ background-color: {c.color}; }}\n"
+                        f".cal-tint-c{i} {{ color: {c.color}; background-color: alpha({c.color}, 0.14); }}\n"
+                        f".cal-chip.new.cal-tint-c{i} {{ background-color: alpha({c.color}, 0.3); "
+                        f"box-shadow: 0 0 0 1px {c.color}, 0 0 10px alpha({c.color}, 0.55); }}\n"
+                        f".cal-chip.new.cal-bg-c{i} {{ box-shadow: 0 0 10px alpha({c.color}, 0.6); }}\n")
             try:
                 self.colors_css.load_from_string(css)
             except AttributeError:
@@ -459,6 +472,9 @@ def build():
                 b = self.cal_buttons[c.id]
                 (b.add_css_class if c.id == cid else b.remove_css_class)("chosen")
                 (self.add_css_class if c.id == cid else self.remove_css_class)(f"cal-{i}")
+            if self.plan:               # the preview chip takes the new color
+                pl = self.plan
+                self.render_week(pl.start if pl.allday else pl.start.date())
 
         def alarms(self):
             return ALLDAY_ALARMS if (self.plan and self.plan.allday) else TIMED_ALARMS
@@ -525,12 +541,113 @@ def build():
             for i, b in enumerate(self.alarm_buttons):
                 b.get_child().set_text(self.alarms()[i][0])
             self.pick_alarm(self.alarm_i, touched)
+            self.render_week(d)
             # the date tile flips when the day changes
             key = d.toordinal()
             if getattr(self, "last_day", None) != key:
                 self.last_day = key
                 self.tile.remove_css_class("flip")
                 GLib.timeout_add(16, lambda: self.tile.add_css_class("flip") and False)
+
+        # ------------------------------------------------------------ preview
+        def render_week(self, d):
+            """Mo-Su of the event's first day, cells and chips like the month
+            view of the calendar popup; the new event is a glowing chip in the
+            chosen calendar's color (an edited event replaces its old self)."""
+            pl = self.plan
+            monday = d - dt.timedelta(days=d.weekday())
+            ci = next((i for i, c in enumerate(self.cals) if c.id == self.cal_id), 0)
+            key = (monday, pl.title, str(pl.start), str(pl.end), ci)
+            if key == self.week_key:
+                return
+            moved = self.week_key is None or self.week_key[0] != monday
+            self.week_key = key
+
+            a = dt.datetime.combine(monday, dt.time(), cal.TZ)
+            b = a + dt.timedelta(days=7)
+            skip = self.editing.event.uid if self.editing else None
+            try:
+                occ = [o for o in cal.occurrences(a, b) if o.event.uid != skip]
+            except Exception:           # a broken .ics must not break quick add
+                occ = []
+            if pl.allday:
+                n_s = dt.datetime.combine(pl.start, dt.time(), cal.TZ)
+                n_e = dt.datetime.combine(pl.end, dt.time(), cal.TZ)
+            else:
+                n_s, n_e = pl.start, max(pl.end, pl.start)
+            NEW = object()
+            items = [(o, *o.bounds()) for o in occ] + [(NEW, n_s, n_e)]
+
+            def last_day(s, e):
+                return (e - dt.timedelta(seconds=1)).date() if e > s else s.date()
+
+            def long(s, e, allday):
+                return allday or (e - s) >= dt.timedelta(days=1)
+
+            child = self.week.get_first_child()
+            while child:
+                self.week.remove(child)
+                child = self.week.get_first_child()
+            today = dt.date.today()
+            for c in range(7):
+                day = monday + dt.timedelta(days=c)
+                here = [it for it in items if it[1].date() <= day <= last_day(it[1], it[2])]
+                here.sort(key=lambda it: (
+                    not long(it[1], it[2], pl.allday if it[0] is NEW else it[0].allday),
+                    it[1], it[0] is not NEW))
+                if len(here) > 3:       # the new one is always shown
+                    rest = [it for it in here if it[0] is not NEW][:2]
+                    new = [it for it in here if it[0] is NEW]
+                    shown = sorted(rest + new, key=here.index)
+                else:
+                    shown = here
+                classes = ["cal-day", "event-day"]
+                if c >= 5:
+                    classes.append("weekend")
+                if day == today:
+                    classes.append("today")
+                if day < today:
+                    classes.append("past")
+                if any(it[0] is NEW for it in here):
+                    classes.append("selected")
+                cell = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2,
+                               css_classes=classes)
+                head = Gtk.Box(spacing=3, halign=Gtk.Align.CENTER)
+                head.append(label(cal.DAYS[day.weekday()][:2], ("event-wd",)))
+                head.append(label(str(day.day), ("cal-num",)))
+                cell.append(head)
+                for it in shown:
+                    cell.append(self.week_chip(it, day, ci, last_day, long, NEW))
+                if len(here) > len(shown):
+                    cell.append(label(f"+{len(here) - len(shown)}", ("cal-more",), xalign=0))
+                self.week.attach(cell, c, 0, 1, 1)
+            if moved:
+                self.week.remove_css_class("enter")
+                GLib.timeout_add(16, lambda: self.week.add_css_class("enter") and False)
+
+        def week_chip(self, it, day, ci, last_day, long, NEW):
+            o, s, e = it
+            new = o is NEW
+            allday = self.plan.allday if new else o.allday
+            i = ci if new else next((k for k, c in enumerate(self.cals) if c.id == o.cal.id), 0)
+            title = (self.plan.title or "Neu") if new else o.summary
+            if long(s, e, allday):
+                classes = ["cal-chip", "bar", f"cal-bg-c{i}"]
+                before = s.date() < day
+                after = last_day(s, e) > day
+                if before and day.weekday() != 0:
+                    classes.append("cont-left")
+                if after and day.weekday() != 6:
+                    classes.append("cont-right")
+                text = title if not before or day.weekday() == 0 else " "
+            else:
+                classes = ["cal-chip", "timed", f"cal-tint-c{i}"]
+                if not new and e <= cal.now():
+                    classes.append("done")
+                text = f"{s:%H:%M} {title}"
+            if new:
+                classes.append("new")
+            return label(text, classes, xalign=0, ellipsize=3, max_width_chars=1, hexpand=True)
 
         def fill_from(self, o):
             """edit: the event written out the way it would be typed, so the
