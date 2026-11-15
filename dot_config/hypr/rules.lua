@@ -286,6 +286,15 @@ hl.layer_rule({
     dim_around = true,
 })
 
+-- Timer tab below the bar (~/.local/bin/timer-popup) slides out by itself
+hl.layer_rule({
+    name = "timer-badge",
+    match = { namespace = "^timer-badge$" },
+    no_anim = true,
+    blur = true,
+    ignore_alpha = 0.5,
+})
+
 -- Notification cards (~/.local/bin/notifications) animate themselves; the
 -- blur only goes behind the cards, not the see-through gaps between them
 hl.layer_rule({

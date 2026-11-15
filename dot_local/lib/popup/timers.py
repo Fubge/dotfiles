@@ -1,5 +1,5 @@
 """Kitchen timers shared by the timer popup (~/.local/bin/timer-popup, which
-also rings them) and the bar countdown (~/.local/bin/timer-bar).
+also rings them and shows the countdown tab below the bar).
 
 State: ~/.local/state/timer/timers.json
     {"timers":  [{"id", "label", "icon", "total", "end"} ...],   running

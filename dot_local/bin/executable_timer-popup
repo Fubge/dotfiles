@@ -5,6 +5,9 @@
     timer-popup --hidden           login autostart: waits hidden, rings timers
     timer-popup quit               stop it (it reloads on the next press)
 
+While a timer runs, a little tab hangs below the middle of the bar with the
+countdown (the Badge below; click: this popup, right click: quiet / pause).
+
 A big dial like a kitchen timer: the orange arc is the time (a full turn =
 one hour), with a knob at its end; the time sits in the middle. Type
 "Pizza 12", "25 min Fokus", "1h 30", "2:30" or "halbe Stunde"; a bare number
@@ -15,8 +18,7 @@ the timer that rings next, counting down.
 
 This resident process also rings the timers (state: ~/.local/lib/popup/
 timers.py): a notification that stays (+5 Min / Aus) and the alarm sound,
-up to three times or until the card is closed. The bar countdown
-(~/.local/bin/timer-bar) only shows them.
+up to three times or until the card is closed.
 
 Keys: Enter starts, Escape closes.
 """
@@ -25,6 +27,14 @@ import os
 import subprocess
 import sys
 import time
+
+LAYER_SHELL = "/usr/lib/libgtk4-layer-shell.so"
+# the badge is a layer-shell surface: gtk4-layer-shell must be loaded before
+# libwayland, so the server restarts itself with it preloaded (as notifications)
+if (sys.argv[1:] != ["quit"] and __name__ == "__main__" and os.path.exists(LAYER_SHELL)
+        and LAYER_SHELL not in os.environ.get("LD_PRELOAD", "")):
+    os.environ["LD_PRELOAD"] = (LAYER_SHELL + " " + os.environ.get("LD_PRELOAD", "")).strip()
+    os.execv(sys.executable, [sys.executable] + sys.argv)
 
 sys.path.insert(0, os.path.expanduser("~/.local/lib/popup"))
 import resident  # noqa: E402
@@ -35,6 +45,7 @@ WIDTH = 500
 CSS = os.path.expanduser("~/.config/popups/style.css")
 CLOSE_MS = 900
 DIAL = 210                  # px, the dial's size
+BADGE_TOP = 38              # the badge hangs right below the bar (8 margin + 30)
 SOUND = "/usr/share/sounds/freedesktop/stereo/alarm-clock-elapsed.oga"
 RINGS = 3                   # the sound plays this often unless stopped
 SNOOZE = 5 * 60
@@ -48,6 +59,11 @@ def build():
     gi.require_version("Gsk", "4.0")
     gi.require_version("Graphene", "1.0")
     from gi.repository import Gdk, Gio, GLib, Graphene, Gsk, Gtk
+    try:
+        gi.require_version("Gtk4LayerShell", "1.0")
+        from gi.repository import Gtk4LayerShell as Layer
+    except (ValueError, ImportError):
+        Layer = None
 
     def label(text="", classes=(), **kw):
         return Gtk.Label(label=text, css_classes=list(classes), **kw)
@@ -122,6 +138,109 @@ def build():
             b.add_circle(pt().init(ex, ey), 9)
             snap.append_fill(b.to_path(), Gsk.FillRule.WINDING, self.knob)
 
+    class Badge(Gtk.Window):
+        """The countdown as a little tab hanging below the middle of the bar
+        (layer surface "timer-badge", hypr/rules.lua): it slides out from
+        behind the bar when a timer starts and back in when none is left.
+        Hourglass, time left, name, a thin progress line; red with a
+        wiggling bell when one is up. Click: the popup, right click: quiet
+        (ringing) or pause / go on (the next timer)."""
+
+        def __init__(self, popup):
+            super().__init__(css_classes=["timer-badge-win"], resizable=False)
+            self.popup = popup
+            Layer.init_for_window(self)
+            Layer.set_namespace(self, "timer-badge")
+            Layer.set_layer(self, Layer.Layer.TOP)
+            Layer.set_anchor(self, Layer.Edge.TOP, True)
+            Layer.set_margin(self, Layer.Edge.TOP, BADGE_TOP)
+            # -1: placed from the screen edge, not pushed below the bar's own
+            # reserved zone (that would put it 38 px further down)
+            Layer.set_exclusive_zone(self, -1)
+            Layer.set_keyboard_mode(self, Layer.KeyboardMode.NONE)
+            self.rev = Gtk.Revealer(transition_type=Gtk.RevealerTransitionType.SLIDE_DOWN,
+                                    transition_duration=260)
+            self.rev.connect("notify::child-revealed", self.on_revealed)
+            box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, css_classes=["timer-badge"])
+            row = Gtk.Box(spacing=7, halign=Gtk.Align.CENTER)
+            self.glyph = label("", ("timer-badge-icon",))
+            self.time = label("", ("timer-badge-time",))
+            self.name = label("", ("timer-badge-name",), ellipsize=3, max_width_chars=14)
+            self.more = label("", ("timer-badge-more",))
+            for w in (self.glyph, self.time, self.name, self.more):
+                row.append(w)
+            box.append(row)
+            self.bar = Gtk.ProgressBar(css_classes=["timer-badge-bar"])
+            box.append(self.bar)
+            self.box = box
+            self.rev.set_child(box)
+            self.set_child(self.rev)
+            click = Gtk.GestureClick(button=0)
+            click.connect("released", self.on_click)
+            box.add_controller(click)
+            self.last = None
+            self.kind = None
+
+        def on_click(self, g, _n, _x, _y):
+            if g.get_current_button() == 3:
+                if self.popup.state["ringing"]:
+                    self.popup.silence_all()
+                else:
+                    run = sorted(self.popup.state["timers"], key=lambda t: timers.left(t))
+                    if run:
+                        timers.change(run[0]["id"], timers.pause)
+                        self.popup.reload()
+                        if self.popup.get_visible():
+                            self.popup.render_list()
+            elif not self.popup.get_visible():
+                self.popup.bring_up(center=True)
+            else:
+                self.popup.close()
+
+        def on_revealed(self, *_a):
+            if not self.rev.get_reveal_child() and not self.rev.get_child_revealed():
+                self.set_visible(False)
+
+        def update(self, state):
+            now = time.time()
+            run = sorted(state["timers"], key=lambda t: timers.left(t, now))
+            if state["ringing"]:
+                r = state["ringing"][-1]
+                view = ("ringing", timers.BELL, "Fertig!", r["label"] or "Timer",
+                        f"+{len(state['ringing']) - 1}" if len(state["ringing"]) > 1 else "", 1.0)
+            elif run:
+                t = run[0]
+                lf = timers.left(t, now)
+                paused = "left" in t
+                kind = "paused" if paused else ("soon" if lf <= 60 else "running")
+                glyph = timers.PAUSED if paused else timers.SAND[int(now) % 3]
+                view = (kind, glyph, timers.clock(lf), t["label"],
+                        f"+{len(run) - 1}" if len(run) > 1 else "",
+                        lf / t["total"] if t["total"] else 0)
+            else:
+                view = None
+            if view == self.last:
+                return
+            self.last = view
+            if view is None:
+                self.rev.set_reveal_child(False)
+                return
+            kind, glyph, text, name, more, frac = view
+            if kind != self.kind:
+                for k in ("ringing", "paused", "soon", "running"):
+                    (self.box.add_css_class if k == kind else self.box.remove_css_class)(k)
+                self.kind = kind
+            self.glyph.set_text(glyph)
+            self.time.set_text(text)
+            self.name.set_text(name)
+            self.name.set_visible(bool(name))
+            self.more.set_text(more)
+            self.more.set_visible(bool(more))
+            self.bar.set_fraction(frac)
+            if not self.get_visible():
+                self.set_visible(True)
+            self.rev.set_reveal_child(True)
+
     class Popup(Gtk.Window):
         popup_width = WIDTH
 
@@ -133,6 +252,7 @@ def build():
             self.set_default_size(WIDTH, 1)
             self.close_timer = None
             self.manual = None          # seconds set with scroll / arrows
+            self.hovered = None         # preset under the mouse: the dial shows it
             self.state = timers.load()
             self.seen = timers.mtime()
             self.rings = {}             # notification id -> {"timer", "left", "proc"}
@@ -183,8 +303,8 @@ def build():
                 b.set_child(inner)
                 b.connect("clicked", lambda _b, k=i: self.start_preset(k))
                 hover = Gtk.EventControllerMotion()
-                hover.connect("enter", lambda *_a, k=i: self.preview_preset(k))
-                hover.connect("leave", lambda *_a: self.refresh())
+                hover.connect("enter", lambda *_a, k=i: self.hover_preset(k))
+                hover.connect("leave", lambda *_a: self.hover_preset(None))
                 b.add_controller(hover)
                 self.presets.append(b)
                 row.append(b)
@@ -209,6 +329,7 @@ def build():
                 self.bus.signal_subscribe(None, "org.freedesktop.Notifications", sig,
                                           "/org/freedesktop/Notifications", None,
                                           Gio.DBusSignalFlags.NONE, self.on_signal)
+            self.badge = Badge(self) if Layer and Layer.is_supported() else None
             GLib.timeout_add(250, self.tick)
             self.check()
 
@@ -246,6 +367,8 @@ def build():
                 if r["timer"]["id"] not in ids:
                     self.hush(nid)
             changed = self.check() or changed
+            if self.badge:
+                self.badge.update(self.state)
             if self.get_visible():
                 if changed:
                     self.render_list()
@@ -398,11 +521,9 @@ def build():
             self.close()
             return False
 
-        def preview_preset(self, k):
-            if self.entry.get_text().strip() or self.manual is not None or self.close_timer:
-                return
-            name, mins, icon, _c = timers.PRESETS[k]
-            self.show_face(icon, timers.clock(mins * 60), name, mins / 60, "#ff7f00")
+        def hover_preset(self, k):
+            self.hovered = k
+            self.refresh()
 
         # ------------------------------------------------------------ view
         def show_face(self, icon, digits, what, fraction, color):
@@ -419,7 +540,12 @@ def build():
             name, sec, icon = self.wanted()
             typed = self.entry.get_text().strip() or self.manual is not None
             running = sorted(self.state["timers"], key=lambda t: timers.left(t))
-            if typed or not running:
+            if self.hovered is not None and not typed:
+                # a preset under the mouse: its time on the dial, before the click
+                pname, mins, picon, _c = timers.PRESETS[self.hovered]
+                self.show_face(picon, timers.clock(mins * 60), pname, mins / 60, "#ff7f00")
+                self.face.remove_css_class("live")
+            elif typed or not running:
                 frac = (sec % 3600) / 3600 if sec % 3600 or not sec else 1.0
                 self.show_face(icon or timers.TIMER, timers.clock(sec), name, frac, "#ff7f00")
                 self.face.remove_css_class("live")

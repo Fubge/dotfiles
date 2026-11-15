@@ -109,25 +109,6 @@ tooltip {
     animation: soft-blink 0.9s steps(6) infinite alternate;
 }
 
-/* Kitchen timer (~/.local/bin/timer-bar): orange hourglass + time left, it
-   blinks in the last minute, grey while paused, rings with a red bell */
-#custom-timer {
-    padding: 0 10px 0 8px;
-    margin: 4px 2px;
-    border-radius: 11px;
-    color: @accent;
-    font-weight: bold;
-    background: alpha(@accent, 0.14);
-}
-#custom-timer.paused  { color: {{ .palette.comment }}; background: alpha({{ .palette.comment }}, 0.14); }
-#custom-timer.soon    { animation: soft-blink 0.5s steps(4) infinite alternate; }
-#custom-timer.ringing {
-    color: @dark;
-    background: @crit;
-    animation: soft-blink 0.4s steps(2) infinite alternate;
-}
-#custom-timer:hover   { background: alpha(@accent, 0.3); }
-
 /* steps(6), not ease: a smooth infinite animation makes GTK redraw (and
    Hyprland composite) every frame, ~20% CPU idle; steps redraw 12x a second */
 @keyframes soft-blink {

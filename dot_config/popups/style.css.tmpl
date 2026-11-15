@@ -625,6 +625,50 @@ button.timer-ringing {
     animation: session-wiggle 600ms ease-in-out 2;
 }
 .timer-ringing-text { color: {{ .palette.accent }}; font-weight: 700; }
+/* the tab below the bar: same dark as the clock pill, hangs from the bar's
+   lower edge; slides out (Gtk.Revealer), red with a wiggling bell when done */
+window.timer-badge-win { background: none; }
+.timer-badge {
+    padding: 3px 14px 5px 14px;
+    margin: 0 10px 10px 10px;        /* room for the shadow and the alarm pulse */
+    border-radius: 0 0 14px 14px;
+    background-color: alpha({{ .palette.bg }}, 0.94);
+    box-shadow: 0 3px 8px alpha(black, 0.35);
+    color: {{ .palette.accent }};
+    font-family: "{{ .design.font }}";
+    transition: background-color 200ms ease, color 200ms ease;
+}
+.timer-badge:hover { background-color: mix({{ .palette.bg }}, {{ .palette.steel }}, 0.3); }
+.timer-badge-icon { font-family: "JetBrainsMono Nerd Font Propo"; font-size: 12pt; }
+.timer-badge-time { font-size: 11pt; font-weight: 800; }
+.timer-badge-name { font-size: 9pt; color: {{ .palette.fg_muted }}; }
+.timer-badge-more { font-size: 8pt; color: {{ .palette.comment }}; }
+progressbar.timer-badge-bar { margin-top: 3px; }
+progressbar.timer-badge-bar trough {
+    min-height: 2px;
+    border-radius: 99px;
+    background-color: alpha({{ .palette.steel }}, 0.4);
+}
+progressbar.timer-badge-bar progress {
+    min-height: 2px;
+    border-radius: 99px;
+    background-color: {{ .palette.accent }};
+}
+.timer-badge.paused { color: {{ .palette.comment }}; }
+.timer-badge.paused progressbar.timer-badge-bar progress { background-color: {{ .palette.comment }}; }
+.timer-badge.soon .timer-badge-icon { animation: icon-wiggle 1s ease-in-out infinite; }
+.timer-badge.soon .timer-badge-time { color: {{ .palette.red }}; }
+.timer-badge.soon progressbar.timer-badge-bar progress { background-color: {{ .palette.red }}; }
+.timer-badge.ringing {
+    background-color: {{ .palette.red }};
+    color: {{ .palette.bg }};
+    animation: notif-alarm 1.2s ease-out infinite;
+}
+.timer-badge.ringing .timer-badge-name,
+.timer-badge.ringing .timer-badge-more { color: alpha({{ .palette.bg }}, 0.75); }
+.timer-badge.ringing .timer-badge-icon { animation: session-wiggle 500ms ease-in-out infinite; }
+.timer-badge.ringing progressbar.timer-badge-bar { opacity: 0; }
+
 window.timer.saved .timer-hello { color: {{ .palette.green }}; animation: hop 420ms ease-out 1; }
 window.timer.saved .timer-dial { animation: hop 420ms ease-out 1; }
 

@@ -146,9 +146,11 @@ Files ending in `.tmpl` are generated from these values.
 - **Timer** (`SUPER+SHIFT+T` or click on the countdown): kitchen-timer dial, type
   "Pizza 12", "25 min Fokus", "1h 30", "2:30" (a bare number = minutes), ↑/↓ or scroll
   = ±1 min (Shift ±5), six presets start right away (Alt+1..6: Ei, Tee, Nudeln, Pizza,
-  Pause, Fokus). Running timers as cards: pause, +1 min, stop. The countdown sits right of
-  the clock; when one is up a notification stays (+ 5 Min / Aus) and the alarm sounds up
-  to three times; right click on the red "Fertig!" = quiet.
+  Pause, Fokus; hover shows their time on the dial). Running timers as cards: pause,
+  +1 min, stop. While one runs, a tab with the countdown hangs below the middle of the bar
+  (click = popup, right click = pause / go on); when one is up it turns red, a
+  notification stays (+ 5 Min / Aus) and the alarm sounds up to three times; right click
+  on the red tab = quiet.
 - A little pixel pet left of the window title shows its state: sleeps while Claude
   is off, potters about when ready (dozes at night), mines / types / thinks while
   working, jumps with a "!" when it needs you, cheers and shows a gem when it finished
