@@ -1,0 +1,25 @@
+# Nextcloud calendars (CalDAV), synced both ways into ~/.local/share/calendars
+# (one folder per calendar, one .ics per event). Timer: vdirsyncer.timer.
+# The app password lives in gnome-keyring:
+#   secret-tool store --label="Nextcloud Kalender" service nextcloud-caldav
+[general]
+status_path = "~/.local/state/vdirsyncer/status/"
+
+[pair calendars]
+a = "calendars_local"
+b = "calendars_nextcloud"
+collections = ["from b"]
+# both sides changed the same event: Nextcloud wins
+conflict_resolution = "b wins"
+metadata = ["displayname", "color"]
+
+[storage calendars_local]
+type = "filesystem"
+path = "~/.local/share/calendars/"
+fileext = ".ics"
+
+[storage calendars_nextcloud]
+type = "caldav"
+url = "https://nx106267.your-storageshare.de/remote.php/dav/"
+username = "Admin"
+password.fetch = ["command", "secret-tool", "lookup", "service", "nextcloud-caldav"]
