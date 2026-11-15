@@ -8,6 +8,8 @@ popup and the reminder daemon.
     cal.day(d)                   -> [Occurrence] on date d, all-day first
     cal.add(cal_id, title, start, end, allday, location, alarm)
     cal.delete(occurrence)       -> removes the event (a series: all of it)
+    cal.update(occurrence, ...)  -> change title / times / place / alarm / calendar
+    cal.shift(occurrence, days)  -> move it (drag and drop)
     cal.sync()                   -> vdirsyncer now, in the background
 
 Small own iCalendar reader (no python-icalendar): unfolds lines, reads VEVENTs
@@ -26,10 +28,12 @@ from dateutil import rrule
 
 ROOT = os.path.expanduser("~/.local/share/calendars")
 OWN = "the-preu-plans-1"            # Flauschebär: the user's own calendar
-# short names and glyphs per calendar (Nextcloud's names are long)
+# short names, glyphs and colors per calendar (Nextcloud's names are long).
+# Color None: the one set in Nextcloud. Flauschebär's Nextcloud blue melted into
+# the dark blue-grey desktop, so here it is lavender (Nextcloud keeps its blue).
 PEOPLE = {
-    "the-preu-plans-1": ("Flauschebär", "\U000F18FB"),   # teddy bear
-    "the-preu-plans": ("Pia", "\U000F02D1"),             # heart
+    "the-preu-plans-1": ("Flauschebär", "\U000F18FB", "#c3a6ff"),   # teddy bear
+    "the-preu-plans": ("Pia", "\U000F02D1", None),                  # heart
 }
 DEFAULT_ALARM = dt.timedelta(minutes=-15)   # own timed events without a VALARM
 
@@ -54,9 +58,8 @@ class Calendar:
         self.path = os.path.join(ROOT, cid)
         name = _read(os.path.join(self.path, "displayname")) or cid
         self.long_name = name
-        self.name, self.glyph = PEOPLE.get(cid, (name.split(" - ")[-1], "\U000F00ED"))
-        self.color = _read(os.path.join(self.path, "color")) or "#7aa2f7"
-        self.color = self.color[:7]
+        self.name, self.glyph, color = PEOPLE.get(cid, (name.split(" - ")[-1], "\U000F00ED", None))
+        self.color = (color or _read(os.path.join(self.path, "color")) or "#7aa2f7")[:7]
         self.own = cid == OWN
 
 
@@ -402,17 +405,7 @@ def add(cal_id, title, start, end, allday=False, location="", alarm=None):
     if location:
         lines.append("LOCATION:" + _esc(location))
     if alarm is not None:
-        secs = int(alarm.total_seconds())
-        sign, secs = ("-" if secs < 0 else ""), abs(secs)
-        d, rest = divmod(secs, 86400)
-        h, rest = divmod(rest, 3600)
-        m = rest // 60
-        trig = f"{sign}P" + (f"{d}D" if d else "") + (
-            "T" + (f"{h}H" if h else "") + (f"{m}M" if m else "") if (h or m) else "")
-        if trig.endswith("P"):
-            trig += "T0S"
-        lines += ["BEGIN:VALARM", "ACTION:DISPLAY", "DESCRIPTION:Reminder",
-                  f"TRIGGER:{trig}", "END:VALARM"]
+        lines += _alarm_lines(alarm)
     lines += ["END:VEVENT", "END:VCALENDAR"]
     path = os.path.join(ROOT, cal_id, uid + ".ics")
     tmp = path + ".tmp"
@@ -430,6 +423,164 @@ def delete(occ):
         return False
     sync()
     return True
+
+
+def find(uid, start_iso):
+    """the occurrence of event uid starting at start_iso (from an --edit option)"""
+    try:
+        when = dt.datetime.fromisoformat(start_iso)
+    except ValueError:
+        return None
+    if when.tzinfo is None:
+        when = when.replace(tzinfo=TZ)
+    for o in occurrences(when - dt.timedelta(days=1), when + dt.timedelta(days=2)):
+        if o.event.uid == uid and o.bounds()[0] == when:
+            return o
+    return None
+
+
+def _when_lines(name, t, allday, tzid):
+    if allday:
+        return [f"{name};VALUE=DATE:{t:%Y%m%d}"]
+    if tzid:
+        return [f"{name};TZID={tzid}:{t.astimezone(ZoneInfo(tzid)):%Y%m%dT%H%M%S}"]
+    return [f"{name}:{_utc(t)}"]
+
+
+def _alarm_lines(alarm):
+    secs = int(alarm.total_seconds())
+    sign, secs = ("-" if secs < 0 else ""), abs(secs)
+    d, rest = divmod(secs, 86400)
+    h, rest = divmod(rest, 3600)
+    m = rest // 60
+    trig = f"{sign}P" + (f"{d}D" if d else "") + (
+        "T" + (f"{h}H" if h else "") + (f"{m}M" if m else "") if (h or m) else "")
+    if trig.endswith("P"):
+        trig += "T0S"
+    return ["BEGIN:VALARM", "ACTION:DISPLAY", "DESCRIPTION:Reminder", f"TRIGGER:{trig}",
+            "END:VALARM"]
+
+
+def update(occ, title=None, start=None, end=None, allday=None, location=None,
+           alarm=..., cal_id=None):
+    """Change an event in place, keeping everything else in its file (UID,
+    Apple fields, other overrides). start/end are the new times of THIS
+    occurrence; a series moves along by the same amount (like "all events" in
+    Google). alarm=... keeps the alarms, None removes them. cal_id moves the
+    file to the other calendar. Writes, then syncs."""
+    ev = occ.event
+    try:
+        with open(ev.path, encoding="utf-8") as f:
+            lines = _unfold(f.read())
+    except OSError:
+        return False
+    if start is None:
+        start, end = occ.start, occ.end
+    if allday is None:
+        allday = not isinstance(start, dt.datetime)
+    delta_start = None
+    if not ev.rrule:
+        new_start, new_end = start, end
+    else:
+        # the series' first start moves by as much as this occurrence did
+        o0 = occ.bounds()[0]
+        n0 = start if not allday else dt.datetime.combine(start, dt.time(), TZ)
+        delta_start = n0 - o0
+        m0 = ev.start if isinstance(ev.start, dt.datetime) else dt.datetime.combine(ev.start, dt.time(), TZ)
+        m0 = m0 + delta_start
+        new_start = m0.date() if allday else m0
+        new_end = new_start + (end - start)
+    out, i, in_master, in_alarm, done = [], 0, False, False, False
+    stamp = _utc(now())
+    for line in lines:
+        name, params, value = _prop(line)
+        if name == "BEGIN" and value.upper() == "VEVENT":
+            in_master = True
+            master_lines = []
+            out.append(line)
+            continue
+        if not in_master:
+            out.append(line)
+            continue
+        if name == "BEGIN" and value.upper() == "VALARM":
+            in_alarm = True
+        if in_alarm:
+            if name == "END" and value.upper() == "VALARM":
+                in_alarm = False
+            if alarm is ...:
+                master_lines.append(line)
+            continue
+        if name == "END" and value.upper() == "VEVENT":
+            # an override (RECURRENCE-ID) stays untouched
+            if any(_prop(l)[0] == "RECURRENCE-ID" for l in master_lines):
+                out.extend(master_lines + [line])
+                in_master = False
+                continue
+            tzid = next((_prop(l)[1].get("TZID") for l in master_lines
+                         if _prop(l)[0] == "DTSTART"), None)
+            if tzid and not any(l.startswith("TZID:" + tzid) for l in lines):
+                tzid = None          # no VTIMEZONE for it in the file: write UTC
+            keep = []
+            seq = 1      # no SEQUENCE yet: this is the first change
+            for l in master_lines:
+                n = _prop(l)[0]
+                if n in ("DTSTART", "DTEND", "DURATION", "DTSTAMP", "LAST-MODIFIED"):
+                    continue
+                if n == "SEQUENCE":
+                    try:
+                        seq = int(_prop(l)[2]) + 1
+                    except ValueError:
+                        seq = 1
+                    continue
+                if n == "SUMMARY" and title is not None:
+                    continue
+                if n == "LOCATION" and location is not None:
+                    continue
+                if n == "TRANSP":
+                    continue
+                if n == "RRULE" and allday != ev.allday:
+                    # UNTIL must match the new value type
+                    l = "RRULE:" + _rule_text(_prop(l)[2], new_start)
+                keep.append(l)
+            new = [f"DTSTAMP:{stamp}", f"LAST-MODIFIED:{stamp}", f"SEQUENCE:{seq}"]
+            new += _when_lines("DTSTART", new_start, allday, tzid)
+            new += _when_lines("DTEND", new_end, allday, tzid)
+            new.append("TRANSP:" + ("TRANSPARENT" if allday else "OPAQUE"))
+            if title is not None:
+                new.append("SUMMARY:" + _esc(title))
+            if location:
+                new.append("LOCATION:" + _esc(location))
+            alarms = []
+            if alarm is not ... and alarm is not None:
+                alarms = _alarm_lines(alarm)
+            # alarms kept (alarm=...) are still in keep, in their place
+            out.extend(new + keep + alarms + [line])
+            in_master = False
+            done = True
+            continue
+        master_lines.append(line)
+    if not done:
+        return False
+    target = ev.path
+    if cal_id and cal_id != ev.cal.id:
+        target = os.path.join(ROOT, cal_id, os.path.basename(ev.path))
+    tmp = target + ".tmp"
+    with open(tmp, "w", newline="") as f:
+        f.write("\r\n".join(_fold(l) for l in out) + "\r\n")
+    os.replace(tmp, target)
+    if target != ev.path:
+        try:
+            os.unlink(ev.path)
+        except OSError:
+            pass
+    sync()
+    return True
+
+
+def shift(occ, days):
+    """Move an event by whole days (drag and drop in the month), same times."""
+    d = dt.timedelta(days=days)
+    return update(occ, start=occ.start + d, end=occ.end + d)
 
 
 def sync():

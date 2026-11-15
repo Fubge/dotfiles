@@ -535,11 +535,47 @@ button.cal-nav {
     background: none;
     transition: background-color 150ms ease, color 150ms ease, transform 150ms ease;
 }
-button.cal-nav:hover { background-color: alpha({{ .palette.steel }}, 0.5); color: {{ .palette.accent }}; }
+button.cal-nav:hover {
+    background-color: alpha({{ .palette.steel }}, 0.5);
+    color: {{ .palette.accent }};
+    animation: session-wiggle 380ms ease-in-out 1;
+}
 button.cal-nav:active { transform: scale(0.85); }
 .cal-legend { margin-left: 8px; }
-.cal-legend-glyph { font-size: 12pt; }
-.cal-legend-name { font-size: 10pt; color: {{ .palette.fg_muted }}; }
+/* calendar avatars (top right): round like the task popup's tags, filled =
+   shown, hollow = hidden; they wiggle under the mouse */
+button.cal-avatar {
+    min-height: 0;
+    min-width: 0;
+    padding: 0;
+    border: none;
+    box-shadow: none;
+    background: none;
+    outline: none;
+}
+.cal-avatar-circle {
+    min-width: 38px;
+    min-height: 38px;
+    border-radius: 99px;
+    font-size: 15pt;
+    background-color: alpha({{ .palette.steel }}, 0.3);
+    transition: background-color 180ms ease, color 180ms ease, box-shadow 180ms ease,
+                transform 200ms ease;
+}
+.cal-avatar-name { font-size: 8pt; color: {{ .palette.comment }}; transition: color 180ms ease; }
+button.cal-avatar:hover .cal-avatar-circle { animation: session-wiggle 420ms ease-in-out 1; }
+button.cal-avatar:not(.on) .cal-avatar-circle { opacity: 0.55; }
+button.cal-avatar:active .cal-avatar-circle { transform: scale(0.85); }
+.cal-season {
+    font-size: 15pt;
+    color: {{ .palette.accent }};
+    animation: cal-sway 3s steps(12) infinite alternate;
+}
+@keyframes cal-sway {
+    from { transform: rotate(-10deg); }
+    to   { transform: rotate(10deg); }
+}
+.cal-greet { font-size: 9pt; color: {{ .palette.comment }}; margin-top: -2px; }
 button.cal-today-btn {
     min-height: 0;
     padding: 6px 14px;
@@ -565,7 +601,7 @@ button.cal-today-btn:hover { background-color: {{ .palette.accent }}; color: {{ 
     color: {{ .palette.comment }};
     padding: 4px 0;
 }
-.cal-wd.weekend { color: alpha({{ .palette.magenta }}, 0.8); }
+.cal-wd.weekend { color: {{ .palette.fg_muted }}; }
 .cal-grid {
     border-radius: 14px;
     background-color: alpha({{ .palette.steel }}, 0.28);   /* shows as the grid lines */
@@ -603,7 +639,13 @@ button.cal-day.today .cal-num {
     background-color: {{ .palette.accent }};
     color: {{ .palette.bg }};
     font-weight: 800;
+    animation: cal-glow 1.8s steps(8) infinite alternate;
 }
+@keyframes cal-glow {
+    from { box-shadow: 0 0 4px alpha({{ .palette.accent }}, 0.3); }
+    to   { box-shadow: 0 0 14px alpha({{ .palette.accent }}, 0.75); }
+}
+button.cal-day:hover:not(.today) .cal-num { animation: hop 280ms ease-out 1; }
 button.cal-day.other .cal-num { color: alpha({{ .palette.comment }}, 0.5); font-weight: normal; }
 button.cal-day.other .cal-chip { opacity: 0.4; }
 
@@ -617,7 +659,18 @@ button.cal-day.other .cal-chip { opacity: 0.4; }
 /* a bar that goes on: square ends that reach into the neighbour cell */
 .cal-chip.bar.cont-left  { border-top-left-radius: 0; border-bottom-left-radius: 0; margin-left: -6px; }
 .cal-chip.bar.cont-right { border-top-right-radius: 0; border-bottom-right-radius: 0; margin-right: -6px; }
-.cal-chip.timed { font-weight: 600; }
+.cal-chip.timed { font-weight: 600; transition: background-color 140ms ease; }
+.cal-chip.bar:hover { box-shadow: inset 0 0 0 99px alpha(white, 0.12); }
+/* drag and drop: the dragged event fades, target days open a dashed frame,
+   a dropped event lands with a hop */
+.cal-chip.dragging, .cal-card.dragging { opacity: 0.35; }
+window.calendar.dragging button.cal-day:hover { background-color: {{ .palette.bg }}; }
+button.cal-day.drop {
+    background-color: alpha({{ .palette.accent }}, 0.12);
+    box-shadow: inset 0 0 0 2px alpha({{ .palette.accent }}, 0.8);
+}
+button.cal-day.drop .cal-num { animation: hop 300ms ease-out infinite; }
+button.cal-day.landed .cal-chip { animation: hop 380ms ease-out 1; }
 .cal-chip.timed.done { opacity: 0.55; }
 .cal-more { font-size: 8pt; color: {{ .palette.comment }}; padding-left: 6px; }
 /* the small color dot in the "Danach" rows */
@@ -684,7 +737,15 @@ button.cal-day.bounce .cal-num { animation: hop 260ms ease-out 1; }
 .cal-card-time { font-size: 9pt; color: {{ .palette.fg_muted }}; }
 .cal-card-flag { font-size: 8pt; color: {{ .palette.comment }}; }
 .cal-card-title { font-size: 11pt; font-weight: 700; }
-.cal-card-owner { font-size: 12pt; }
+.cal-card-owner {
+    font-size: 12pt;
+    min-width: 28px;
+    min-height: 28px;
+    border-radius: 99px;
+}
+.cal-card:hover .cal-card-owner { animation: session-wiggle 420ms ease-in-out 1; }
+.cal-card:hover .cal-card-title { color: {{ .palette.accent }}; }
+.cal-card-title { transition: color 140ms ease; }
 .cal-card-loc { font-size: 9pt; color: {{ .palette.comment }}; }
 .cal-badge {
     font-size: 8pt;

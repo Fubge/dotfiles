@@ -135,6 +135,8 @@ Files ending in `.tmpl` are generated from these values.
   keyring: `secret-tool lookup service nextcloud-caldav`).
   - **`SUPER+K`** or click on the bar date = calendar popup:
     Google-style month (event bars / pills), the chosen day right (cards, trash asks first), arrows / PgUp / PgDn / T, N = new event.
+    Click a card / double click an event = edit (text, date, time, place, calendar);
+    drag an event onto another day = move it. Avatars top right hide / show a calendar.
   - **`SUPER+SHIFT+K`** or right click = new event in one line: "Kino morgen 20 Uhr",
     "Zahnarzt 24.11. 14:30 für 30 min", "Fr 18-20 Grillen", "Urlaub 10.12.-14.12.";
     Alt+F / Alt+P whose calendar, Alt+R reminder.
