@@ -110,7 +110,8 @@ def build():
 
         # ------------------------------------------------------------ content
         def fill(self):
-            out = subprocess.run(["cliphist", "list"], capture_output=True, text=True).stdout
+            out = subprocess.run(["cliphist", "list"], capture_output=True,
+                                 encoding="utf-8", errors="replace").stdout
             lines = [l for l in out.split("\n") if "\t" in l]
             self.list.remove_all()
             ids = set()
