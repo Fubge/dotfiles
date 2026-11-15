@@ -158,28 +158,30 @@ tooltip {
 {{- end }}
 
 /* ---------------------------------------------------------------- right */
-#hardware { padding: 0 4px; }
-#system   { background: @steel; border-radius: 15px; padding: 0 2px; }
-#connect  { padding: 0 2px; }
-#session  { background: @dark; border-radius: 15px; padding: 0 2px; }
+#hardware { padding: 0 2px; }
+#system   { background: @steel; border-radius: 15px; padding: 0 3px; }
+#connect  { padding: 0 3px; }
+/* bell and power: a small dark pill at the far right, the two side by side */
+#session  { background: @dark; border-radius: 15px; padding: 0 3px; }
 
-#cpu, #temperature, #memory { padding: 0 10px; }
+#cpu, #temperature, #memory { padding: 0 9px; }
 
-/* Icon-only modules: one fixed slot each, glyph centered, so every icon sits
-   the same distance from the next. Padding alone gave 27-57 px gaps, as the
-   glyphs differ in width; the Propo font makes each glyph as wide as it looks
-   (the mono one lets wide icons hang out to the right). The battery grows
-   past its slot while the plug shows. */
+/* Icon-only modules: one fixed 30 px slot each, glyph centered, so every icon
+   sits the same distance from the next (padding alone gave 27-57 px gaps, the
+   glyphs differ in width). Tight enough that the three pills keep air between
+   them. The Propo font makes each glyph as wide as it looks (the mono one lets
+   wide icons hang out to the right). The battery grows past its slot while
+   the plug shows. */
 #idle_inhibitor, #custom-power-profile, #custom-brightness, #custom-battery,
 #wireplumber, #network, #bluetooth,
 #custom-notifications, #custom-power {
     font-family: "JetBrainsMono Nerd Font Propo", "Symbols Nerd Font";
     padding: 0;
-    min-width: 38px;
+    min-width: 30px;
 }
-/* tray icons on the same 38 px grid: 17 px icon + 21 px spacing */
-#tray { padding: 0 10px; }
-#custom-wifi-name { padding: 0 6px 0 0; margin-left: -6px; }
+/* tray icons on the same 30 px grid: 17 px icon + 13 px spacing */
+#tray { padding: 0 6px; }
+#custom-wifi-name { padding: 0 6px 0 0; margin-left: -4px; }
 
 #custom-power { color: @accent; }
 /* Notification bell (~/.local/bin/notification-bell) left of the power button:

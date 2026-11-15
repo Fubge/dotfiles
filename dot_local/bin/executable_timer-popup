@@ -223,7 +223,11 @@ def build():
                 return
             self.last = view
             if view is None:
+                # slide back behind the bar, then unmap: a mapped empty surface
+                # left a dark stub below the clock
                 self.rev.set_reveal_child(False)
+                GLib.timeout_add(320, lambda: (not self.rev.get_reveal_child()
+                                               and self.set_visible(False)) and False)
                 return
             kind, glyph, text, name, more, frac = view
             if kind != self.kind:
