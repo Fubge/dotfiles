@@ -1,0 +1,537 @@
+#!/usr/bin/env python3
+"""Timer popup (SUPER+SHIFT+T, click on the bar countdown): kitchen timers.
+
+    timer-popup toggle [--center]  show it, or hide it when open
+    timer-popup --hidden           login autostart: waits hidden, rings timers
+    timer-popup quit               stop it (it reloads on the next press)
+
+A big dial like a kitchen timer: the orange arc is the time (a full turn =
+one hour), with a knob at its end; the time sits in the middle. Type
+"Pizza 12", "25 min Fokus", "1h 30", "2:30" or "halbe Stunde"; a bare number
+is minutes. Scroll on the dial or press Up / Down for +-1 min (Shift: 5).
+Six round preset buttons start right away (Alt+1..6). Running timers are
+cards below: pause / go on, +1 min, stop. With nothing typed, the dial shows
+the timer that rings next, counting down.
+
+This resident process also rings the timers (state: ~/.local/lib/popup/
+timers.py): a notification that stays (+5 Min / Aus) and the alarm sound,
+up to three times or until the card is closed. The bar countdown
+(~/.local/bin/timer-bar) only shows them.
+
+Keys: Enter starts, Escape closes.
+"""
+import math
+import os
+import subprocess
+import sys
+import time
+
+sys.path.insert(0, os.path.expanduser("~/.local/lib/popup"))
+import resident  # noqa: E402
+import timers  # noqa: E402
+
+APP = "popup.timer"
+WIDTH = 500
+CSS = os.path.expanduser("~/.config/popups/style.css")
+CLOSE_MS = 900
+DIAL = 210                  # px, the dial's size
+SOUND = "/usr/share/sounds/freedesktop/stereo/alarm-clock-elapsed.oga"
+RINGS = 3                   # the sound plays this often unless stopped
+SNOOZE = 5 * 60
+
+
+def build():
+    import gi
+
+    gi.require_version("Gtk", "4.0")
+    gi.require_version("Gdk", "4.0")
+    gi.require_version("Gsk", "4.0")
+    gi.require_version("Graphene", "1.0")
+    from gi.repository import Gdk, Gio, GLib, Graphene, Gsk, Gtk
+
+    def label(text="", classes=(), **kw):
+        return Gtk.Label(label=text, css_classes=list(classes), **kw)
+
+    class Dial(Gtk.Widget):
+        """track ring, 12 ticks, the arc from the top clockwise, a knob at
+        its end; fraction 0..1 (a full turn = one hour)"""
+
+        def __init__(self):
+            super().__init__(css_classes=["timer-dial"])
+            self.fraction = 0.0
+            self.color = Gdk.RGBA()
+            self.color.parse("#ff7f00")
+            self.track = Gdk.RGBA()
+            self.track.parse("rgba(89,102,144,0.35)")
+            self.tick = Gdk.RGBA()
+            self.tick.parse("rgba(122,130,153,0.7)")
+            self.knob = Gdk.RGBA()
+            self.knob.parse("#f8f8f2")
+
+        def do_measure(self, orientation, for_size):
+            return DIAL, DIAL, -1, -1
+
+        def set_fraction(self, f, color=None):
+            self.fraction = max(0.0, min(1.0, f))
+            if color:
+                self.color.parse(color)
+            self.queue_draw()
+
+        def do_snapshot(self, snap):
+            w, h = self.get_width(), self.get_height()
+            cx, cy = w / 2, h / 2
+            r = min(w, h) / 2 - 16
+            pt = Graphene.Point
+
+            def stroke(path, width, color):
+                st = Gsk.Stroke.new(width)
+                st.set_line_cap(Gsk.LineCap.ROUND)
+                snap.append_stroke(path, st, color)
+
+            b = Gsk.PathBuilder.new()
+            b.add_circle(pt().init(cx, cy), r)
+            stroke(b.to_path(), 14, self.track)
+            # ticks every 5 minutes, outside the ring
+            b = Gsk.PathBuilder.new()
+            for i in range(12):
+                a = i / 12 * 2 * math.pi
+                long = 5 if i % 3 == 0 else 2
+                b.move_to(cx + math.sin(a) * (r + 10), cy - math.cos(a) * (r + 10))
+                b.line_to(cx + math.sin(a) * (r + 10 + long), cy - math.cos(a) * (r + 10 + long))
+            stroke(b.to_path(), 2, self.tick)
+
+            f = self.fraction
+            if f <= 0:
+                return
+            end = f * 2 * math.pi
+            ex, ey = cx + math.sin(end) * r, cy - math.cos(end) * r
+            b = Gsk.PathBuilder.new()
+            if f >= 0.999:
+                b.add_circle(pt().init(cx, cy), r)
+            else:
+                b.move_to(cx, cy - r)
+                b.svg_arc_to(r, r, 0, f > 0.5, True, ex, ey)
+            glow = Gdk.RGBA()
+            glow.red, glow.green, glow.blue, glow.alpha = (self.color.red, self.color.green,
+                                                           self.color.blue, 0.25)
+            arc = b.to_path()           # to_path() empties the builder: keep it
+            stroke(arc, 24, glow)
+            stroke(arc, 14, self.color)
+            # the knob
+            b = Gsk.PathBuilder.new()
+            b.add_circle(pt().init(ex, ey), 9)
+            snap.append_fill(b.to_path(), Gsk.FillRule.WINDING, self.knob)
+
+    class Popup(Gtk.Window):
+        popup_width = WIDTH
+
+        def __init__(self):
+            super().__init__(title="Timer")
+            for c in ("popup", "menu", "timer"):
+                self.add_css_class(c)
+            self.set_decorated(False)
+            self.set_default_size(WIDTH, 1)
+            self.close_timer = None
+            self.manual = None          # seconds set with scroll / arrows
+            self.state = timers.load()
+            self.seen = timers.mtime()
+            self.rings = {}             # notification id -> {"timer", "left", "proc"}
+            self.cards = {}
+
+            box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4,
+                          css_classes=["timer-box"])
+            self.hello = label("Timer stellen", ("menu-title", "timer-hello"))
+            self.sub = label("Wie lange, und wofür?", ("timer-sub",))
+            box.append(self.hello)
+            box.append(self.sub)
+
+            # the dial with the time in the middle
+            over = Gtk.Overlay(halign=Gtk.Align.CENTER, css_classes=["timer-face"])
+            self.dial = Dial()
+            over.set_child(self.dial)
+            mid = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, valign=Gtk.Align.CENTER,
+                          halign=Gtk.Align.CENTER)
+            self.icon = label("", ("timer-icon",))
+            self.digits = label("0:00", ("timer-digits",))
+            self.what = label("", ("timer-what",), ellipsize=3, max_width_chars=12)
+            for w in (self.icon, self.digits, self.what):
+                mid.append(w)
+            over.add_overlay(mid)
+            scroll = Gtk.EventControllerScroll(
+                flags=Gtk.EventControllerScrollFlags.VERTICAL)
+            scroll.connect("scroll", self.on_scroll)
+            over.add_controller(scroll)
+            self.face = over
+            box.append(over)
+
+            self.entry = Gtk.Entry(placeholder_text="z. B. Pizza 12 · 25 min Fokus · 1h 30",
+                                   css_classes=["menu-search", "timer-entry"])
+            self.entry.connect("activate", lambda _e: self.start())
+            self.entry.connect("changed", lambda _e: self.on_text())
+            box.append(self.entry)
+
+            # presets: round buttons that start right away
+            row = Gtk.Box(spacing=12, halign=Gtk.Align.CENTER, css_classes=["timer-row"])
+            self.presets = []
+            for i, (name, mins, icon, color) in enumerate(timers.PRESETS):
+                b = Gtk.Button(css_classes=["timer-preset", "flat", f"tp-{color}"],
+                               focusable=False, tooltip_text=f"{name}, {mins} Min · Alt+{i + 1}")
+                inner = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=3)
+                inner.append(label(icon, ("timer-circle",), halign=Gtk.Align.CENTER))
+                inner.append(label(name, ("timer-label",)))
+                inner.append(label(f"{mins} Min", ("timer-mins",)))
+                b.set_child(inner)
+                b.connect("clicked", lambda _b, k=i: self.start_preset(k))
+                hover = Gtk.EventControllerMotion()
+                hover.connect("enter", lambda *_a, k=i: self.preview_preset(k))
+                hover.connect("leave", lambda *_a: self.refresh())
+                b.add_controller(hover)
+                self.presets.append(b)
+                row.append(b)
+            box.append(row)
+
+            # running timers
+            self.list = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6,
+                                css_classes=["timer-list"])
+            box.append(self.list)
+            self.caption = label("", ("task-caption", "timer-caption"))
+            box.append(self.caption)
+            self.set_child(box)
+
+            keys = Gtk.EventControllerKey()
+            keys.set_propagation_phase(Gtk.PropagationPhase.CAPTURE)
+            keys.connect("key-pressed", self.on_key)
+            self.add_controller(keys)
+
+            # ringing: notification actions / closes stop the sound
+            self.bus = Gio.bus_get_sync(Gio.BusType.SESSION)
+            for sig in ("ActionInvoked", "NotificationClosed"):
+                self.bus.signal_subscribe(None, "org.freedesktop.Notifications", sig,
+                                          "/org/freedesktop/Notifications", None,
+                                          Gio.DBusSignalFlags.NONE, self.on_signal)
+            GLib.timeout_add(250, self.tick)
+            self.check()
+
+        # ------------------------------------------------------------ state
+        def reload(self):
+            m = timers.mtime()
+            if m != self.seen:
+                self.seen = m
+                self.state = timers.load()
+                return True
+            return False
+
+        def write(self):
+            timers.save(self.state)
+            self.seen = timers.mtime()
+
+        def check(self):
+            """ring every timer whose time is up"""
+            now = time.time()
+            due = [t for t in self.state["timers"] if "end" in t and t["end"] <= now]
+            if not due:
+                return False
+            for t in due:
+                self.state["timers"].remove(t)
+                self.state["ringing"].append(dict(t, at=now))
+                self.ring(t)
+            self.write()
+            return True
+
+        def tick(self):
+            changed = self.reload()
+            # rung timers dismissed elsewhere (bar right click): stop them here too
+            ids = {x["id"] for x in self.state["ringing"]}
+            for nid, r in list(self.rings.items()):
+                if r["timer"]["id"] not in ids:
+                    self.hush(nid)
+            changed = self.check() or changed
+            if self.get_visible():
+                if changed:
+                    self.render_list()
+                self.refresh()
+            return True
+
+        # ------------------------------------------------------------ ringing
+        def ring(self, t):
+            name = t["label"] or "Timer"
+            try:
+                res = self.bus.call_sync(
+                    "org.freedesktop.Notifications", "/org/freedesktop/Notifications",
+                    "org.freedesktop.Notifications", "Notify",
+                    GLib.Variant("(susssasa{sv}i)", (
+                        "Timer", 0, "alarm-symbolic",
+                        f"{t['icon'] or timers.BELL}  {name} ist fertig!",
+                        f"{timers.words(t['total'])} sind um",
+                        ["default", "Aus", "snooze", "+ 5 Min", "off", "Aus"],
+                        {"urgency": GLib.Variant("y", 2)}, -1)),
+                    GLib.VariantType("(u)"), Gio.DBusCallFlags.NONE, 2000, None)
+                nid = res.unpack()[0]
+            except GLib.Error:
+                nid = -int(time.time())
+            self.rings[nid] = {"timer": t, "left": RINGS, "proc": None}
+            self.play(nid)
+
+        def play(self, nid):
+            r = self.rings.get(nid)
+            if not r or r["left"] <= 0:
+                return False
+            r["left"] -= 1
+            try:
+                r["proc"] = subprocess.Popen(["pw-play", SOUND], stdout=subprocess.DEVNULL,
+                                             stderr=subprocess.DEVNULL)
+            except OSError:
+                return False
+            GLib.child_watch_add(GLib.PRIORITY_DEFAULT, r["proc"].pid,
+                                 lambda *_a: GLib.timeout_add(600, self.play, nid))
+            return False
+
+        def silence(self, nid):
+            r = self.rings.pop(nid, None)
+            if r and r["proc"] and r["proc"].poll() is None:
+                r["proc"].terminate()
+            if r:
+                self.state["ringing"] = [x for x in self.state["ringing"]
+                                         if x["id"] != r["timer"]["id"]]
+                self.write()
+            return r
+
+        def on_signal(self, _c, _s, _p, _i, signal, params):
+            if signal == "ActionInvoked":
+                nid, key = params.unpack()
+                r = self.silence(nid)
+                if r and key == "snooze":
+                    t = r["timer"]
+                    timers.add(t["label"], SNOOZE, t["icon"])
+                    self.reload()
+            else:
+                self.silence(params.unpack()[0])
+            if self.get_visible():
+                self.render_list()
+
+        def hush(self, nid):
+            """stop the sound and take the notification away"""
+            self.silence(nid)
+            if nid > 0:
+                try:
+                    self.bus.call_sync(
+                        "org.freedesktop.Notifications", "/org/freedesktop/Notifications",
+                        "org.freedesktop.Notifications", "CloseNotification",
+                        GLib.Variant("(u)", (nid,)), None, Gio.DBusCallFlags.NONE, 1000, None)
+                except GLib.Error:
+                    pass
+
+        def silence_all(self):
+            for nid in list(self.rings):
+                self.hush(nid)
+            self.state["ringing"] = []
+            self.write()
+
+        # ------------------------------------------------------------ input
+        def wanted(self):
+            """(label, seconds, icon) from the entry, scroll and presets"""
+            name, sec = timers.parse(self.entry.get_text())
+            icon = ""
+            preset = next((p for p in timers.PRESETS if p[0].lower() == name.lower()), None)
+            if preset:
+                icon = preset[2]
+                if not sec:
+                    sec = preset[1] * 60
+            if self.manual is not None:     # scroll / arrows win over the text
+                sec = self.manual
+            return name, sec, icon
+
+        def on_text(self):
+            self.manual = None
+            self.entry.remove_css_class("shake")
+            self.refresh()
+
+        def nudge(self, minutes):
+            _n, sec, _i = self.wanted()
+            sec = max(0, (sec // 60 + minutes) * 60)
+            self.manual = min(sec, 24 * 3600)
+            self.refresh()
+            self.dial.remove_css_class("nudge")
+            GLib.timeout_add(16, lambda: self.dial.add_css_class("nudge") and False)
+
+        def on_scroll(self, _ctrl, _dx, dy):
+            step = 5 if (_ctrl.get_current_event_state() & Gdk.ModifierType.SHIFT_MASK) else 1
+            self.nudge(-step if dy > 0 else step)
+            return True
+
+        def start(self):
+            if self.close_timer:
+                return
+            name, sec, icon = self.wanted()
+            if sec <= 0:
+                self.entry.remove_css_class("shake")
+                GLib.timeout_add(16, lambda: self.entry.add_css_class("shake") and False)
+                self.caption.set_text("Wie lange? Eine Zahl reicht: 10 = 10 Minuten")
+                return
+            self.go(name, sec, icon)
+
+        def start_preset(self, k):
+            if self.close_timer:
+                return
+            name, mins, icon, _c = timers.PRESETS[k]
+            b = self.presets[k]
+            b.remove_css_class("picked")
+            b.add_css_class("picked")
+            self.go(name, mins * 60, icon)
+
+        def go(self, name, sec, icon):
+            timers.add(name, sec, icon)
+            self.reload()
+            self.entry.set_text("")
+            self.manual = None
+            self.add_css_class("saved")
+            self.hello.set_text("Läuft ✓")
+            resident.type_title(self.hello)
+            self.caption.set_text(f"{name or 'Timer'} · klingelt um "
+                                  f"{time.strftime('%H:%M', time.localtime(time.time() + sec))}")
+            self.render_list()
+            self.refresh()
+            self.close_timer = GLib.timeout_add(CLOSE_MS, self.done)
+
+        def done(self):
+            self.close_timer = None
+            self.close()
+            return False
+
+        def preview_preset(self, k):
+            if self.entry.get_text().strip() or self.manual is not None or self.close_timer:
+                return
+            name, mins, icon, _c = timers.PRESETS[k]
+            self.show_face(icon, timers.clock(mins * 60), name, mins / 60, "#ff7f00")
+
+        # ------------------------------------------------------------ view
+        def show_face(self, icon, digits, what, fraction, color):
+            self.icon.set_text(icon)
+            self.icon.set_visible(bool(icon))
+            self.digits.set_text(digits)
+            self.what.set_text(what)
+            self.what.set_visible(bool(what))
+            self.dial.set_fraction(fraction, color)
+
+        def refresh(self):
+            if self.close_timer:
+                return
+            name, sec, icon = self.wanted()
+            typed = self.entry.get_text().strip() or self.manual is not None
+            running = sorted(self.state["timers"], key=lambda t: timers.left(t))
+            if typed or not running:
+                frac = (sec % 3600) / 3600 if sec % 3600 or not sec else 1.0
+                self.show_face(icon or timers.TIMER, timers.clock(sec), name, frac, "#ff7f00")
+                self.face.remove_css_class("live")
+            else:
+                t = running[0]
+                lf = timers.left(t)
+                color = "#7a8299" if "left" in t else ("#ff5555" if lf < 60 else "#ff7f00")
+                self.show_face(t["icon"] or timers.TIMER, timers.clock(lf),
+                               (t["label"] or "Timer") + (" · Pause" if "left" in t else ""),
+                               lf / t["total"] if t["total"] else 0, color)
+                self.face.add_css_class("live")
+            for t in running:
+                card = self.cards.get(t["id"])
+                if card:
+                    lf = timers.left(t)
+                    card.time.set_text(timers.clock(lf))
+                    card.bar.set_fraction(lf / t["total"] if t["total"] else 0)
+
+        def render_list(self):
+            child = self.list.get_first_child()
+            while child:
+                self.list.remove(child)
+                child = self.list.get_first_child()
+            self.cards = {}
+            running = sorted(self.state["timers"], key=lambda t: timers.left(t))
+            if self.state["ringing"]:
+                b = Gtk.Button(css_classes=["timer-ringing", "flat"], focusable=False)
+                names = ", ".join(r["label"] or "Timer" for r in self.state["ringing"])
+                b.set_child(label(f"{timers.BELL}  {names} – fertig! Klick: Ruhe",
+                                  ("timer-ringing-text",)))
+                b.connect("clicked", lambda _b: (self.silence_all(), self.render_list()))
+                self.list.append(b)
+            for t in running:
+                card = Gtk.Box(spacing=10, css_classes=["timer-card"]
+                               + (["paused"] if "left" in t else []))
+                card.append(label(t["icon"] or timers.TIMER, ("timer-card-icon",)))
+                mid = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4, hexpand=True,
+                              valign=Gtk.Align.CENTER)
+                top = Gtk.Box(spacing=8)
+                top.append(label(t["label"] or "Timer", ("timer-card-name",), xalign=0,
+                                 hexpand=True, ellipsize=3))
+                card.time = label("", ("timer-card-time",))
+                top.append(card.time)
+                mid.append(top)
+                card.bar = Gtk.ProgressBar(css_classes=["timer-card-bar"])
+                mid.append(card.bar)
+                card.append(mid)
+                for glyph, tip, fn in (
+                        ("\U000F040A" if "left" in t else "\U000F03E4",
+                         "Weiter" if "left" in t else "Pause", timers.pause),
+                        ("\U000F0415", "+1 Min", timers.plus),
+                        ("\U000F0156", "Stopp", lambda _t: False)):
+                    b = Gtk.Button(css_classes=["timer-card-btn", "flat"], focusable=False,
+                                   tooltip_text=tip)
+                    b.set_child(label(glyph))
+                    b.connect("clicked", lambda _b, tid=t["id"], f=fn: self.act(tid, f))
+                    card.append(b)
+                self.cards[t["id"]] = card
+                self.list.append(card)
+            self.list.set_visible(bool(running or self.state["ringing"]))
+            self.refresh()
+
+        def act(self, tid, fn):
+            timers.change(tid, fn)
+            self.reload()
+            self.render_list()
+
+        # ------------------------------------------------------------ window
+        def show_up(self):
+            if self.close_timer:
+                GLib.source_remove(self.close_timer)
+                self.close_timer = None
+            self.reload()
+            self.remove_css_class("saved")
+            for b in self.presets:
+                b.remove_css_class("picked")
+                b.remove_css_class("enter")
+            GLib.timeout_add(30, lambda: [b.add_css_class("enter")
+                                          for b in self.presets] and False)
+            self.hello.set_text("Timer stellen")
+            n = len(self.state["timers"])
+            self.sub.set_text("Wie lange, und wofür?" if not n else
+                              f"{n} {'läuft' if n == 1 else 'laufen'} schon · noch einer?")
+            self.caption.set_text("Enter startet · ↑↓ / Scrollen: ±1 Min · Alt+1–6")
+            self.manual = None
+            self.entry.set_text("")
+            self.render_list()
+            self.set_default_size(WIDTH, 1)
+            self.present()
+            self.entry.grab_focus()
+
+        def on_key(self, _ctrl, keyval, _code, state):
+            if keyval == Gdk.KEY_Escape:
+                self.close()
+                return True
+            if keyval in (Gdk.KEY_Up, Gdk.KEY_Down):
+                step = 5 if state & Gdk.ModifierType.SHIFT_MASK else 1
+                self.nudge(step if keyval == Gdk.KEY_Up else -step)
+                return True
+            if state & Gdk.ModifierType.ALT_MASK:
+                ch = chr(Gdk.keyval_to_unicode(keyval) or 0)
+                if ch.isdigit() and 1 <= int(ch) <= len(timers.PRESETS):
+                    self.start_preset(int(ch) - 1)
+                    return True
+            return False
+
+    provider = Gtk.CssProvider()
+    provider.load_from_path(CSS)
+    Gtk.StyleContext.add_provider_for_display(
+        Gdk.Display.get_default(), provider, Gtk.STYLE_PROVIDER_PRIORITY_USER)
+    return Popup()
+
+
+if __name__ == "__main__":
+    resident.main(APP, build, __doc__)

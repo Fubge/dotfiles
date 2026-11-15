@@ -1,0 +1,60 @@
+#!/usr/bin/env python3
+"""Bar countdown for the kitchen timers (waybar custom/timer, next to the
+clock). Reads ~/.local/state/timer/timers.json (~/.local/lib/popup/timers.py),
+the timer popup writes it and rings the timers.
+
+Shows the timer that rings next: an hourglass that runs down (its sand
+glyph changes every second) and the time left, "+1" for each further one.
+Classes: running, soon (last minute, blinks), paused, ringing (bell, done).
+Nothing is shown (the module hides) while no timer runs. One line of JSON
+per change, a stat() per second otherwise.
+"""
+import json
+import os
+import sys
+import time
+
+sys.path.insert(0, os.path.expanduser("~/.local/lib/popup"))
+import timers  # noqa: E402
+
+
+def line():
+    s = timers.load()
+    now = time.time()
+    if s["ringing"]:
+        names = ", ".join(r["label"] or "Timer" for r in s["ringing"])
+        return {"text": f"{timers.BELL} Fertig!", "class": "ringing",
+                "tooltip": f"{names} ist fertig\nKlick: Timer · Rechtsklick: Ruhe"}
+    run = sorted(s["timers"], key=lambda t: timers.left(t, now))
+    if not run:
+        return {"text": "", "class": "idle", "tooltip": ""}
+    t = run[0]
+    lf = timers.left(t, now)
+    paused = "left" in t
+    glyph = timers.PAUSED if paused else timers.SAND[int(now) % 3]
+    text = f"{glyph} {timers.clock(lf)}"
+    if len(run) > 1:
+        text += f" <small>+{len(run) - 1}</small>"
+    cls = "paused" if paused else ("soon" if lf <= 60 else "running")
+    tip = "\n".join(f"{x['label'] or 'Timer'}: {timers.clock(timers.left(x, now))}"
+                    + (" (Pause)" if "left" in x else "") for x in run)
+    return {"text": text, "class": cls, "tooltip": tip + "\nKlick: Timer"}
+
+
+def main():
+    last = None
+    while True:
+        out = json.dumps(line(), ensure_ascii=False)
+        if out != last:
+            print(out, flush=True)
+            last = out
+        time.sleep(1 - time.time() % 1 + 0.02)      # just after each full second
+
+
+if __name__ == "__main__":
+    if sys.argv[1:] == ["hush"]:        # right click: done ringing (the popup
+        st = timers.load()              # sees it and stops sound + notification)
+        st["ringing"] = []
+        timers.save(st)
+    else:
+        main()

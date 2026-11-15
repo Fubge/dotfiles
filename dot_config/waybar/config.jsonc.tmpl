@@ -13,7 +13,7 @@
     "spacing": 0,
 
     "modules-left":   ["hyprland/workspaces", "custom/claude", "custom/window"],
-    "modules-center": ["custom/prompt", "clock#hours", "custom/colon", "clock#minutes", "clock#date", "custom/caret", "group/music"],
+    "modules-center": ["custom/prompt", "clock#hours", "custom/colon", "clock#minutes", "clock#date", "custom/caret", "custom/timer", "group/music"],
     "modules-right":  ["group/hardware", "group/system", "group/connect", "group/session"],
 
     // ---------------------------------------------------------------- groups
@@ -91,6 +91,16 @@
     "custom/caret": {
         "format": "\u258d",
         "tooltip": false
+    },
+    // Kitchen timer countdown right of the clock (hidden while none runs):
+    // a running-down hourglass and the time left (~/.local/bin/timer-bar).
+    // Click: timer popup, right click: stop the ringing
+    "custom/timer": {
+        "exec": "~/.local/bin/timer-bar",
+        "return-type": "json",
+        "escape": false,
+        "on-click": "~/.local/bin/popup-cmd timer-popup toggle --center",
+        "on-click-right": "~/.local/bin/timer-bar hush"
     },
     // Now playing (hidden when nothing plays): icon, six visualizer bars, title.
     // One script (~/.local/bin/music, exec of custom/music) drives all parts; the

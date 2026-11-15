@@ -169,6 +169,7 @@ walks through a full LUKS + btrfs + UKI setup.
 | `SUPER+L` | Lock | `SUPER+Escape` | Session (lock, reboot, off) |
 | `Home` | Area screenshot to clipboard | `SUPER+G` | Mark window as game |
 | `SUPER+K` | Calendar | `SUPER+SHIFT+K` | New event ("Kino morgen 20 Uhr") |
+| `SUPER+SHIFT+T` | Timer ("Pizza 12") | Right click countdown | Stop the ringing |
 
 ## Make it yours
 

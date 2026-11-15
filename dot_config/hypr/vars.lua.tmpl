@@ -62,6 +62,7 @@ M.background = {
     M.bin .. "task-popup --hidden",       -- new task for Claude (SUPER+T), same
     M.bin .. "calendar-popup --hidden",   -- calendar (bar date, SUPER+K), same
     M.bin .. "event-popup --hidden",      -- new event (SUPER+SHIFT+K), same
+    M.bin .. "timer-popup --hidden",      -- kitchen timers (SUPER+SHIFT+T); also rings them
     M.bin .. "calendar-remind",           -- calendar reminders as notifications
     "nextcloud --background",           -- file sync, tray icon only
 }
@@ -120,6 +121,7 @@ M.popup = {
         "popup.task",    -- new task for Claude; centered (~/.local/bin/task-popup)
         "popup.calendar", -- month + day agenda (~/.local/bin/calendar-popup)
         "popup.event",   -- new event in one line; centered (~/.local/bin/event-popup)
+        "popup.timer",   -- kitchen timers; centered (~/.local/bin/timer-popup)
     },
     top = 46,   -- bar margin (8) + bar height (30) + gap (8), also in resident.py
 }

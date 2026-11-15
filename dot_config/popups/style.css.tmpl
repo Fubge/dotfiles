@@ -516,6 +516,118 @@ button.task-tag.enter.chosen .task-circle { animation-delay: 380ms; }
 window.task.saved .task-hello { color: {{ .palette.green }}; animation: hop 420ms ease-out 1; }
 window.task.saved button.task-tag.chosen .task-circle { animation: hop 420ms ease-out 1; }
 
+/* ---------------------------------------------------------------- timer */
+/* ~/.local/bin/timer-popup (SUPER+SHIFT+T, bar countdown): a kitchen timer
+   dial (drawn in code, orange arc + knob), round preset buttons that pop in,
+   running timers as cards with a slim progress bar */
+.timer-box { padding: 24px 28px 16px 28px; }
+.timer-hello { font-size: 16pt; }
+.timer-sub { font-size: 9pt; color: {{ .palette.comment }}; margin-bottom: 4px; }
+.timer-face { margin: 4px 0 10px 0; }
+.timer-icon { font-family: "JetBrainsMono Nerd Font Propo"; font-size: 17pt; color: {{ .palette.accent }}; }
+.timer-digits {
+    font-family: "{{ .design.font }}";
+    font-size: 30pt;
+    font-weight: 800;
+    color: {{ .palette.fg }};
+}
+.timer-what { font-size: 10pt; color: {{ .palette.fg_muted }}; }
+.timer-face.live .timer-icon { animation: icon-wiggle 1.2s ease-in-out infinite; }
+.timer-dial.nudge { animation: hop 220ms ease-out 1; }
+.timer-entry { font-size: 12pt; padding: 11px 16px; transition: box-shadow 160ms ease; }
+.timer-entry:focus-within { box-shadow: inset 0 0 0 1px alpha({{ .palette.accent }}, 0.6); }
+.timer-entry.shake {
+    animation: shake 380ms ease-in-out 1;
+    box-shadow: inset 0 0 0 1px alpha({{ .palette.red }}, 0.8);
+}
+.timer-row { margin-top: 14px; }
+button.timer-preset {
+    min-height: 0;
+    min-width: 0;
+    padding: 0;
+    border: none;
+    box-shadow: none;
+    background: none;
+    outline: none;
+}
+.timer-circle {
+    min-width: 51px;
+    min-height: 48px;
+    padding: 2px 0 0 1px;
+    border-radius: 99px;
+    font-family: "JetBrainsMono Nerd Font Propo";
+    font-size: 17pt;
+    background-color: alpha({{ .palette.steel }}, 0.3);
+    transition: background-color 160ms ease, color 160ms ease, transform 200ms ease,
+                box-shadow 200ms ease;
+}
+.timer-label { font-size: 9pt; color: {{ .palette.fg_muted }}; transition: color 160ms ease; }
+.timer-mins { font-size: 7pt; color: {{ .palette.comment }}; }
+{{- range $name, $color := dict "yellow" .palette.yellow "green" .palette.green "accent" .palette.accent "red" .palette.red "cyan" .palette.cyan "magenta" .palette.magenta }}
+button.timer-preset.tp-{{ $name }} .timer-circle { color: {{ $color }}; }
+button.timer-preset.tp-{{ $name }}:hover .timer-circle,
+button.timer-preset.tp-{{ $name }}.picked .timer-circle {
+    background-color: {{ $color }};
+    color: {{ $.palette.bg }};
+    transform: scale(1.1);
+    box-shadow: 0 0 16px alpha({{ $color }}, 0.45);
+    animation: session-wiggle 420ms ease-in-out 1;
+}
+button.timer-preset.tp-{{ $name }}:hover .timer-label { color: {{ $color }}; }
+{{- end }}
+button.timer-preset.enter { animation: session-pop 380ms ease-out both; }
+{{- range $i := until 6 }}
+.timer-row button.timer-preset.enter:nth-child({{ add $i 1 }}) { animation-delay: {{ mul $i 45 }}ms; }
+{{- end }}
+button.timer-preset.picked .timer-circle { animation: hop 420ms ease-out 1; }
+.timer-list { margin-top: 14px; }
+.timer-card {
+    padding: 8px 8px 8px 14px;
+    border-radius: 4px 12px 12px 4px;
+    border-left: 3px solid {{ .palette.accent }};
+    background-color: alpha({{ .palette.bg_alt }}, 0.9);
+    animation: card-in 220ms ease-out both;
+}
+.timer-card.paused { border-left-color: {{ .palette.comment }}; }
+.timer-card-icon { font-family: "JetBrainsMono Nerd Font Propo"; font-size: 14pt; color: {{ .palette.accent }}; }
+.timer-card.paused .timer-card-icon, .timer-card.paused .timer-card-time { color: {{ .palette.comment }}; }
+.timer-card-name { font-size: 10pt; font-weight: 700; }
+.timer-card-time { font-family: "{{ .design.font }}"; font-size: 10pt; font-weight: 700; color: {{ .palette.accent }}; }
+progressbar.timer-card-bar trough {
+    min-height: 4px;
+    border-radius: 99px;
+    background-color: alpha({{ .palette.steel }}, 0.4);
+}
+progressbar.timer-card-bar progress {
+    min-height: 4px;
+    border-radius: 99px;
+    background-color: {{ .palette.accent }};
+}
+.timer-card.paused progressbar.timer-card-bar progress { background-color: {{ .palette.comment }}; }
+button.timer-card-btn {
+    min-width: 30px;
+    min-height: 30px;
+    padding: 0;
+    border-radius: 99px;
+    font-family: "JetBrainsMono Nerd Font Propo";
+    font-size: 12pt;
+    color: {{ .palette.fg_muted }};
+    background: none;
+    box-shadow: none;
+}
+button.timer-card-btn:hover { color: {{ .palette.accent }}; background-color: alpha({{ .palette.steel }}, 0.35); }
+button.timer-card-btn:last-child:hover { color: {{ .palette.red }}; }
+button.timer-ringing {
+    padding: 9px 14px;
+    border-radius: 12px;
+    background-color: alpha({{ .palette.accent }}, 0.18);
+    box-shadow: inset 0 0 0 1px alpha({{ .palette.accent }}, 0.6);
+    animation: session-wiggle 600ms ease-in-out 2;
+}
+.timer-ringing-text { color: {{ .palette.accent }}; font-weight: 700; }
+window.timer.saved .timer-hello { color: {{ .palette.green }}; animation: hop 420ms ease-out 1; }
+window.timer.saved .timer-dial { animation: hop 420ms ease-out 1; }
+
 /* ---------------------------------------------------------------- calendar */
 /* ~/.local/bin/calendar-popup (bar date, SUPER+K): month left, the
    chosen day right. Colors per calendar (Nextcloud's own) come from the popup
