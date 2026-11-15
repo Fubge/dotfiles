@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 """Quick add (SUPER+SHIFT+K, N in the calendar popup, right click on the bar
-date): a new event in one line, the way you would say it.
+date): a new event in two fields, "Was?" and "Wann?".
 
     event-popup show [--center] [--date 2026-11-20]
     event-popup show --center --edit UID START   change an event (calendar popup)
+    ... --back                        opened from the calendar popup: saving or
+                                      Escape opens it again on the event's day
     event-popup --hidden / quit       like every resident popup
 
     Kino morgen 20 Uhr                  tomorrow 20:00-21:00
@@ -13,18 +15,22 @@ date): a new event in one line, the way you would say it.
     Pizza in 3 Tagen abends             19:00
     Wäsche                              all-day on the preset day (today)
 
-The words that set date and time light up as chips under the field and drop
-out of the title; a ticket below shows what will be saved and counts down.
+"Was?" is the title, taken as typed. "Wann?" is read by the parser below;
+its words light up as chips, words it does not know show up struck through.
+With "Wann?" empty the one-liner still works: date words in "Was?" are found
+and cut out of the title (the examples below). A ticket shows what will be
+saved and counts down.
 Two round buttons pick the calendar (Flauschebär = own, preselected; Pia),
 the chips below the reminder. Enter saves (~/.local/lib/popup/cal.py writes
 the .ics and starts vdirsyncer), the title turns green and the popup closes.
 
 Keys: Enter saves, Alt+F / Alt+P calendar, Alt+R next reminder, Tab moves
-to the place field, Escape closes (the text stays until it is saved).
+Was -> Wann -> Wo, Escape closes (the text stays until it is saved).
 """
 import datetime as dt
 import os
 import re
+import subprocess
 import sys
 
 sys.path.insert(0, os.path.expanduser("~/.local/lib/popup"))
@@ -32,9 +38,15 @@ import cal  # noqa: E402
 import resident  # noqa: E402
 
 APP = "popup.event"
+
+
+def _day(t):
+    """the date of an event start (a date or a datetime)"""
+    return t.date() if isinstance(t, dt.datetime) else t
 WIDTH = 560
 CSS = os.path.expanduser("~/.config/popups/style.css")
 CLOSE_MS = 1000
+POPUP_CMD = os.path.expanduser("~/.local/bin/popup-cmd")
 DEFAULT_LENGTH = dt.timedelta(hours=1)
 
 # reminder choices: (label, timedelta before start or None)
@@ -122,6 +134,42 @@ def parse(text, today, preset=None):
         p.date, p.end_date = a, b
     take(B + r"(?P<d1>\d{1,2})\.(?P<m1>\d{1,2})\.(?P<y1>\d{2,4})?\s*(?:-|–|bis)\s*"
          r"(?P<d2>\d{1,2})\.(?P<m2>\d{1,2})\.?(?P<y2>\d{4})?" + E, date_range)
+
+    # the weekend: "kommendes Wochenende", "am Wochenende", "dieses Wochenende"
+    # -> Sat-Sun; a weekday range in the same text ("... von Fr bis So") wins
+    # and is counted from that weekend's week
+    weekend = None
+    if p.date is None:
+        def wkend(m):
+            nonlocal weekend
+            ahead = (5 - today.weekday()) % 7
+            if today.weekday() == 6:                # Sunday: "dieses" = today's
+                ahead = -1 if (m["this"] and not m["n"]) else 6
+            if m["n"] and m["n"].startswith("über"):
+                ahead += 7
+            weekend = today + dt.timedelta(days=ahead)
+        take(B + r"(?:am\s+|übers?\s+|an\s+dem\s+)?(?:(?P<this>dieses|diesem)\s+|"
+             r"(?P<n>(?:über)?nächste[ns]?|kommende[ns]?)\s+)?wochenende" + E, wkend)
+
+    # weekday ranges: Fr-So, von Freitag bis Sonntag, nächsten Mo bis Mi
+    if p.date is None:
+        days = dict(WEEKDAYS, so=6)           # "so" alone is a word, in a range Sunday
+        names = "|".join(sorted(days, key=len, reverse=True))
+
+        def wd_range(m):
+            a, b = days[m["w1"]], days[m["w2"]]
+            if weekend:
+                start = weekend - dt.timedelta(days=5) + dt.timedelta(days=a)
+            else:
+                start = today + dt.timedelta(days=(a - today.weekday()) % 7 or 7)
+                if m["n"] and m["n"].startswith("übernächst"):
+                    start += dt.timedelta(days=7)
+            p.date = start
+            p.end_date = start + dt.timedelta(days=(b - a) % 7)
+        take(B + r"(?:von\s+|am\s+)?(?P<n>(?:über)?nächsten?\s+|kommenden?\s+)?(?P<w1>" + names
+             + r")\.?\s*(?:-|–|bis)\s*(?:zum\s+)?(?P<w2>" + names + r")\.?" + E, wd_range)
+    if p.date is None and weekend:
+        p.date, p.end_date = weekend, weekend + dt.timedelta(days=1)
 
     # explicit dates: 24.11. / 24.11.2026 / 24.11 / 24. November
     def explicit(m):
@@ -220,6 +268,12 @@ def parse(text, today, preset=None):
     while words and words[0].lower().strip(",.") in FILLER:
         words.pop(0)
     title = " ".join(words).strip(" ,-–")
+    # spoken lead-ins: "ich will mein Auto fertig machen" -> "Auto fertig machen"
+    title = re.sub(r"^(?:ich\s+)?(?:will|muss|möchte|sollte|werde|wollte|würde\s+gern|"
+                   r"möchte\s+gern|hab\s+vor|habe\s+vor)?\s*(?:noch\s+|mal\s+|gern\s+)*"
+                   r"(?:mein|meine|meinen|meinem|meiner|unser|unsere|unseren)?\s+",
+                   "", " " + title if not title.lower().startswith("ich ") else title,
+                   flags=re.I).strip() or title
     title = re.sub(r"\s+([,.!?])", r"\1", title)
     p.title = title[:1].upper() + title[1:]
     if p.date is None:
@@ -278,18 +332,22 @@ def build():
             box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4,
                           css_classes=["event-box"])
             self.hello = label("Neuer Termin", ("menu-title", "event-hello"))
-            self.sub = label("Sag es einfach, wie du es sagen würdest", ("event-sub",))
+            self.sub = label("", ("event-sub",))
             box.append(self.hello)
             box.append(self.sub)
 
-            self.entry = Gtk.Entry(placeholder_text="z. B. Kino morgen 20 Uhr",
+            self.entry = Gtk.Entry(placeholder_text="Was? z. B. Auto fertig machen",
                                    css_classes=["menu-search", "event-entry"])
+            self.when = Gtk.Entry(placeholder_text="Wann? z. B. Fr bis So · morgen 20 Uhr",
+                                  css_classes=["menu-search", "event-when"])
             self.place = Gtk.Entry(placeholder_text="Wo? (optional)",
                                    css_classes=["menu-search", "event-place"])
-            for e in (self.entry, self.place):
+            for e in (self.entry, self.when, self.place):
                 e.connect("activate", lambda _e: self.save())
-            self.entry.connect("changed", lambda _e: self.update())
+            for e in (self.entry, self.when):
+                e.connect("changed", lambda _e: self.update())
             box.append(self.entry)
+            box.append(self.when)
             self.chips = Gtk.Box(spacing=6, css_classes=["event-chips"])
             box.append(self.chips)
             box.append(self.place)
@@ -322,7 +380,9 @@ def build():
             for i, c in enumerate(self.cals):
                 b = Gtk.Button(css_classes=["event-cal", "flat", f"ec-{i}"], focusable=False)
                 inner = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=5)
-                inner.append(label(c.glyph, ("event-circle",), halign=Gtk.Align.CENTER))
+                # the heart carries its weight up top: nudged down a bit more (style.css)
+                circle = ("event-circle",) + (("heart",) if c.glyph == "\U000F02D1" else ())
+                inner.append(label(c.glyph, circle, halign=Gtk.Align.CENTER))
                 inner.append(label(c.name, ("event-label",)))
                 keys = Gtk.Box(spacing=3, halign=Gtk.Align.CENTER)
                 keys.append(label("alt", ("key", "mod", "task-key")))
@@ -374,6 +434,8 @@ def build():
             self.preset = None
             self.editing = None
             self.cal_id = cal.OWN       # new events start in the own calendar
+            self.back = "--back" in opts
+            self.back_day = None
             if "--edit" in opts:
                 i = opts.index("--edit")
                 try:
@@ -386,6 +448,10 @@ def build():
                     self.preset = dt.date.fromisoformat(opts[i + 1])
                 except (IndexError, ValueError):
                     pass
+            if self.editing:
+                self.back_day = _day(self.editing.bounds()[0])
+            else:
+                self.back_day = self.preset
 
         def pick_cal(self, cid):
             self.cal_id = cid
@@ -406,7 +472,15 @@ def build():
         def update(self):
             today = dt.date.today()
             was_allday = self.plan.allday if self.plan else None
-            p = parse(self.entry.get_text(), today, self.preset)
+            what, when = self.entry.get_text(), self.when.get_text()
+            unknown = ""
+            if when.strip():
+                p = parse(when, today, self.preset)
+                unknown = p.title         # what the parser could not place
+                title = " ".join(what.split())
+                p.title = title[:1].upper() + title[1:]
+            else:
+                p = parse(what, today, self.preset)
             self.plan = Plan(p)
             child = self.chips.get_first_child()
             while child:
@@ -414,7 +488,9 @@ def build():
                 child = self.chips.get_first_child()
             for c in p.chips:
                 self.chips.append(label(c, ("event-chip",)))
-            self.chips.set_visible(bool(p.chips))
+            if unknown:
+                self.chips.append(label(unknown, ("event-chip", "unknown")))
+            self.chips.set_visible(bool(p.chips or unknown))
 
             pl = self.plan
             d = pl.start if pl.allday else pl.start.date()
@@ -470,8 +546,10 @@ def build():
             else:
                 d = o.start
                 when = f"{d.day}.{d.month}.{d.year} {o.start:%H:%M}-{o.end:%H:%M}"
-            self.entry.set_text(f"{o.summary} {when}")
+            self.entry.set_text(o.summary)
+            self.when.set_text(when)
             self.place.set_text(o.location)
+            self.from_edit = True       # a new event must not start with this text
             self.cal_id = o.cal.id
             self.preset = o.start if o.allday else o.start.date()
             # the reminder chip that matches its first alarm, none if no match
@@ -510,8 +588,9 @@ def build():
                 self.caption.set_text(f"Konnte nicht speichern: {e.strerror}")
                 self.caption.add_css_class("error")
                 return
-            self.entry.set_text("")
-            self.place.set_text("")
+            self.back_day = _day(pl.start)
+            for e in (self.entry, self.when, self.place):
+                e.set_text("")
             self.add_css_class("saved")
             self.hello.set_text("Geändert ✓" if self.editing else "Eingetragen ✓")
             self.editing = None
@@ -523,7 +602,19 @@ def build():
         def done(self):
             self.close_timer = None
             self.close()
+            self.go_back()
             return False
+
+        def go_back(self):
+            """opened from the calendar popup: show it again (only after saving
+            or Escape; focus leaving closes both, as any popup)"""
+            if not self.back:
+                return
+            self.back = False
+            cmd = [POPUP_CMD, "calendar-popup", "show", "--center"]
+            if self.back_day:
+                cmd += ["--date", self.back_day.isoformat()]
+            subprocess.Popen(cmd)
 
         # ------------------------------------------------------------ window
         def show_up(self):
@@ -538,16 +629,20 @@ def build():
             else:
                 self.hello.set_text("Neuer Termin")
                 self.alarm_i = 0         # never a reminder unless picked
+                if getattr(self, "from_edit", False):   # an edit left by Escape
+                    for e in (self.entry, self.when, self.place):
+                        e.set_text("")
+                self.from_edit = False
             if self.editing:
                 pass
             elif self.preset and self.preset != dt.date.today():
                 self.sub.set_text(f"Für {cal.DAYS[self.preset.weekday()]}, "
                                   f"{self.preset.day}. {cal.MONTHS[self.preset.month - 1]} "
-                                  "– oder sag ein anderes Datum")
+                                  "– oder sag unter Wann ein anderes Datum")
             else:
-                self.sub.set_text("Sag es einfach, wie du es sagen würdest")
-            self.caption.set_text("Enter speichert · Tab: Ort" if not self.editing else
-                                  "Ändere Text, Datum oder Uhrzeit · Enter speichert")
+                self.sub.set_text("Was steht an, und wann?")
+            self.caption.set_text("Enter speichert · Tab: nächstes Feld" if not self.editing else
+                                  "Ändere Titel, Datum oder Uhrzeit · Enter speichert")
             self.pick_cal(self.cal_id)
             self.last_day = None
             self.update()
@@ -564,6 +659,7 @@ def build():
         def on_key(self, _ctrl, keyval, _code, state):
             if keyval == Gdk.KEY_Escape:
                 self.close()
+                self.go_back()
                 return True
             if state & Gdk.ModifierType.ALT_MASK:
                 ch = chr(Gdk.keyval_to_unicode(keyval) or 0).lower()

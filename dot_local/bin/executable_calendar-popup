@@ -3,6 +3,8 @@
 Nextcloud calendars (~/.local/lib/popup/cal.py, synced by vdirsyncer).
 
     calendar-popup toggle [--center]  show it, or hide it when open
+    calendar-popup show --center --date 2026-11-20   open on that day
+                                      (back from editing in event-popup)
     calendar-popup --hidden           login autostart: waits hidden
     calendar-popup quit               stop it (it reloads on the next press)
 
@@ -93,6 +95,7 @@ def build():
             self.selected = dt.date.today()
             self.cells = {}
             self.hidden = set()        # calendar ids switched off with the avatars
+            self.open_day = None       # show --date: open on that day, not today
             self.drag = {}             # drag key -> occurrence
             self.grid_n = 0
             self.armed = None          # card whose trash asks "Sicher?"
@@ -250,7 +253,9 @@ def build():
                 b = Gtk.Button(css_classes=["cal-avatar", "flat", f"av-c{i}", "on"],
                                focusable=False, tooltip_text=f"{c.name} aus- / einblenden")
                 inner = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
-                inner.append(label(c.glyph, ("cal-avatar-circle",), halign=Gtk.Align.CENTER))
+                # the heart carries its weight up top: it gets nudged down a bit more
+                circle = ("cal-avatar-circle",) + (("heart",) if c.glyph == "\U000F02D1" else ())
+                inner.append(label(c.glyph, circle, halign=Gtk.Align.CENTER))
                 inner.append(label(c.name, ("cal-avatar-name",)))
                 b.set_child(inner)
                 b.connect("clicked", lambda _b, cid=c.id: self.toggle_cal(cid))
@@ -681,13 +686,13 @@ def build():
         # ------------------------------------------------------------ actions
         def edit(self, o):
             self.close()
-            subprocess.Popen([EVENT_POPUP, "event-popup", "show", "--center", "--edit",
-                              o.event.uid, o.bounds()[0].isoformat()])
+            subprocess.Popen([EVENT_POPUP, "event-popup", "show", "--center", "--back",
+                              "--edit", o.event.uid, o.bounds()[0].isoformat()])
 
         def new_event(self, d=None):
             d = d or self.selected
             self.close()
-            subprocess.Popen([EVENT_POPUP, "event-popup", "show", "--center",
+            subprocess.Popen([EVENT_POPUP, "event-popup", "show", "--center", "--back",
                               "--date", d.isoformat()])
 
         def on_key(self, _ctrl, keyval, _code, state):
@@ -719,12 +724,22 @@ def build():
                 GLib.source_remove(self.tick_timer)
                 self.tick_timer = None
 
+        def take_opts(self, opts):
+            self.open_day = None
+            if "--date" in opts:
+                i = opts.index("--date")
+                try:
+                    self.open_day = dt.date.fromisoformat(opts[i + 1])
+                except (IndexError, ValueError):
+                    pass
+
         def show_up(self):
-            today = dt.date.today()
+            day = self.open_day or dt.date.today()
+            self.open_day = None
             if not self.cals:
                 self.load_calendars()
-            self.selected = today
-            self.month = today.replace(day=1)
+            self.selected = day
+            self.month = day.replace(day=1)
             self.title.set_text("")          # retype the month on every show
             self.title.full_text = ""
             self.render_month(transition=None, wave=True)

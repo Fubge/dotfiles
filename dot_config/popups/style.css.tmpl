@@ -554,14 +554,21 @@ button.cal-avatar {
     outline: none;
 }
 .cal-avatar-circle {
-    min-width: 38px;
-    min-height: 38px;
+    /* 38 x 38 in all: the padding counts on top of min-width / min-height */
+    min-width: 37px;
+    min-height: 36px;
     border-radius: 99px;
+    /* the Propo variant: its icons are as wide as they look, so they sit in the
+       middle; the mono fallback lets them stick out to the right */
+    font-family: "JetBrainsMono Nerd Font Propo";
     font-size: 15pt;
+    /* optical centering: the icons sit a touch high and left in their box */
+    padding: 2px 0 0 1px;
     background-color: alpha({{ .palette.steel }}, 0.3);
     transition: background-color 180ms ease, color 180ms ease, box-shadow 180ms ease,
                 transform 200ms ease;
 }
+.cal-avatar-circle.heart { padding-top: 4px; min-height: 34px; }
 .cal-avatar-name { font-size: 8pt; color: {{ .palette.comment }}; transition: color 180ms ease; }
 button.cal-avatar:hover .cal-avatar-circle { animation: session-wiggle 420ms ease-in-out 1; }
 button.cal-avatar:not(.on) .cal-avatar-circle { opacity: 0.55; }
@@ -853,16 +860,17 @@ button.cal-add:hover .cal-add-icon { animation: spin 500ms ease-out 1; }
 .cal-hint { font-size: 8pt; color: {{ .palette.comment }}; margin-left: 2px; }
 
 /* ---------------------------------------------------------------- event */
-/* ~/.local/bin/event-popup (SUPER+SHIFT+K): a new event in one line. Same
+/* ~/.local/bin/event-popup (SUPER+SHIFT+K): a new event, "Was?" + "Wann?". Same
    build as the task popup; recognized words light up as chips, a ticket
    shows what will be saved, round buttons pick whose calendar */
 .event-box { padding: 24px 28px 16px 28px; }
 .event-hello { font-size: 16pt; }
 .event-sub { font-size: 9pt; color: {{ .palette.comment }}; margin-bottom: 12px; }
 .event-entry { font-size: 13pt; padding: 12px 16px; }
+.event-when { font-size: 11pt; padding: 9px 16px; margin-top: 4px; }
 .event-place { font-size: 10pt; padding: 7px 16px; margin-top: 4px; }
-.event-entry, .event-place { transition: box-shadow 160ms ease; }
-.event-entry:focus-within, .event-place:focus-within {
+.event-entry, .event-when, .event-place { transition: box-shadow 160ms ease; }
+.event-entry:focus-within, .event-when:focus-within, .event-place:focus-within {
     box-shadow: inset 0 0 0 1px alpha({{ .palette.accent }}, 0.6);
 }
 .event-entry.shake {
@@ -883,6 +891,13 @@ button.cal-add:hover .cal-add-icon { animation: spin 500ms ease-out 1; }
     background-color: alpha({{ .palette.accent }}, 0.15);
     border: 1px solid alpha({{ .palette.accent }}, 0.45);
     animation: chip-in 260ms ease-out both;
+}
+/* words under "Wann?" the parser could not place */
+.event-chip.unknown {
+    color: {{ .palette.comment }};
+    background-color: transparent;
+    border-color: alpha({{ .palette.comment }}, 0.45);
+    text-decoration: line-through;
 }
 .event-ticket {
     margin-top: 14px;
@@ -908,14 +923,18 @@ button.event-cal {
     outline: none;
 }
 .event-circle {
-    min-width: 58px;
-    min-height: 58px;
+    /* centered like .cal-avatar-circle (Propo font, optical nudge), 58 x 58 in all */
+    min-width: 57px;
+    min-height: 55px;
+    padding: 3px 0 0 1px;
     border-radius: 99px;
+    font-family: "JetBrainsMono Nerd Font Propo";
     font-size: 21pt;
     background-color: alpha({{ .palette.steel }}, 0.3);
     transition: background-color 160ms ease, color 160ms ease, transform 200ms ease,
                 box-shadow 200ms ease;
 }
+.event-circle.heart { padding-top: 6px; min-height: 52px; }
 .event-label { font-size: 10pt; color: {{ .palette.fg_muted }}; transition: color 160ms ease; }
 button.event-cal.chosen .event-circle {
     transform: scale(1.1);
