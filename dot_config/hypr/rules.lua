@@ -140,7 +140,8 @@ local function fit_specials()
             if m.transform % 2 == 1 then mw, mh = mh, mw end
             local top = (m.reserved and m.reserved.top or 0) + GAP
             for _, w in ipairs(windows) do
-                if w.floating and w.workspace and w.workspace.name == sp.name then
+                if w.floating and not w.hidden and w.mapped ~= false
+                    and w.workspace and w.workspace.name == sp.name then
                     local ww = math.min(w.size.x, mw - 2 * GAP)
                     local wh = math.min(w.size.y, mh - top - GAP)
                     local x = m.position.x + math.floor((mw - ww) / 2)
@@ -157,7 +158,12 @@ local function fit_specials()
         end
     end
 end
-hl.on("workspace.special_active", fit_specials)
+-- Deferred: right at login (autostart parks Claude on its special while the
+-- monitors come up) the window has no place in the layout yet, and moving it
+-- by coordinates crashed Hyprland 0.57.2 (SEGV in CSpace::moveTarget)
+hl.on("workspace.special_active", function()
+    hl.timer(fit_specials, { timeout = 150, type = "oneshot" })
+end)
 
 -- The Claude and dropdown specials belong to one window each. Anything else
 -- started while one of them is shown (e.g. "Network settings" from the Wi-Fi
