@@ -2,7 +2,12 @@
    Colors and fonts come from .chezmoidata/{palette,design}.toml. Hyprland draws
    the rounded corners, the orange border and the blur behind the window. */
 
+/* backdrop-filter: GTK (4.22+) asks the compositor itself which part of a
+   surface to blur (ext-background-effect) and Hyprland then leaves the rest
+   alone. Without it nothing behind a popup was blurred and text of the
+   window below showed through sharply. */
 window.popup {
+    backdrop-filter: blur(12px);
     background-color: alpha({{ .palette.bg }}, 0.94);
     color: {{ .palette.fg }};
     font-family: "{{ .design.font_ui }}";
@@ -636,6 +641,7 @@ window.timer-badge-win { background: none; }
    readable on a bright wallpaper */
 .timer-fuse { filter: drop-shadow(0 1px 2px alpha(black, 0.5)); }
 .timer-badge {
+    backdrop-filter: blur(12px);
     padding: 3px 14px 5px 14px;
     margin: 0 10px 10px 10px;        /* room for the shadow and the alarm pulse */
     border-radius: 0 0 14px 14px;
@@ -1249,6 +1255,7 @@ button.slider-icon.muted { animation: mute-shake 320ms ease-in-out 1; }
 window.notifications { background: none; }
 .notif-stack { padding: {{ add .design.gaps_in 4 }}px {{ .design.gaps_out }}px 12px 14px; }
 .notif {
+    backdrop-filter: blur(12px);
     margin-bottom: 8px;
     border-radius: {{ add .design.rounding 4 }}px;
     border: 1px solid alpha({{ .palette.fg }}, 0.07);
@@ -1727,6 +1734,7 @@ button.sys-chip label, .segment-icon, .session-circle {
    bumps when it changes; muted: red chip, grey fill */
 window.osd-win { background: none; }
 .osd {
+    backdrop-filter: blur(12px);
     padding: 10px 18px 10px 10px;
     margin: 12px;                    /* room for the shadow */
     border-radius: 99px;
