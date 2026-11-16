@@ -116,12 +116,11 @@ hl.on("workspace.active", function(ws)
     if ws and ws.id and ws.id >= 1 and ws.id <= 8 then last_main_ws = ws.id end
 end)
 
-local function arrange()
+-- The rules alone (no window or focus moves). An older rule would keep 9/10
+-- persistent or 1-8 tied to a screen that is gone: drop the last set first.
+local function write_rules()
     local main = main_monitor()
-    local back = tostring(last_main_ws or 1)
     current_main = main
-    -- an older rule would keep 9/10 persistent (or 1-8 tied to a screen that
-    -- is gone): drop the last set, then write the new one
     for _, r in ipairs(rules) do r:set_enabled(false) end
     rules = {}
     for i = 1, 8 do
@@ -131,6 +130,16 @@ local function arrange()
     if split then
         for _, ws in ipairs(laptop_ws) do
             table.insert(rules, hl.workspace_rule({ workspace = ws, monitor = internal, persistent = true }))
+        end
+    end
+    return main, split
+end
+
+local function arrange()
+    local back = tostring(last_main_ws or 1)
+    local main, split = write_rules()
+    if split then
+        for _, ws in ipairs(laptop_ws) do
             hl.dispatch(hl.dsp.workspace.move({ workspace = ws, monitor = internal }))
         end
         hl.dispatch(hl.dsp.focus({ monitor = internal }))
@@ -195,6 +204,9 @@ hl.on("monitor.removed", function()
     end, { timeout = 300, type = "oneshot" })
 end)
 hl.on("hyprland.start", refresh)
+-- A config reload forgets the workspace rules (the bar lost its empty
+-- workspaces until the next monitor change): write them again, nothing moves
+if #hl.get_monitors() > 0 then write_rules() end
 
 -- Follow the charger: a cheap sysfs read every 5 s, the panel only changes
 -- when the power source did. Each config load starts its own re-armed timer
