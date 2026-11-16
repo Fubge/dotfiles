@@ -122,6 +122,10 @@ entry.search text placeholder { color: {{ .palette.comment }}; }
     color: {{ .palette.accent }};
 }
 .plus { color: {{ .palette.comment }}; font-size: 9pt; }
+.key-or { min-width: 6px; }             /* between alternatives: "h j k l" */
+/* page switch below the search pill: system / Neovim */
+.overview-pages { margin-top: -8px; }
+.overview-pages button.segment { min-width: 96px; padding: 5px 14px; border-radius: 999px; }
 
 /* ---------------------------------------------------------------- pet picker */
 /* One card per bar pet (~/.local/bin/pet-picker); the pet in use is framed

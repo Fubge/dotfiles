@@ -4,6 +4,11 @@
 Built live from `hyprctl binds -j`: every bind with a description in
 hypr/binds.lua shows up, grouped by the "Group: text" prefix of its description,
 so this never goes stale. Typing filters; Escape closes.
+
+A second page (Tab, or the switch on top) has the Neovim keys: the mappings
+of the config, asked from Neovim itself (~/.local/lib/popup/nvim-keys.lua),
+plus hand-picked basics from the language file. It opens on that page when
+the focused window is Neovim.
 Look: ~/.config/popups/style.css (shared with the other popups).
 
     keybinds toggle   SUPER+H: show it, or hide it when open
@@ -14,8 +19,11 @@ Resident like the bar popups (~/.local/lib/popup/resident.py): starting Python,
 GTK and a Gtk.Application took ~1.2 s per press. The binds are read again on
 every show, so a changed binds.lua shows up without a restart.
 """
+import glob
 import json
 import os
+import re
+import subprocess
 import sys
 
 sys.path.insert(0, os.path.expanduser("~/.local/lib/popup"))
@@ -39,8 +47,98 @@ KEY_NAMES = {
 KEYCODES = {49: "^"}
 
 
+NVIM_DIR = os.path.expanduser("~/.config/nvim")
+NVIM_DUMP = os.path.expanduser("~/.local/lib/popup/nvim-keys.lua")
+VIM_NAMES = {"cr": "Enter", "esc": "Esc", "bs": "⌫", "tab": "Tab", "space": T("keys.space"),
+             "lt": "<", "bar": "|", "up": "↑", "down": "↓", "left": "←", "right": "→"}
+VIM_MODS = {"c": "CTRL", "s": "SHIFT", "m": "ALT", "a": "ALT", "d": "SUPER"}
+
+
+def vim_keys(lhs):
+    """Vim notation -> steps to press one after the other, each a list of
+    keys held together: "<C-w>d" -> [["CTRL", "W"], ["d"]], " sf" ->
+    [["Leertaste"], ["s"], ["f"]]. Plain letters keep their case (G is not g)."""
+    steps = []
+    for tok in re.findall(r"<[^<>]+>|.", lhs):
+        if tok == " ":
+            steps.append([VIM_NAMES["space"]])
+        elif len(tok) == 1:
+            steps.append([tok])
+        else:
+            *mods, key = tok[1:-1].split("-") if tok != "<->" else ["-"]
+            name = VIM_NAMES.get(key.lower(), key.upper() if len(key) == 1 and mods else key)
+            steps.append([VIM_MODS.get(m.lower(), m) for m in mods] + [name])
+    return steps
+
+
+def nvim_stamp():
+    """newest change in the Neovim config (its mappings are read again then)"""
+    files = glob.glob(NVIM_DIR + "/**/*.lua", recursive=True)
+    return max((os.path.getmtime(f) for f in files), default=0)
+
+
+def nvim_maps():
+    """The config's mappings with a description, from a headless Neovim
+    (~30 ms). [] when Neovim or the config is not there."""
+    try:
+        out = subprocess.run(["nvim", "--headless", "-c", "luafile " + NVIM_DUMP, "-c", "q"],
+                             capture_output=True, text=True, timeout=5).stdout
+        return json.loads(out[out.index("["):])
+    except (OSError, ValueError, subprocess.TimeoutExpired):
+        return []
+
+
+def nvim_group(m):
+    """which card a mapping goes on"""
+    lhs, desc, mode = m["lhs"], m["desc"].lower(), m["mode"]
+    if mode == "i":
+        return "insert"
+    if "hunk" in desc or lhs.startswith(" g"):
+        return "git"
+    if lhs[:2] in (" s", "  ", " b", " e"):
+        return "search"
+    if (m.get("lsp") or lhs[:2] in (" c", " q", "gc", "gr") or lhs == "gO"
+            or "diagnostic" in desc or "lsp" in desc):
+        return "code"
+    if mode == "x":
+        return "select"
+    return "other"
+
+
+def load_nvim(maps):
+    """-> {card title: [(steps, text), ...]}: basics from the language file,
+    then the config's own mappings. Left out: built-in defaults that only
+    point to :help or an Ex command, and the auto-pair helpers."""
+    groups = {}
+    for key in ("modes", "move", "edit"):
+        rows = groups.setdefault(T("nvim.g_" + key), [])
+        lines = T("nvim." + key)
+        for line in lines if isinstance(lines, list) else []:
+            keys, _, text = line.partition("|")
+            rows.append(([step for alt in keys.split(" ") for step in vim_keys(alt) + [None]][:-1],
+                         text))
+    order = ("search", "git", "code", "insert", "select", "other")
+    found = {k: {} for k in order}
+    seen = set()
+    for m in sorted(maps, key=lambda m: (not m["lhs"].startswith(" "), m["lhs"].lower())):
+        desc = m["desc"]
+        if desc.startswith((":", "Mini")) or " action for " in desc or m["lhs"] in ("<BS>",):
+            continue
+        if desc.startswith("vim.lsp."):         # "vim.lsp.buf.code_action()" -> "LSP: code action"
+            parts = desc.rstrip("()").split(".")[2:]
+            desc = "LSP: " + " ".join(p for p in parts if p != "buf").replace("_", " ")
+        if m["lhs"] not in seen:                # normal and visual mode: once
+            seen.add(m["lhs"])
+            found[nvim_group(m)][m["lhs"]] = (vim_keys(m["lhs"]), desc)
+    for k in order:
+        if found[k]:
+            groups[T("nvim.g_" + k)] = list(found[k].values())
+    return groups
+
+
 def load_binds(raw):
-    """hyprctl binds JSON -> {group: [(keys, text), ...]} in the order of binds.lua"""
+    """hyprctl binds JSON -> {group: [(steps, text), ...]} in the order of
+    binds.lua (steps as in vim_keys: here always one, the whole combination)"""
     try:
         binds = json.loads(raw or "[]")
     except ValueError:
@@ -55,7 +153,7 @@ def load_binds(raw):
         keys = [name for bit, name in MODS if b["modmask"] & bit]
         key = b["key"] or KEYCODES.get(b.get("keycode"), "")   # bound by keycode: no key name
         keys.append(KEY_NAMES.get(key, key.upper() if len(key) == 1 else key))
-        groups.setdefault(group, []).append((keys, text))
+        groups.setdefault(group, []).append(([keys], text))
     return groups
 
 
@@ -66,13 +164,19 @@ def build():
     gi.require_version("Gdk", "4.0")
     from gi.repository import Gdk, Gtk, Pango
 
-    def keycaps(keys):
+    def keycaps(steps):
+        """keys held together are joined with "+", keys pressed one after the
+        other just sit side by side; None = "or" (a wider gap)"""
         box = Gtk.Box(spacing=4, valign=Gtk.Align.CENTER)
-        for i, key in enumerate(keys):
-            if i:
-                box.append(Gtk.Label(label="+", css_classes=["plus"]))
-            classes = ["key", "mod"] if key in ("SUPER", "CTRL", "ALT", "SHIFT") else ["key"]
-            box.append(Gtk.Label(label=key, css_classes=classes))
+        for step in steps:
+            if step is None:
+                box.append(Gtk.Label(label="", css_classes=["key-or"]))
+                continue
+            for i, key in enumerate(step):
+                if i:
+                    box.append(Gtk.Label(label="+", css_classes=["plus"]))
+                classes = ["key", "mod"] if key in ("SUPER", "CTRL", "ALT", "SHIFT") else ["key"]
+                box.append(Gtk.Label(label=key, css_classes=classes))
         return box
 
     class Overview(Gtk.Window):
@@ -96,6 +200,20 @@ def build():
             pill.append(Gtk.Label(label="\U000F0349", css_classes=["lens", "mirror"]))
             root.append(pill)
 
+            # the two pages: system (Hyprland binds) and Neovim
+            self.page = "system"
+            self.tabs = {}
+            switch = Gtk.Box(spacing=6, halign=Gtk.Align.CENTER, css_classes=["overview-pages"])
+            for name in ("system", "nvim"):
+                button = Gtk.Button(label=T("keys.page_" + name), focusable=False,
+                                    css_classes=["segment", "small", "flat"])
+                button.connect("clicked", lambda _b, n=name: self.set_page(n))
+                switch.append(button)
+                self.tabs[name] = button
+            root.append(switch)
+            self.nvim = nvim_maps()
+            self.nvim_seen = nvim_stamp()
+
             # Cards in three equal columns that share the fixed overlay width
             # (long texts get "..."). Each card goes below the shortest column
             # (masonry): a grid with rows as high as the longest card pushed
@@ -118,9 +236,26 @@ def build():
             self.add_controller(keys)
             self.fill()       # built while hidden: the first press is fast too
 
+        def set_page(self, name):
+            self.page = name
+            self.fill()
+            self.on_filter(self.search)
+            self.search.grab_focus()
+
         def fill(self):
-            """(Re)build the cards when the binds changed since the last show."""
-            raw = resident.hypr("j/binds")
+            """(Re)build the cards when the page or its binds changed since
+            the last show."""
+            for name, button in self.tabs.items():
+                (button.add_css_class if name == self.page else button.remove_css_class)("active")
+            if self.page == "nvim":
+                stamp = nvim_stamp()
+                if stamp != self.nvim_seen:
+                    self.nvim, self.nvim_seen = nvim_maps(), stamp
+                raw = ("nvim", stamp)
+                groups = lambda: load_nvim(self.nvim)   # noqa: E731
+            else:
+                raw = resident.hypr("j/binds")
+                groups = lambda: load_binds(raw)        # noqa: E731
             if raw == getattr(self, "raw", None):
                 return
             self.raw = raw
@@ -130,7 +265,7 @@ def build():
             self.rows = []    # (row widget, card, search text)
             self.cards = []
             filled = [0] * len(self.columns)    # rows per column, card title included
-            for group, binds in load_binds(raw).items():
+            for group, binds in groups().items():
                 card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2, css_classes=["card"])
                 card.append(Gtk.Label(label=group.upper(), css_classes=["card-title"], xalign=0))
                 child = card
@@ -140,13 +275,21 @@ def build():
                                          ellipsize=Pango.EllipsizeMode.END, tooltip_text=text))
                     row.append(keycaps(keys))
                     card.append(row)
-                    self.rows.append((row, child, f"{group} {text} {' '.join(keys)}".lower()))
+                    flat = " ".join(k for step in keys if step for k in step)
+                    self.rows.append((row, child, f"{group} {text} {flat} {flat.replace(' ', '')}".lower()))
                 shortest = filled.index(min(filled))
                 self.columns[shortest].append(card)
                 filled[shortest] += len(binds) + 2
                 self.cards.append(card)
 
         def show_up(self):
+            # asked from inside Neovim: its keys first
+            try:
+                win = json.loads(resident.hypr("j/activewindow") or "{}")
+            except ValueError:
+                win = {}
+            title = (win.get("title") or "").lower()
+            self.page = "nvim" if re.search(r"\bn?vim\b", title) else "system"
             self.fill()
             self.search.set_text("")
             self.present()
@@ -166,6 +309,9 @@ def build():
         def on_key(self, _ctrl, keyval, _code, _state):
             if keyval == Gdk.KEY_Escape:
                 self.close()
+                return True
+            if keyval in (Gdk.KEY_Tab, Gdk.KEY_ISO_Left_Tab):
+                self.set_page("system" if self.page == "nvim" else "nvim")
                 return True
             return False
 

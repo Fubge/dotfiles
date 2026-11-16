@@ -166,12 +166,99 @@ no_match    = { de = "Kein Treffer", en = "No match" }
 [strings.keys]
 title       = { de = "Tastenkürzel", en = "Shortcuts" }
 filter      = { de = "Tastenkürzel filtern …", en = "Filter shortcuts..." }
-footer      = { de = "SUPER = Windows-Taste      ·      Esc  schließen", en = "SUPER = Windows key      ·      Esc  close" }
+footer      = { de = "SUPER = Windows-Taste      ·      Tab  System / Neovim      ·      Esc  schließen", en = "SUPER = Windows key      ·      Tab  system / Neovim      ·      Esc  close" }
+page_system = "System"
+page_nvim   = "Neovim"
 drag        = { de = "Ziehen", en = "Drag" }
 right_drag  = { de = "Rechts ziehen", en = "Right drag" }
 wheel_down  = { de = "Rad ↓", en = "Wheel ↓" }
 wheel_up    = { de = "Rad ↑", en = "Wheel ↑" }
 space       = { de = "Leertaste", en = "Space" }
+
+# Neovim page of the shortcut overview (SUPER+H, then Tab). The mappings of
+# the config come from Neovim itself (their descriptions are the English ones
+# from the config); here are only the card titles and the hand-picked basics,
+# each "keys|text" (keys in Vim notation, a space separates alternatives).
+[strings.nvim]
+g_search = { de = "Suchen & Dateien", en = "Search & files" }
+g_git    = "Git"
+g_code   = "Code & LSP"
+g_insert = { de = "Beim Tippen (Insert)", en = "While typing (insert)" }
+g_select = { de = "Auswahl (Visual)", en = "Selection (visual)" }
+g_other  = { de = "Fenster & Sonstiges", en = "Windows & other" }
+g_modes  = { de = "Grundlagen: Modi", en = "Basics: modes" }
+g_move   = { de = "Grundlagen: Bewegen", en = "Basics: moving" }
+g_edit   = { de = "Grundlagen: Bearbeiten", en = "Basics: editing" }
+leader   = { de = "Leertaste = Leader", en = "Space = leader" }
+modes = { de = [
+    "i a|Tippen vor / nach dem Cursor",
+    "I A|Tippen am Zeilenanfang / -ende",
+    "o O|Neue Zeile darunter / darüber",
+    "<Esc>|Zurück in den Normal-Modus",
+    "v V|Auswählen: Zeichen / ganze Zeilen",
+    "<C-v>|Auswählen: Block (Spalten)",
+    ":w<CR>|Speichern",
+    ":q<CR>|Schließen (:q! ohne Speichern)",
+], en = [
+    "i a|Type before / after the cursor",
+    "I A|Type at line start / end",
+    "o O|New line below / above",
+    "<Esc>|Back to normal mode",
+    "v V|Select: characters / whole lines",
+    "<C-v>|Select: block (columns)",
+    ":w<CR>|Save",
+    ":q<CR>|Close (:q! without saving)",
+] }
+move = { de = [
+    "h j k l|Links, runter, hoch, rechts",
+    "w b e|Wort vor / zurück / Wortende",
+    "0 $|Zeilenanfang / Zeilenende",
+    "gg G|Dateianfang / Dateiende",
+    "<C-d> <C-u>|Halbe Seite runter / hoch",
+    "f t|Zum Zeichen / davor (z. B. f,)",
+    "%|Zur passenden Klammer",
+    "/ ?|Suchen vorwärts / rückwärts",
+    "n N|Nächster / vorheriger Treffer",
+    "*|Wort unter dem Cursor suchen",
+    "<C-o> <C-i>|Zurück / vor in der Sprungliste",
+], en = [
+    "h j k l|Left, down, up, right",
+    "w b e|Word forward / back / word end",
+    "0 $|Line start / line end",
+    "gg G|File start / file end",
+    "<C-d> <C-u>|Half a page down / up",
+    "f t|To a character / before it (e.g. f,)",
+    "%|To the matching bracket",
+    "/ ?|Search forward / backward",
+    "n N|Next / previous match",
+    "*|Search the word under the cursor",
+    "<C-o> <C-i>|Back / forward in the jump list",
+] }
+edit = { de = [
+    "x|Zeichen löschen",
+    "dd yy|Zeile löschen / kopieren",
+    "p P|Einfügen danach / davor",
+    "u <C-r>|Rückgängig / wiederholen",
+    ".|Letzte Änderung noch einmal",
+    "ciw|Wort ersetzen (change inner word)",
+    "ci\"|Text in Anführungszeichen ersetzen",
+    "dw D|Wort / Rest der Zeile löschen",
+    ">> <<|Zeile ein- / ausrücken",
+    "J|Nächste Zeile anhängen",
+    "~|Groß / klein umschalten",
+], en = [
+    "x|Delete a character",
+    "dd yy|Delete / copy the line",
+    "p P|Paste after / before",
+    "u <C-r>|Undo / redo",
+    ".|Repeat the last change",
+    "ciw|Replace the word (change inner word)",
+    "ci\"|Replace the text inside quotes",
+    "dw D|Delete word / rest of the line",
+    ">> <<|Indent / unindent the line",
+    "J|Join the next line",
+    "~|Toggle upper / lower case",
+] }
 
 [strings.binds]  # shortcut descriptions (SUPER+H), hypr/binds.lua
 group_apps        = "Apps"

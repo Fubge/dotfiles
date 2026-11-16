@@ -10,19 +10,22 @@ vim.lsp.enable({ "lua_ls", "bashls", "taplo", "yamlls" })
 --   gO     symbols in file       [d / ]d  prev/next diagnostic
 --   <C-s>  signature help (insert mode)
 -- Extra keys below are only added to buffers with a server.
+-- (a list, so the shortcut overview can show them: ~/.local/lib/popup/nvim-keys.lua)
+local keys = {
+    { "gd", vim.lsp.buf.definition, "Go to definition" },
+    { "<leader>cd", vim.diagnostic.open_float, "Show diagnostic under cursor" },
+    { "<leader>ss", function()
+        MiniExtra.pickers.lsp({ scope = "document_symbol" })
+    end, "Search symbols in file" },
+    { "<leader>sS", function()
+        MiniExtra.pickers.lsp({ scope = "workspace_symbol" })
+    end, "Search symbols in project" },
+}
 vim.api.nvim_create_autocmd("LspAttach", {
     callback = function(args)
-        local map = function(keys, fn, desc)
-            vim.keymap.set("n", keys, fn, { buffer = args.buf, desc = desc })
+        for _, k in ipairs(keys) do
+            vim.keymap.set("n", k[1], k[2], { buffer = args.buf, desc = k[3] })
         end
-        map("gd", vim.lsp.buf.definition, "Go to definition")
-        map("<leader>cd", vim.diagnostic.open_float, "Show diagnostic under cursor")
-        map("<leader>ss", function()
-            MiniExtra.pickers.lsp({ scope = "document_symbol" })
-        end, "Search symbols in file")
-        map("<leader>sS", function()
-            MiniExtra.pickers.lsp({ scope = "workspace_symbol" })
-        end, "Search symbols in project")
 
         -- Show inlay hints (parameter names, types) where the server supports them
         local client = vim.lsp.get_client_by_id(args.data.client_id)
@@ -46,3 +49,5 @@ vim.diagnostic.config({
         },
     },
 })
+
+return { keys = keys }
