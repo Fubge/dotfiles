@@ -39,6 +39,8 @@ I_HEADSET, I_WEBCAM = "\U000F02CE", "\U000F05A0"       # mic of a headset / of a
 I_APP = "\U000F075A"                                  # music note: app without icon
 I_MIXER = "\U000F062E"                                 # sliders
 NOISY = 0.6     # s after a drag in which PipeWire's echo does not move the slider
+TICK = 0.14     # s between two feedback ticks of the output slider
+TICK_SOUND = os.path.expanduser("~/.local/share/sounds/slate/tick.oga")   # assets/make-sounds.py
 
 
 def pactl_json(*args):
@@ -122,9 +124,12 @@ def build():
     class Slider(Gtk.Box):
         """Icon (click: mute) + slider + percent for one sink, source or app."""
 
-        def __init__(self, kind, target, icon=None):
+        def __init__(self, kind, target, icon=None, feedback=False):
             super().__init__(spacing=12, css_classes=["slider-row"])
             self.kind, self.target = kind, target       # pactl set-KIND-volume TARGET
+            self.feedback = feedback    # a tick at the new volume while dragging
+            self.ticked = 0.0
+            self.last_tick = None
             self.touched = 0.0
             self.pending = None
             self.loading = False
@@ -168,7 +173,32 @@ def build():
         def apply(self):
             self.pactl("volume", f"{int(self.scale.get_value())}%")
             self.pending = None
+            if self.feedback:
+                self.tick()
             return False
+
+        def tick(self, last=False):
+            """Hear how loud it is now: a short tick through the same output,
+            at most every TICK s while dragging, and one more when the slider
+            comes to rest (that one has the final volume)."""
+            if self.last_tick:
+                GLib.source_remove(self.last_tick)
+                self.last_tick = None
+            now = time.monotonic()
+            if last or now - self.ticked >= TICK:
+                self.ticked = now
+                try:
+                    subprocess.Popen(["pw-play", "--media-role", "event", TICK_SOUND],
+                                     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                except OSError:
+                    pass
+            if not last:
+                def rest():
+                    self.last_tick = None
+                    if time.monotonic() - self.ticked > 0.1:
+                        self.tick(last=True)
+                    return False
+                self.last_tick = GLib.timeout_add(200, rest)
 
     def section(text):
         return Gtk.Label(label=text, xalign=0, css_classes=["section"])
@@ -195,7 +225,7 @@ def build():
             box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4,
                           css_classes=["menu-box"])
             box.append(Gtk.Label(label=T("sound.title"), css_classes=["menu-title"]))
-            self.master = Slider("sink", "@DEFAULT_SINK@")
+            self.master = Slider("sink", "@DEFAULT_SINK@", feedback=True)
             self.mic = Slider("source", "@DEFAULT_SOURCE@")
             box.append(self.master)
             box.append(self.mic)

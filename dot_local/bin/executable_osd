@@ -11,9 +11,19 @@ run=${XDG_RUNTIME_DIR:-/tmp}
 sink=@DEFAULT_AUDIO_SINK@
 source=@DEFAULT_AUDIO_SOURCE@
 
+# Volume keys: a short tick at the new volume, so you hear how loud it is
+# (at most every 140 ms: a held key would rattle). Sound: assets/make-sounds.py
+tick() {
+    local last=0 now=${EPOCHREALTIME/[.,]/}
+    { read -r last <"$run/osd.tick"; } 2>/dev/null
+    (( now - last < 140000 )) && return
+    echo "$now" >"$run/osd.tick"
+    pw-play --media-role event "$HOME/.local/share/sounds/slate/tick.oga" >/dev/null 2>&1 &
+}
+
 case "$1 ${2-}" in
-"volume up")      wpctl set-mute $sink 0; wpctl set-volume -l 1 $sink 5%+ ;;
-"volume down")    wpctl set-volume $sink 5%- ;;
+"volume up")      wpctl set-mute $sink 0; wpctl set-volume -l 1 $sink 5%+; tick ;;
+"volume down")    wpctl set-volume $sink 5%-; tick ;;
 "volume mute")    wpctl set-mute $sink toggle ;;
 "mic mute")       wpctl set-mute $source toggle ;;
 "brightness up")  brightnessctl -q -e2 -n1 set 5%+ ;;
