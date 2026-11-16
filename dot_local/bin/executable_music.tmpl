@@ -4,6 +4,7 @@
   music          title module (custom/music) = `music part title`
   music part P   print the JSON lines of part P (title, icon, bar0..bar5) for
                  waybar; starts the daemon when none runs
+  music ensure   start the daemon unless one runs (reader loop, see part)
   music daemon   watch the player, feed every part through its FIFO
   music show     bring the player window here (Spotify), start it if needed
   music hide     Spotify's own "Minimize to Tray" (keeps playing; SUPER+X)
@@ -23,6 +24,7 @@ import fcntl
 import html
 import json
 import os
+import re
 import subprocess
 import sys
 import threading
@@ -120,15 +122,48 @@ def follow():
 class Cava:
     """Runs cava while music plays and keeps `levels` (0-LEVELS per bar) fresh."""
 
+    CHECK = 4    # seconds between health checks while playing
+
     def __init__(self):
         self.proc = None
+        self.checked = 0.0
         run = os.environ.get("XDG_RUNTIME_DIR", "/tmp")
         self.conf = os.path.join(run, "music-cava.conf")
         with open(self.conf, "w") as f:
             f.write(CAVA_CONF)
 
+    def wired(self):
+        """Is cava still listening to the default sink? cava stays alive when its
+        sink vanishes (Bluetooth profile switch, headset off) and WirePlumber
+        relinks it to the default *source*, the microphone: the bars then dance
+        to the room or sit still. `pw-link -l` lists cava's inputs and their peers."""
+        try:
+            meta = subprocess.run(["pw-metadata", "0", "default.audio.sink"], capture_output=True,
+                                  text=True, timeout=2).stdout
+            links = subprocess.run(["pw-link", "-l"], capture_output=True, text=True, timeout=2).stdout
+        except (OSError, subprocess.TimeoutExpired):
+            return True
+        m = re.search(r'"name":\s*"([^"]+)"', meta)
+        if not m:
+            return True
+        peers, inside = [], False
+        for line in links.splitlines():
+            if not line.startswith(" "):
+                inside = line.startswith("cava:input")
+            elif inside and "|<-" in line:
+                peers.append(line.split("|<-", 1)[1].strip())
+        return any(p.startswith(m.group(1) + ":monitor") for p in peers)
+
     def running(self, on):
+        """Start/stop cava; while on, restart it every few seconds when it died
+        or lost the default sink (checked at most every CHECK seconds)."""
+        if on and self.proc and time.monotonic() - self.checked > self.CHECK:
+            self.checked = time.monotonic()
+            if self.proc.poll() is not None or not self.wired():
+                self.proc.terminate()
+                self.proc = None
         if on and not self.proc:
+            self.checked = time.monotonic()
             self.proc = subprocess.Popen(["cava", "-p", self.conf], stdout=subprocess.PIPE,
                                          stderr=subprocess.DEVNULL, text=True)
             threading.Thread(target=self.read, args=(self.proc,), daemon=True).start()
@@ -249,12 +284,20 @@ def part(name):
     (an unbuffered Python line loop read byte by byte, one syscall per
     character at the visualizer's frame rate)."""
     path = fifo(name)
+    ensure()
+    # cat only ends when the daemon is gone (it holds the write end open), so
+    # every pass of the loop first brings a daemon back: it quits after a code
+    # change or when idle, and without this the bar froze until waybar restarted
+    os.execvp("sh", ["sh", "-c", 'trap \'rm -f "$1"\' EXIT; while :; do "$2" ensure; cat "$1"; sleep 1; done',
+                     "sh", path, os.path.realpath(sys.argv[0])])
+
+
+def ensure():
+    """Start the daemon unless one runs."""
     if lock_free():
         subprocess.Popen([sys.argv[0], "daemon"], start_new_session=True,
                          stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
                          stderr=subprocess.DEVNULL)
-    os.execvp("sh", ["sh", "-c", 'trap \'rm -f "$1"\' EXIT; while :; do cat "$1"; sleep 1; done',
-                     "sh", path])
 
 
 def span(color, text):
@@ -277,8 +320,11 @@ def title_text(title, since, playing):
     # one cycle: hold at the start, then scroll once through the whole loop
     cycle = SCROLL_HOLD + len(loop) / SCROLL_SPEED
     phase = t % cycle if playing else 0
-    pos = max(0.0, phase - SCROLL_HOLD) * SCROLL_SPEED
-    return marquee(loop * 2, pos), playing
+    if phase <= SCROLL_HOLD:
+        # at rest the title starts with its first letter: the marquee always
+        # spends its leftmost slot on the letter sliding out (blank at rest)
+        return html.escape(title[:WIDTH]), playing
+    return marquee(loop * 2, (phase - SCROLL_HOLD) * SCROLL_SPEED), playing
 
 
 def gap(px):
@@ -545,6 +591,8 @@ if __name__ == "__main__":
         menu()
     elif args[:1] == ["part"] and len(args) == 2:
         part(args[1])
+    elif args == ["ensure"]:
+        ensure()
     elif args == ["daemon"]:
         daemon()
     else:
