@@ -39,7 +39,9 @@
         // so each bar only shows the workspaces on its own screen
         // Solid logo-style glyphs: 1 desktop (Arch), 2 browser (Firefox logo),
         // 3 Neovim, 4 YouTube, 5 games (ghost), 6 free (Pac-Man, chases
-        // the ghost), 7 chat (Discord), 8 notes (Obsidian)
+        // the ghost), 7 chat (Discord), 8 notes (Obsidian). With an external
+        // main screen the laptop keeps two of its own: 9 (laptop) and 10
+        // (space invader, the third arcade icon)
         "format-icons": {
             "1": "\uf303",
             "2": "\uf269",
@@ -50,6 +52,7 @@
             "7": "\udb81\ude6f",
             "8": "\ue6bb",
             "9": "\udb80\udf22",
+            "10": "\udb82\udfc9",
             "default": "\udb81\udf66"
         },
         "on-scroll-up": "hyprctl dispatch 'hl.dsp.focus({workspace = \"e-1\"})'",

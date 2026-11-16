@@ -105,24 +105,42 @@ local function main_monitor()
 end
 
 -- Workspaces 1-8 live on the main screen (persistent, so the bar always shows
--- all eight); the laptop panel, when it is not the main one, gets workspace 9.
--- Unplugging hands everything back to the laptop on its own.
+-- all eight). The laptop panel, when it is not the main one, gets 9 and 10 of
+-- its own (SUPER+9 / SUPER+0); alone again, it takes 1-8 back and 9/10 only
+-- stay around while they still hold windows.
+local laptop_ws = { "9", "10" }
 local current_main
+local rules = {}        -- workspace rules of the last arrange()
+local last_main_ws      -- workspace (1-8) last looked at, shown again after a change
+hl.on("workspace.active", function(ws)
+    if ws and ws.id and ws.id >= 1 and ws.id <= 8 then last_main_ws = ws.id end
+end)
+
 local function arrange()
     local main = main_monitor()
+    local back = tostring(last_main_ws or 1)
     current_main = main
+    -- an older rule would keep 9/10 persistent (or 1-8 tied to a screen that
+    -- is gone): drop the last set, then write the new one
+    for _, r in ipairs(rules) do r:set_enabled(false) end
+    rules = {}
     for i = 1, 8 do
-        hl.workspace_rule({ workspace = tostring(i), monitor = main, persistent = true })
+        table.insert(rules, hl.workspace_rule({ workspace = tostring(i), monitor = main, persistent = true }))
     end
-    local has_internal = hl.get_monitor(internal) ~= nil
-    if main ~= internal and has_internal then
+    local split = main ~= internal and hl.get_monitor(internal) ~= nil
+    if split then
+        for _, ws in ipairs(laptop_ws) do
+            table.insert(rules, hl.workspace_rule({ workspace = ws, monitor = internal, persistent = true }))
+            hl.dispatch(hl.dsp.workspace.move({ workspace = ws, monitor = internal }))
+        end
         hl.dispatch(hl.dsp.focus({ monitor = internal }))
-        hl.dispatch(hl.dsp.focus({ workspace = "9" }))    -- laptop needs one of its own
+        hl.dispatch(hl.dsp.focus({ workspace = laptop_ws[1] }))
     end
     for i = 1, 8 do
         hl.dispatch(hl.dsp.workspace.move({ workspace = tostring(i), monitor = main }))
     end
-    hl.dispatch(hl.dsp.focus({ workspace = "1" }))
+    -- back to where the work was, on whichever screen has it now
+    hl.dispatch(hl.dsp.focus({ workspace = back }))
 end
 
 -- Laptop panel off while an external screen is on (menu switch), back on as
@@ -163,10 +181,17 @@ hl.on("monitor.added", function()
     -- give the new output a moment to finish its mode switch
     hl.timer(refresh, { timeout = 500, type = "oneshot" })
 end)
+-- A screen left: its workspaces fell onto whatever is still there, but the
+-- rules kept pointing at it and the laptop stayed on its own workspace 9.
+-- Hand 1-8 to the new main screen. If the laptop panel was off, turn it on
+-- first; its "monitor.added" then arranges.
 hl.on("monitor.removed", function()
     hl.timer(function()
-        if not hl.get_monitor(internal) and #externals() == 0 then internal_on() end
-        current_main = main_monitor()
+        if not hl.get_monitor(internal) and #externals() == 0 then
+            internal_on()
+        else
+            arrange()
+        end
     end, { timeout = 300, type = "oneshot" })
 end)
 hl.on("hyprland.start", refresh)
