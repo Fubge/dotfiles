@@ -4,7 +4,7 @@ local mod = "SUPER" -- the Windows key
 local run = function(cmd)
     return hl.dsp.exec_cmd(v.launch .. cmd)
 end
--- Menus and popups start directly: a systemd scope (uwsm app) costs ~0.2 s per
+-- Menus and popups start directly: a systemd scope (uwsm) costs time on every
 -- press, and they are no apps (resident popups get their command through
 -- popup-cmd, ~5 ms; rofi starts apps through uwsm itself, vars.lua M.menu)
 local menu = function(cmd)
@@ -24,7 +24,9 @@ local function bind(keys, action, desc, opts)
 end
 
 group(S.group_apps)
-bind(mod .. " + Q", run(v.terminal), S.terminal)
+-- the terminal only asks the running kitty server for a window (vars.lua):
+-- nothing to put into a scope, so it starts directly like the menus
+bind(mod .. " + Q", menu(v.terminal), S.terminal)
 bind(mod .. " + B", run(v.browser), S.browser)
 bind(mod .. " + E", run(v.fileManager), S.files)
 -- Discord: jump straight to its window (looked up here, no process to start);
@@ -157,7 +159,7 @@ bind(mod .. " + Tab", function()
         end
     end
     -- Not running: just start it, the window rule opens the special workspace
-    hl.dispatch(hl.dsp.exec_cmd(v.launch .. v.terminal .. " --class " .. v.dropdown.class))
+    hl.dispatch(hl.dsp.exec_cmd(v.terminal .. " --class " .. v.dropdown.class))
 end, S.dropdown)
 
 group(S.group_screenshots)

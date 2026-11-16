@@ -8,9 +8,9 @@ if [[ -n $addr ]]; then
     hyprctl dispatch "hl.dsp.window.close({window = \"address:$addr\"})" >/dev/null
 else
     # No bar tooltips on top of the popup while it is open (~/.local/bin/bar-tooltips);
-    # uwsm app (scope) runs in the foreground, so the trap fires when the popup closes
+    # uwsm-app (scope) runs in the foreground, so the trap fires when the popup closes
     "$HOME/.local/bin/bar-tooltips" off $$
     trap '"$HOME/.local/bin/bar-tooltips" on $$' EXIT
     "$HOME/.local/bin/list-menu" --close
-    uwsm app -- "$@"
+    uwsm-app -- "$@"
 fi

@@ -8,4 +8,4 @@ has() { hyprctl clients -j | grep -q "\"class\": \"$1"; }
 
 for _ in $(seq 60); do has vivaldi-stable && break; sleep 1; done
 sleep 5   # restored windows appear a moment after the first one
-has "$APP_CLASS" || exec uwsm app -- vivaldi --app=https://www.youtube.com
+has "$APP_CLASS" || exec uwsm-app -- vivaldi --app=https://www.youtube.com

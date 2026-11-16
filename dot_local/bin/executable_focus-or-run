@@ -12,7 +12,7 @@ focus() { hyprctl dispatch "hl.dsp.focus({window = \"address:$1\"})" >/dev/null;
 
 addr=$(find_window)
 [[ -n $addr ]] && { focus "$addr"; exit; }
-uwsm app -- "$@" >/dev/null 2>&1 &
+uwsm-app -- "$@" >/dev/null 2>&1 &
 for _ in {1..300}; do   # up to 30 s (a cold start after login can take a while)
     sleep 0.1
     addr=$(find_window)

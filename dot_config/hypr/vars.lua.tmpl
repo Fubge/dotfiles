@@ -4,14 +4,21 @@ local M = {}
 
 -- Applications ---------------------------------------------------------------
 -- Every app is launched through uwsm so it runs in its own systemd scope.
-M.launch      = "uwsm app -- "
-M.terminal    = "kitty"
+-- uwsm-app is the small shell client of uwsm's app daemon: same scope, but no
+-- Python start per launch (measured to the mapped window: 100 instead of
+-- 145 ms on the charger, 310 instead of 510 ms in the power-saver profile).
+M.launch      = "uwsm-app -- "
+-- Terminals are windows of ONE kitty process (-1 = --single-instance): a new
+-- window is there in ~10 ms (~20 ms on battery) instead of 80 ms (270 ms on
+-- battery), because nothing has to start. The process is the hidden server
+-- from M.background below; if it ever dies, the next terminal becomes it.
+M.terminal    = "kitty -1"
 M.browser     = "vivaldi"
 M.fileManager = "dolphin"
 -- App launcher; text without a matching app is searched on the web.
 -- rofi itself starts without uwsm (faster), the apps it starts get their scope
 M.menu        = "rofi -show combi -modes combi,web:" .. os.getenv("HOME") .. "/.local/bin/rofi-web-mode -combi-modes web,drun -display-combi Apps -theme launcher"
-    .. " -run-command 'uwsm app -- {cmd}'"
+    .. " -run-command 'uwsm-app -- {cmd}'"
 M.bin         = os.getenv("HOME") .. "/.local/bin/"
 -- Apps whose window SUPER+X keeps (lowercase window classes) and what it does
 -- instead; SUPER+SHIFT+X really closes them. Spotify: hide its workspace (keeps
@@ -32,9 +39,13 @@ M.keepAlive   = {
 -- waits until it answers.
 local portalReady = "busctl --user call org.freedesktop.portal.Desktop /org/freedesktop/portal/desktop "
     .. "org.freedesktop.portal.Settings ReadOne ss org.freedesktop.appearance color-scheme >/dev/null 2>&1"
+-- The login terminal must not win the race against the hidden kitty server
+-- (M.background): the first kitty becomes the shared process, and one with a
+-- window quits with its last window. Wait (up to 5 s) for the server's socket.
+local kittyReady = "for i in $(seq 50); do ss -xl | grep -q @kitty-ipc- && break; sleep 0.1; done"
 M.startup = {
     { workspace = 2, cmd = "sh -c '" .. portalReady .. "; exec " .. M.browser .. "'", class = "vivaldi" },
-    { workspace = 3, cmd = M.terminal .. " nvim", class = "kitty" },
+    { workspace = 3, cmd = "sh -c '" .. kittyReady .. "; exec " .. M.terminal .. " nvim'", class = "kitty" },
 }
 -- Started out of sight: Spotify's window rule puts it on special:music, which
 -- would pop up over the desktop; `music hide` closes it again (SUPER+M shows it)
@@ -42,6 +53,7 @@ M.hidden = {
     { cmd = "spotify-launcher", class = "spotify", hide = M.bin .. "music hide" },
 }
 M.background = {
+    "kitty -1 --start-as=hidden",         -- the kitty server every terminal window lives in (M.terminal)
     M.bin .. "notifications",             -- notification cards (replaces dunst)
     M.bin .. "osd-pill",                  -- volume / brightness pill (keys: ~/.local/bin/osd)
     M.bin .. "discord-start",             -- workspace 7 without switching (rules.lua), bar-style tray icons
