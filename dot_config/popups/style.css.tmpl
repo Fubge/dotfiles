@@ -10,7 +10,7 @@ window.popup {
     backdrop-filter: blur(12px);
     background-color: alpha({{ .palette.bg }}, 0.94);
     color: {{ .palette.fg }};
-    font-family: "{{ .design.font_ui }}";
+    font-family: "{{ .design.font }}";
     font-size: 11pt;
 }
 
@@ -240,6 +240,10 @@ button.sound-row.active { color: {{ .palette.accent }}; }
     font-size: 9pt;
     color: {{ .palette.comment }};
 }
+/* orange means "this one is on": in device lists (Wi-Fi, Bluetooth) only
+   the connected row has an orange icon, the others are quiet */
+button.device .row-icon { color: {{ .palette.fg_muted }}; }
+button.device.active .row-icon, .device.active .row-icon { color: {{ .palette.accent }}; }
 button.device.active .row-status { color: {{ .palette.fg_muted }}; }
 button.device.busy .row-status { color: {{ .palette.accent }}; }
 .note {
@@ -1262,7 +1266,7 @@ window.notifications { background: none; }
     background-color: {{ .palette.bg }};
     box-shadow: inset 0 1px alpha({{ .palette.fg }}, 0.05);
     color: {{ .palette.fg }};
-    font-family: "{{ .design.font_ui }}";
+    font-family: "{{ .design.font }}";
     font-size: 10pt;
     transition: background-color 180ms ease, border-color 180ms ease;
 }
@@ -1421,7 +1425,7 @@ button.more.dnd.on { color: {{ .palette.accent }}; background-color: alpha({{ .p
     border-radius: {{ add .design.rounding 2 }}px;
     border: 1px solid transparent;
     background-color: alpha({{ .palette.steel }}, 0.16);
-    font-family: "{{ .design.font_ui }}";
+    font-family: "{{ .design.font }}";
     font-size: 10pt;
     transition: background-color 150ms ease, border-color 150ms ease;
 }
@@ -1543,13 +1547,13 @@ button.sys-tile {
                 box-shadow 200ms ease, border-radius 200ms ease;
 }
 .sys-tile-name {
-    font-family: "{{ .design.font_ui }}";
+    font-family: "{{ .design.font }}";
     font-size: 10pt;
     color: {{ .palette.fg_muted }};
     margin-top: 2px;
 }
 .sys-tile-status {
-    font-family: "{{ .design.font_ui }}";
+    font-family: "{{ .design.font }}";
     font-size: 8pt;
     color: {{ .palette.comment }};
 }
@@ -1569,7 +1573,7 @@ window.enter .sys-tile.in-{{ $i }} { animation: session-pop 340ms ease-out {{ mu
 {{- end }}
 
 /* pages: cards of rows */
-.sys-page { font-family: "{{ .design.font_ui }}"; }
+.sys-page { font-family: "{{ .design.font }}"; }
 .sys-card {
     padding: 12px 14px 10px 14px;
     border-radius: 12px;
@@ -1704,7 +1708,7 @@ button.sys-chip.on {
     font-family: "{{ .design.font }}";
     font-size: 14pt;
 }
-.sys-confirm-text { font-family: "{{ .design.font_ui }}"; font-size: 10pt; }
+.sys-confirm-text { font-family: "{{ .design.font }}"; font-size: 10pt; }
 button.item-action.sys-keep { background-color: {{ .palette.accent }}; color: {{ .palette.bg }}; }
 
 /* field to try the key repeat */
@@ -1742,7 +1746,7 @@ window.osd-win { background: none; }
     border: 1px solid alpha({{ .palette.steel }}, 0.35);
     box-shadow: 0 6px 18px alpha(black, 0.4);
     color: {{ .palette.fg }};
-    font-family: "{{ .design.font_ui }}";
+    font-family: "{{ .design.font }}";
     transition: background-color 150ms ease;
 }
 .osd:hover { background-color: mix({{ .palette.bg }}, {{ .palette.steel }}, 0.25); }
