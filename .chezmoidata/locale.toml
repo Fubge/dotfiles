@@ -495,6 +495,8 @@ looks_like   = { de = "wirkt wie {w} × {h}", en = "looks like {w} × {h}" }
 scale        = { de = "Skalierung", en = "Scale" }
 vrr          = "Adaptive Sync"
 vrr_sub      = { de = "gegen Ruckeln, wenn Spiele schwanken", en = "against stutter when games fluctuate" }
+battery_60     = { de = "Auf Akku nur 60 Hz", en = "Only 60 Hz on battery" }
+battery_60_sub = { de = "spart Strom; aus = immer die gewählte Rate, flüssiger", en = "saves power; off = always the chosen rate, smoother" }
 lid_off      = { de = "Aus, solange ein Bildschirm dran ist", en = "Off while a display is plugged in" }
 lid_off_sub  = { de = "Zuklappen macht das sowieso", en = "Closing the lid does that anyway" }
 disabled_note = { de = "Ausgeschaltet. Wähle oben, wo er stehen soll, dann geht er wieder an.", en = "Switched off. Pick where it should sit above, and it comes back on." }

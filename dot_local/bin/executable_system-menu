@@ -706,6 +706,11 @@ def build():
                                                           lambda v: self.set_screen(m, mons, vrr=v)),
                                 T("sys.vrr_sub")))
             if is_int:
+                # default on (hypr/monitors.lua: 60 Hz on battery unless battery_60 is false)
+                slow = saved.get("internal", {}).get("battery_60", True)
+                rows.append(row(T("sys.battery_60"), switch(
+                    slow, lambda v: self.set_internal(battery_60=v)),
+                    T("sys.battery_60_sub")))
                 off = saved.get("internal", {}).get("off_with_external", False)
                 rows.append(row(T("sys.lid_off"), switch(
                     off, lambda v: self.set_internal(off_with_external=v)),
