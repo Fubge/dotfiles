@@ -47,8 +47,13 @@ CSS = os.path.expanduser("~/.config/popups/style.css")
 CLOSE_MS = 900
 DIAL = 210                  # px, the dial's size
 BADGE_TOP = 38              # the badge hangs right below the bar (8 margin + 30)
-SOUND = "/usr/share/sounds/freedesktop/stereo/alarm-clock-elapsed.oga"
+FUSE_W, FUSE_H = 150, 14    # the fuse fits into the 16 px gap below the bar
+PEEK = 3.5                  # s the tab shows itself when a timer starts
+# a soft three-note chime (assets/make-sounds.py); the freedesktop alarm clock
+# it replaces was a harsh beeping
+SOUND = os.path.expanduser("~/.local/share/sounds/slate/timer.oga")
 RINGS = 3                   # the sound plays this often unless stopped
+RING_GAP = 1500             # ms of quiet between two rings
 SNOOZE = 5 * 60
 
 
@@ -139,13 +144,63 @@ def build():
             b.add_circle(pt().init(ex, ey), 9)
             snap.append_fill(b.to_path(), Gsk.FillRule.WINDING, self.knob)
 
+    class Fuse(Gtk.Widget):
+        """A burning fuse: a thin line that gets shorter towards the left as
+        the time runs out, with a glowing spark at its end. Low enough to fit
+        into the gap between the bar and the windows."""
+
+        def __init__(self):
+            super().__init__(css_classes=["timer-fuse"], halign=Gtk.Align.CENTER)
+            self.fraction, self.phase, self.paused = 1.0, 0, False
+
+        def do_measure(self, orientation, for_size):
+            n = FUSE_W if orientation == Gtk.Orientation.HORIZONTAL else FUSE_H
+            return n, n, -1, -1
+
+        def set(self, fraction, phase, paused):
+            self.fraction, self.phase, self.paused = max(0.0, min(1.0, fraction)), phase, paused
+            self.queue_draw()
+
+        def do_snapshot(self, snap):
+            def rgba(spec):
+                c = Gdk.RGBA()
+                c.parse(spec)
+                return c
+
+            def line(x0, x1, width, color):
+                b = Gsk.PathBuilder.new()
+                b.move_to(x0, y)
+                b.line_to(x1, y)
+                st = Gsk.Stroke.new(width)
+                st.set_line_cap(Gsk.LineCap.ROUND)
+                snap.append_stroke(b.to_path(), st, color)
+
+            def dot(x, r, color):
+                b = Gsk.PathBuilder.new()
+                b.add_circle(Graphene.Point().init(x, y), r)
+                snap.append_fill(b.to_path(), Gsk.FillRule.WINDING, color)
+
+            pad, y = 7, self.get_height() / 2
+            w = self.get_width() - 2 * pad
+            end = pad + w * self.fraction
+            line(pad, pad + w, 3, rgba("rgba(28,32,41,0.85)"))      # burnt part
+            if self.paused:
+                line(pad, end, 3, rgba("#7a8299"))
+                return
+            line(pad, end, 3, rgba("#ff7f00"))
+            # the spark flickers: big and small glow in turn
+            dot(end, 5.5 if self.phase else 4, rgba("rgba(255,127,0,0.35)"))
+            dot(end, 2.5, rgba("#ffd9a8"))
+
     class Badge(Gtk.Window):
-        """The countdown as a little tab hanging below the middle of the bar
-        (layer surface "timer-badge", hypr/rules.lua): it slides out from
-        behind the bar when a timer starts and back in when none is left.
-        Hourglass, time left, name, a thin progress line; red with a
-        wiggling bell when one is up. Click: the popup, right click: quiet
-        (ringing) or pause / go on (the next timer)."""
+        """The countdown below the middle of the bar (layer surface
+        "timer-badge", hypr/rules.lua). Most of the time it is only a fuse
+        (Fuse) in the gap between bar and windows, so it covers nothing. The
+        tab with hourglass, time left and name slides out from behind the bar
+        for a moment when a timer starts, while the mouse is on it, during
+        the last minute and, red with a wiggling bell, when one is up.
+        Click: the popup, right click: quiet (ringing) or pause / go on (the
+        next timer)."""
 
         def __init__(self, popup):
             super().__init__(css_classes=["timer-badge-win"], resizable=False)
@@ -175,12 +230,45 @@ def build():
             box.append(self.bar)
             self.box = box
             self.rev.set_child(box)
-            self.set_child(self.rev)
+            self.fuse = Fuse()
+            self.fuse_rev = Gtk.Revealer(transition_type=Gtk.RevealerTransitionType.SLIDE_UP,
+                                         transition_duration=140, reveal_child=True)
+            self.fuse_rev.set_child(self.fuse)
+            root = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+            root.append(self.fuse_rev)
+            root.append(self.rev)
+            self.set_child(root)
             click = Gtk.GestureClick(button=0)
             click.connect("released", self.on_click)
-            box.add_controller(click)
+            root.add_controller(click)
+            motion = Gtk.EventControllerMotion()
+            motion.connect("enter", self.on_hover, True)
+            motion.connect("leave", self.on_hover, False)
+            root.add_controller(motion)
             self.last = None
             self.kind = None
+            self.hover = False
+            self.leave_timer = None
+            self.peek_until = 0     # the tab shows itself until then
+            self.known = None       # timer ids seen so far: a new one peeks
+
+        def on_hover(self, _c, *args):
+            inside = args[-1]
+            if self.leave_timer:
+                GLib.source_remove(self.leave_timer)
+                self.leave_timer = None
+            if inside:
+                self.hover = True
+                self.update(self.popup.state)
+            else:
+                # not at once: growing or shrinking the surface under the
+                # mouse sends a leave of its own
+                def left():
+                    self.leave_timer = None
+                    self.hover = False
+                    self.update(self.popup.state)
+                    return False
+                self.leave_timer = GLib.timeout_add(450, left)
 
         def on_click(self, g, _n, _x, _y):
             if g.get_current_button() == 3:
@@ -199,12 +287,16 @@ def build():
                 self.popup.close()
 
         def on_revealed(self, *_a):
-            if not self.rev.get_reveal_child() and not self.rev.get_child_revealed():
+            if self.last is None and not self.rev.get_child_revealed():
                 self.set_visible(False)
 
         def update(self, state):
             now = time.time()
             run = sorted(state["timers"], key=lambda t: timers.left(t, now))
+            ids = {t["id"] for t in state["timers"]}
+            if self.known is not None and ids - self.known:
+                self.peek_until = now + PEEK
+            self.known = ids
             if state["ringing"]:
                 r = state["ringing"][-1]
                 view = ("ringing", timers.BELL, T("timer.done_short"), r["label"] or T("timer.name"),
@@ -220,6 +312,10 @@ def build():
                         lf / t["total"] if t["total"] else 0)
             else:
                 view = None
+            if view:
+                # tab or fuse; the fuse's spark changes twice a second
+                tab = self.hover or now < self.peek_until or view[0] in ("ringing", "soon")
+                view += (tab, 0 if tab else int(now * 2) % 2)
             if view == self.last:
                 return
             self.last = view
@@ -227,10 +323,11 @@ def build():
                 # slide back behind the bar, then unmap: a mapped empty surface
                 # left a dark stub below the clock
                 self.rev.set_reveal_child(False)
-                GLib.timeout_add(320, lambda: (not self.rev.get_reveal_child()
+                self.fuse_rev.set_reveal_child(False)
+                GLib.timeout_add(320, lambda: (self.last is None
                                                and self.set_visible(False)) and False)
                 return
-            kind, glyph, text, name, more, frac = view
+            kind, glyph, text, name, more, frac, tab, phase = view
             if kind != self.kind:
                 for k in ("ringing", "paused", "soon", "running"):
                     (self.box.add_css_class if k == kind else self.box.remove_css_class)(k)
@@ -242,9 +339,11 @@ def build():
             self.more.set_text(more)
             self.more.set_visible(bool(more))
             self.bar.set_fraction(frac)
+            self.fuse.set(frac, phase, kind == "paused")
             if not self.get_visible():
                 self.set_visible(True)
-            self.rev.set_reveal_child(True)
+            self.rev.set_reveal_child(tab)
+            self.fuse_rev.set_reveal_child(not tab)
 
     class Popup(Gtk.Window):
         popup_width = WIDTH
@@ -411,7 +510,7 @@ def build():
             except OSError:
                 return False
             GLib.child_watch_add(GLib.PRIORITY_DEFAULT, r["proc"].pid,
-                                 lambda *_a: GLib.timeout_add(600, self.play, nid))
+                                 lambda *_a: GLib.timeout_add(RING_GAP, self.play, nid))
             return False
 
         def silence(self, nid):

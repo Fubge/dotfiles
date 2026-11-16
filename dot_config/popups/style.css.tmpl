@@ -628,6 +628,9 @@ button.timer-ringing {
 /* the tab below the bar: same dark as the clock pill, hangs from the bar's
    lower edge; slides out (Gtk.Revealer), red with a wiggling bell when done */
 window.timer-badge-win { background: none; }
+/* the fuse it shrinks to (drawn by the popup): a soft shadow keeps it
+   readable on a bright wallpaper */
+.timer-fuse { filter: drop-shadow(0 1px 2px alpha(black, 0.5)); }
 .timer-badge {
     padding: 3px 14px 5px 14px;
     margin: 0 10px 10px 10px;        /* room for the shadow and the alarm pulse */
