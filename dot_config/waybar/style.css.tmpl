@@ -15,14 +15,22 @@
 
 * {
     font-family: "{{ .design.font }}", "Symbols Nerd Font";
-    font-size: 14px;
     min-height: 0;
     border: none;
 }
 
+/* Text size is set once per bar and inherited. External screens run at scale 1
+   (a 27" 1440p is ~109 dpi against the laptop panel's ~120 at scale 2), so the
+   same pixels look smaller there: their bar gets one px more. The laptop bar
+   (waybar adds the output name as a class) keeps 14 px. Height, pet and
+   visualizer stay in px, so popups below the bar still line up. */
 window#waybar {
     background: transparent;
     color: @fg;
+    font-size: 15px;
+}
+window#waybar.eDP-1, tooltip, menu {
+    font-size: 14px;
 }
 
 tooltip {
