@@ -32,7 +32,9 @@ HEAD = """\
 # Written by ~/.local/bin/idle-config ({source}), do not edit:
 # change the times in the system menu (SUPER+ALT+Space -> lock & idle)
 general {{
-    lock_cmd         = pidof hyprlock || hyprlock
+    # own scope via uwsm-app: a child of hypridle would die with it when
+    # idle-config restarts hypridle (charger plugged in while locked)
+    lock_cmd         = pidof hyprlock || uwsm-app -- hyprlock
     before_sleep_cmd = loginctl lock-session; hyprctl dispatch 'hl.dsp.submap("wake")'
     # the key that woke the laptop is swallowed by the "wake" submap (binds.lua);
     # after 2 s keys go to the lock screen again (woken by opening the lid)
