@@ -13,6 +13,11 @@ before it starts (systemd/user/hypridle.service.d/override.conf); `watch`
 runs in the background (hypr/vars.lua M.background) and restarts hypridle
 when the power source changes. Times come from settings.json (section
 "idle", seconds, 0 = never) on top of DEFAULTS.
+
+The lid ("lid" per source: "suspend" or "on"): logind suspends on its own.
+For "on", `apply` and `watch` hold a lid inhibitor in the user unit
+slate-lid.service, so logind leaves the lid to hypr/monitors.lua, which only
+darkens the panel (the screen keeps rendering: a Miracast stream goes on).
 """
 import os
 import subprocess
@@ -42,11 +47,12 @@ general {{
 }}
 """
 LISTENERS = {
-    # dim the screen (not to 0, OLED) and turn the keyboard backlight off
+    # dim the screen (not to 0, OLED) and turn the keyboard backlight off;
+    # not with the lid closed (monitors.lua darkened it and saved the levels)
     "dim": """
 listener {{
     timeout    = {t}
-    on-timeout = brightnessctl -s set 10 && brightnessctl -sd tpacpi::kbd_backlight set 0
+    on-timeout = grep -q closed /proc/acpi/button/lid/*/state || {{ brightnessctl -s set 10 && brightnessctl -sd tpacpi::kbd_backlight set 0; }}
     on-resume  = brightnessctl -r && brightnessctl -rd tpacpi::kbd_backlight
 }}
 """,
@@ -115,9 +121,30 @@ def write():
     return True
 
 
+LID_UNIT = "slate-lid.service"
+
+
+def lid_on(source):
+    return settings.get("idle").get(source, {}).get("lid", "suspend") == "on"
+
+
+def sync_lid():
+    """Hold the lid inhibitor exactly while the current source wants "on"."""
+    want = lid_on("ac" if on_ac() else "battery")
+    held = subprocess.run(["systemctl", "--user", "is-active", "--quiet", LID_UNIT]).returncode == 0
+    if want and not held:
+        subprocess.run(["systemd-run", "--user", "--quiet", "--collect", "--unit", LID_UNIT,
+                        "systemd-inhibit", "--what=handle-lid-switch", "--mode=block",
+                        "--who=Slate", "--why=Lid: keep running (system menu)",
+                        "sleep", "infinity"])
+    elif held and not want:
+        subprocess.run(["systemctl", "--user", "stop", LID_UNIT])
+
+
 def apply(force=False):
     if write() or force:
         subprocess.run(["systemctl", "--user", "try-restart", "hypridle.service"])
+    sync_lid()
 
 
 def watch():

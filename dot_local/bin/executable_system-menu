@@ -19,7 +19,8 @@ existing popups (Wi-Fi, Bluetooth, sound, power, shortcuts) or tools
                 tap to click, right click by two fingers or by the corner
     keyboard    layout, repeat delay and rate (with a field to try it), swaps
     nightlight  warmer colors: off, from sunset, own times, always (nightlight)
-    idle        dim / lock / screen off / suspend, for charger and battery
+    idle        dim / lock / screen off / suspend, and what closing the lid
+                does (suspend or keep running dark), for charger and battery
 
 Everything applies at once and is kept in ~/.local/state/slate/settings.json
 (machine-local, never touched by chezmoi; ~/.local/lib/popup/settings.py).
@@ -1081,6 +1082,20 @@ def build():
             rows = [row(title, stepper(IDLE_VALUES, steps[key], idle_text,
                                        lambda v, k=key: set_step(k, v)))
                     for key, _icon, title in IDLE_STEPS]
+            # lid: suspend (logind) or keep running with the panel dark
+            # (idle-config holds a lid inhibitor, hypr/monitors.lua darkens)
+            lid = settings.get("idle").get(src, {}).get("lid", "suspend")
+
+            def set_lid(v):
+                cur = dict(settings.get("idle").get(src, {}))
+                cur["lid"] = v
+                apply("idle", {src: cur})
+                subprocess.Popen([BIN + "idle-config", "apply"])
+                self.render("idle")
+
+            rows.append(row(T("sys.lid"), None, T("sys.lid_sub"), stacked=True))
+            rows.append(segments([("suspend", T("sys.lid_sleep")), ("on", T("sys.lid_on"))],
+                                 lid, set_lid))
             box.append(card("\U000F0341", T("sys.on_ac") if src == "ac" else T("sys.on_battery"), *rows))
             box.append(lbl(T("sys.idle_tip"), "sys-sub", wrap=True, xalign=0.5))
 
