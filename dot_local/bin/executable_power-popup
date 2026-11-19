@@ -13,6 +13,11 @@ level, time left / until full, power draw, health and charge limit come from
 UPower; the profile from power-profiles-daemon. Both over D-Bus, followed
 live while the popup is open.
 
+The lid row (what closing the lid does on the current power source: suspend
+or keep running with the screen dark, e.g. streaming to a TV) is the same
+setting as in the system menu (SUPER+ALT+Space -> lock & idle), see
+~/.local/bin/idle-config.
+
 The profile buttons switch at once (the charger udev rule switches again on
 the next plug / unplug, see power-profile-auto). Escape closes.
 """
@@ -23,6 +28,7 @@ from pathlib import Path
 
 sys.path.insert(0, os.path.expanduser("~/.local/lib/popup"))
 import resident  # noqa: E402
+import settings  # noqa: E402
 from i18n import T  # noqa: E402
 
 APP = "popup.power"
@@ -46,6 +52,20 @@ PROFILE_ROWS = [("power-saver", "\U000F032A", T("power.saver")),
                 ("balanced", "\U000F0F85", T("power.balanced")),
                 ("performance", "\U000F04C5", T("power.performance"))]
 I_SESSION = "\U000F0425"
+LID_ROWS = [("suspend", "\U000F0904", T("sys.lid_sleep")),
+            ("on", "\U000F0502", T("sys.lid_on"))]
+IDLE_CONFIG = os.path.expanduser("~/.local/bin/idle-config")
+
+
+def on_ac():
+    for ps in Path("/sys/class/power_supply").iterdir():
+        try:
+            if ((ps / "type").read_text().strip() == "Mains"
+                    and (ps / "online").read_text().strip() == "1"):
+                return True
+        except OSError:
+            pass
+    return False
 
 
 def duration(seconds):
@@ -142,6 +162,22 @@ def build():
                 self.profile_box.append(b)
             box.append(self.profile_box)
 
+            # lid: suspend or keep running, for the power source in use
+            self.lid_label = Gtk.Label(xalign=0, css_classes=["section"])
+            box.append(self.lid_label)
+            lid_box = Gtk.Box(spacing=6, homogeneous=True, css_classes=["segments"])
+            self.lid_buttons = {}
+            for key, icon, label in LID_ROWS:
+                b = Gtk.Button(css_classes=["segment", "flat"])
+                inner = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
+                inner.append(Gtk.Label(label=icon, css_classes=["segment-icon"]))
+                inner.append(Gtk.Label(label=label, css_classes=["segment-label"]))
+                b.set_child(inner)
+                b.connect("clicked", lambda _b, k=key: self.set_lid(k))
+                self.lid_buttons[key] = b
+                lid_box.append(b)
+            box.append(lid_box)
+
             box.append(Gtk.Separator(css_classes=["sound-sep"]))
             more = Gtk.Box(spacing=12)
             more.append(Gtk.Label(label=I_SESSION, css_classes=["row-icon"]))
@@ -178,6 +214,15 @@ def build():
                 p.call_finish(res)
             except GLib.Error:
                 return
+
+        def set_lid(self, key):
+            src = "ac" if on_ac() else "battery"
+            cur = dict(settings.get("idle").get(src, {}))
+            cur["lid"] = key
+            settings.update("idle", {src: cur})
+            resident.hypr("eval Slate.apply('idle')")
+            subprocess.Popen([IDLE_CONFIG, "apply"], start_new_session=True)
+            self.render()
 
         def open_session(self):
             self.close()
@@ -237,6 +282,12 @@ def build():
             for key, b in self.profile_buttons.items():
                 b.set_visible(key in offered)
                 (b.add_css_class if key == active else b.remove_css_class)("active")
+
+            ac = on_ac()
+            self.lid_label.set_text(T("sys.lid") + "  ·  " + T("sys.on_ac" if ac else "sys.on_battery"))
+            lid = settings.get("idle").get("ac" if ac else "battery", {}).get("lid", "suspend")
+            for key, b in self.lid_buttons.items():
+                (b.add_css_class if key == lid else b.remove_css_class)("active")
 
             if self.get_visible():
                 self.set_default_size(WIDTH, 1)
