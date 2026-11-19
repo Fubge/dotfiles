@@ -227,14 +227,13 @@ hl.timer(power_tick, { timeout = 5000, type = "oneshot" })
 
 -- Lid switch: with an external monitor connected, closing the lid only turns
 -- off the internal panel. Without one, logind suspends as usual, unless the
--- system menu says "keep running" for this power source (idle.<src>.lid =
--- "on"; ~/.local/bin/idle-config then holds logind's lid inhibitor): the
+-- system menu or power popup says "keep running" (idle.lid = "on";
+-- ~/.local/bin/idle-config then holds logind's lid inhibitor): the
 -- panel only goes dark. Not DPMS off: the screen keeps rendering, so a screen
 -- share (Miracast to a TV) goes on. The dim step of hypridle leaves it alone.
 local lid_dark = false
 local function lid_keeps_running()
-    local idle = s.get("idle")[on_battery() and "battery" or "ac"] or {}
-    return idle.lid == "on"
+    return s.get("idle").lid == "on"
 end
 
 hl.bind("switch:on:Lid Switch", function()

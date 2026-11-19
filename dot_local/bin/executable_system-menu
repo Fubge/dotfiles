@@ -1082,21 +1082,22 @@ def build():
             rows = [row(title, stepper(IDLE_VALUES, steps[key], idle_text,
                                        lambda v, k=key: set_step(k, v)))
                     for key, _icon, title in IDLE_STEPS]
-            # lid: suspend (logind) or keep running with the panel dark
-            # (idle-config holds a lid inhibitor, hypr/monitors.lua darkens)
-            lid = settings.get("idle").get(src, {}).get("lid", "suspend")
+            box.append(card("\U000F0341", T("sys.on_ac") if src == "ac" else T("sys.on_battery"), *rows))
+
+            # lid, one setting for both sources: suspend (logind) or keep
+            # running with the panel dark (idle-config holds a lid inhibitor,
+            # hypr/monitors.lua darkens); also in the power popup
+            lid = settings.get("idle").get("lid", "suspend")
 
             def set_lid(v):
-                cur = dict(settings.get("idle").get(src, {}))
-                cur["lid"] = v
-                apply("idle", {src: cur})
+                apply("idle", {"lid": v})
                 subprocess.Popen([BIN + "idle-config", "apply"])
                 self.render("idle")
 
-            rows.append(row(T("sys.lid"), None, T("sys.lid_sub"), stacked=True))
-            rows.append(segments([("suspend", T("sys.lid_sleep")), ("on", T("sys.lid_on"))],
-                                 lid, set_lid))
-            box.append(card("\U000F0341", T("sys.on_ac") if src == "ac" else T("sys.on_battery"), *rows))
+            box.append(card("\U000F0502", T("sys.lid"),
+                            lbl(T("sys.lid_sub"), "sys-sub", wrap=True, xalign=0),
+                            segments([("suspend", T("sys.lid_sleep")), ("on", T("sys.lid_on"))],
+                                     lid, set_lid)))
             box.append(lbl(T("sys.idle_tip"), "sys-sub", wrap=True, xalign=0.5))
 
         # ================================================================ window
