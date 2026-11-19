@@ -9,6 +9,8 @@ only fstab and the GRUB tweaks come from the base install and the GRUB theme scr
 
 | Managed file (from `system/`, `system-boot/`) | Purpose |
 |---|---|
+| `/etc/NetworkManager/conf.d/wifi-backend.conf` | Wi-Fi backend `wpa_supplicant` (Wi-Fi Direct for Miracast); `iwd.service` disabled, never stopped: switches at the next reboot |
+| `/usr/local/bin/wifi-backend` | `sudo wifi-backend iwd\|wpa_supplicant`: switch back offline (from a TTY), takes effect at reboot |
 | `/usr/local/bin/power-profile-auto` | performance on AC, power-saver on battery |
 | `/etc/udev/rules.d/99-power-profile.rules` | runs it when the charger is plugged in/out |
 | `/etc/systemd/system/power-profile-auto.service` | runs it at boot |
@@ -39,6 +41,7 @@ log in, run `sudo rm /etc/sddm.conf.d/10-theme.conf` and reboot.
 | `/etc/fstab` | btrfs mounts with `noatime,compress=zstd:1` | No metadata write on every file read; fast transparent compression (fewer bytes through dm-crypt) |
 | `NetworkManager-wait-online.service` | disabled (by the system-files script) | Nothing waits for the network at boot |
 | `fstrim.timer` | enabled | Weekly TRIM |
+| ufw | allow `7236/tcp`, `67/udp` | Miracast: the TV connects back for RTSP; DHCP on Wi-Fi Direct |
 | `/etc/grub.d/15_uki` | removed (by the GRUB theme script) | Replaced by the explicit entry in `40_custom` |
 | `/etc/grub.d/30_uefi-firmware` | `chmod -x` (by the GRUB theme script) | Hides "UEFI Firmware Settings"; a `grub` update restores it until the script runs again |
 | your user | login shell `/usr/bin/zsh` (`chsh`) | zsh as interactive shell |

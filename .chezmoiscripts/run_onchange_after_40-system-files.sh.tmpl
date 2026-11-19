@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Install root-owned files into / (copied, not symlinked):
-#   system/       every machine (SDDM theme, power profile switching, iwd Wi-Fi backend,
+#   system/       every machine (SDDM theme, power profile switching, Wi-Fi backend,
 #                 hyprlock PAM (unlocks the keyring too),
 #                 sysctl + journald tuning)
 #   system-boot/  only with machine.boot = true (GRUB, kernel cmdline, console)
@@ -73,9 +73,13 @@ sudo udevadm control --reload
 sudo systemctl daemon-reload
 sudo systemctl enable --now power-profile-auto.service
 
-# Wi-Fi backend: iwd instead of wpa_supplicant (system/etc/NetworkManager/conf.d/wifi-backend.conf)
-sudo systemctl disable --now wpa_supplicant.service 2>/dev/null || true
-sudo systemctl enable --now iwd.service
+# Wi-Fi backend: wpa_supplicant (system/etc/NetworkManager/conf.d/wifi-backend.conf).
+# NetworkManager starts wpa_supplicant itself over D-Bus, so it needs no enabling.
+# iwd is only disabled, never stopped: stopping it would drop the running Wi-Fi.
+# The switch happens at the next reboot. Undo: sudo wifi-backend iwd
+if ! grep -q '^wifi.backend=iwd' /etc/NetworkManager/conf.d/wifi-backend.conf; then
+    sudo systemctl disable iwd.service 2>/dev/null || true
+fi
 # Nothing here needs the network before login; waiting for it only delays boot
 sudo systemctl disable NetworkManager-wait-online.service 2>/dev/null || true
 # Never restart the network from here: it cuts every running session (SSH,

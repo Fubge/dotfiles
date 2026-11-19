@@ -18,8 +18,9 @@ snap-pac
 
 # Networking & bluetooth
 networkmanager
-wpa_supplicant
-iwd             # Wi-Fi backend for NetworkManager (band preference, faster roaming)
+wpa_supplicant  # Wi-Fi backend for NetworkManager (Wi-Fi Direct for Miracast)
+iwd             # fallback backend: sudo wifi-backend iwd
+dnsmasq         # DHCP for Wi-Fi Direct groups (Miracast)
 bluez
 bluez-utils
 ufw

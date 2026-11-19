@@ -8,7 +8,8 @@ Two ways in. Both end with the same desktop.
 | **B. Full layout** | a fresh disk | the setup as it runs here: LUKS + btrfs snapshots + UKI + themed GRUB |
 
 > Requirements: x86_64, a user with `sudo`, network. Everything comes from the
-> official repos (no AUR helper). NVIDIA support exists but is untested.
+> official repos, except `packages/aur.txt` (built with `makepkg` by `aur-update`,
+> no AUR helper). NVIDIA support exists but is untested.
 
 ## A. On an existing Arch install
 
@@ -44,7 +45,7 @@ safe to run again):
 2. `chezmoi apply`: packages, dotfiles, root files from `system/`, SDDM theme, user services
 3. enables NetworkManager, bluetooth, **SDDM**, power-profiles-daemon, ufw, fstrim, paccache, reflector
    (disable your old display manager first if you have one)
-4. ufw: deny incoming, allow outgoing
+4. ufw: deny incoming, allow outgoing (except Miracast: 7236/tcp, 67/udp), then the AUR packages
 5. snapper for `/`, only if `/.snapshots` is in fstab (btrfs layout)
 6. zsh as login shell, `gamemode` group
 

@@ -97,6 +97,15 @@ else
     run sudo ufw default allow outgoing
     run sudo ufw --force enable
 fi
+# Miracast (gnome-network-displays): the TV connects back to the laptop for
+# RTSP, and over Wi-Fi Direct the laptop may hand out the address (DHCP).
+# ufw skips rules that already exist.
+run sudo ufw allow 7236/tcp comment 'Miracast RTSP'
+run sudo ufw allow 67/udp comment 'Wi-Fi Direct DHCP (Miracast)'
+
+# ---------------------------------------------------------------- AUR
+step "AUR packages (packages/aur.txt, built with makepkg)"
+run "$HOME/.local/bin/aur-update"
 
 # ---------------------------------------------------------------- snapper
 # Snapshots of / only (pre/post every pacman run via snap-pac). The

@@ -1,0 +1,55 @@
+#!/usr/bin/env bash
+# Build and update the AUR packages listed in packages/aur.txt with plain
+# makepkg (no AUR helper). pacman -Syu never updates them, so run this now
+# and then, and with --rebuild if one of them stops starting after a system
+# update (a library it was built against changed).
+#
+#   aur-update              install missing ones, update outdated ones
+#   aur-update --rebuild    rebuild all of them, even if up to date
+#
+# Before every build the PKGBUILD (or what changed in it since the last
+# build) is shown and has to be confirmed: AUR packages are not reviewed.
+set -euo pipefail
+
+rebuild=false
+[[ ${1-} == --rebuild ]] && rebuild=true
+
+list="$(chezmoi source-path 2>/dev/null || echo "$HOME/.local/share/chezmoi")/packages/aur.txt"
+mapfile -t pkgs < <(sed 's/#.*//; s/[[:space:]]//g; /^$/d' "$list")
+cache="${XDG_CACHE_HOME:-$HOME/.cache}/aur"
+mkdir -p "$cache"
+
+query=$(printf '&arg[]=%s' "${pkgs[@]}")
+info=$(curl -fsSL "https://aur.archlinux.org/rpc/v5/info?${query#&}")
+
+for pkg in "${pkgs[@]}"; do
+    aur=$(jq -r --arg p "$pkg" '.results[] | select(.Name == $p) | .Version' <<<"$info")
+    [[ -n $aur ]] || { echo "$pkg: not in the AUR (anymore?), skipped" >&2; continue; }
+    have=$(pacman -Q "$pkg" 2>/dev/null | cut -d' ' -f2 || true)
+
+    if [[ -n $have ]] && ! $rebuild && (($(vercmp "$have" "$aur") >= 0)); then
+        echo "$pkg $have is up to date"
+        continue
+    fi
+    echo
+    echo "==> $pkg: ${have:-not installed} -> $aur"
+
+    dir="$cache/$pkg"
+    if [[ -d $dir/.git ]]; then
+        git -C "$dir" fetch -q
+        last=$(git -C "$dir" rev-parse HEAD)
+        if [[ $last != $(git -C "$dir" rev-parse '@{u}') ]]; then
+            git -C "$dir" --no-pager diff "$last" '@{u}' -- PKGBUILD
+        else
+            echo "(PKGBUILD unchanged since the last build)"
+        fi
+    else
+        git clone -q "https://aur.archlinux.org/$pkg.git" "$dir"
+        cat "$dir/PKGBUILD"
+    fi
+
+    read -rp "Build and install $pkg? [y/N] " ok
+    [[ $ok == [yYjJ]* ]] || { echo "skipped"; continue; }
+    git -C "$dir" merge -q --ff-only '@{u}'
+    (cd "$dir" && makepkg -sic --cleanbuild --force)
+done

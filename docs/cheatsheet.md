@@ -40,6 +40,22 @@ chezmoi add ~/.config/someapp/config.toml
 Installed something with `sudo pacman -S` first? Add it to a list afterwards,
 otherwise a fresh install will not have it. `dots-check` lists such packages.
 
+AUR packages (only `packages/aur.txt`, keep it tiny) are never updated by
+`pacman -Syu`. Run `aur-update` now and then; it shows the PKGBUILD changes and
+asks before building. One stops starting after a system update? `aur-update --rebuild`.
+
+## Stream to a TV
+
+Miracast (Samsung "Screen Mirroring", most smart TVs): open **Network Displays**
+(`gnome-network-displays`), pick the TV, confirm on the TV. Picture and sound both
+go to the TV, so they stay in sync. Hotel TVs often block it: take an HDMI cable.
+Keep watching with the lid closed: power popup -> "Keep running with lid closed"
+(screen goes dark; the Wi-Fi antennas sit in the lid, so leave it a crack open
+if the picture stutters).
+
+Needs NetworkManager on `wpa_supplicant` (Wi-Fi Direct). No Wi-Fi after a reboot?
+Ctrl+Alt+F3, log in, `sudo wifi-backend iwd`, reboot: back on iwd.
+
 ## Save and upload
 
 ```sh

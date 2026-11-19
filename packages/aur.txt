@@ -1,0 +1,3 @@
+# The only packages from the AUR, built with makepkg by `aur-update`
+# (no AUR helper). Keep this list short: every entry is code from a stranger.
+gnome-network-displays  # Miracast: mirror the screen (with sound) to a TV

@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+# Pick NetworkManager's Wi-Fi backend. Works offline, e.g. from a TTY
+# (Ctrl+Alt+F3) when Wi-Fi does not come back after a reboot:
+#
+#   sudo wifi-backend iwd              back to iwd
+#   sudo wifi-backend wpa_supplicant   wpa_supplicant (needed for Miracast)
+#   wifi-backend                       show the configured backend
+#
+# Nothing is restarted: the change takes effect at the next reboot.
+# The repo default is wpa_supplicant; `chezmoi apply` writes that back
+# unless system/etc/NetworkManager/conf.d/wifi-backend.conf is changed too.
+set -euo pipefail
+
+conf=/etc/NetworkManager/conf.d/wifi-backend.conf
+
+if (($# == 0)); then
+    sed -n 's/^wifi.backend=//p' "$conf" 2>/dev/null || echo "wpa_supplicant (default)"
+    exit 0
+fi
+case $1 in
+    iwd | wpa_supplicant) backend=$1 ;;
+    *) echo "usage: sudo wifi-backend iwd|wpa_supplicant" >&2; exit 2 ;;
+esac
+((EUID == 0)) || { echo "run with sudo" >&2; exit 1; }
+pacman -Qq "$backend" &>/dev/null || { echo "$backend is not installed" >&2; exit 1; }
+
+printf '# Set by wifi-backend\n[device]\nwifi.backend=%s\n' "$backend" >"$conf"
+if [[ $backend == iwd ]]; then
+    systemctl enable iwd.service
+else
+    systemctl disable iwd.service
+fi
+echo "Wi-Fi backend: $backend. Reboot to use it (nothing was restarted)."

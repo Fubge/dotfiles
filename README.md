@@ -28,7 +28,8 @@ look like they were made by the same hand. It is playful where it does not cost
 you anything: window titles type themselves, the CPU icon turns from snail into
 rocket, and a small pixel pet keeps you company while Claude Code thinks.
 
-And it is honest Arch: **official repos only**, plain package lists, one script,
+And it is honest Arch: official repos plus exactly one AUR package (Miracast, built
+with plain `makepkg`), plain package lists, one script,
 no curl-to-bash. You can read every line of it in an afternoon.
 
 ## What's inside
