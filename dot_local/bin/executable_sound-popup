@@ -41,6 +41,9 @@ I_MIXER = "\U000F062E"                                 # sliders
 NOISY = 0.6     # s after a drag in which PipeWire's echo does not move the slider
 TICK = 0.14     # s between two feedback ticks of the output slider
 TICK_SOUND = os.path.expanduser("~/.local/share/sounds/slate/tick.oga")   # assets/make-sounds.py
+# names that belong to an audio library, not to the app (Discord's voice
+# module is Google's WebRTC engine and says so): show the program instead
+ENGINE_NAMES = {"WEBRTC VoiceEngine"}
 
 
 def pactl_json(*args):
@@ -104,10 +107,15 @@ def fetch():
         p = i["properties"]
         if p.get("media.role") == "event":       # notification sounds
             continue
+        binary = p.get("application.process.binary") or ""
+        name = p.get("application.name")
+        if name in ENGINE_NAMES:
+            name = binary
+        # first icon the theme knows wins (themes name icons in lower case)
+        icons = tuple(n for n in (p.get("application.icon_name"), binary, binary.lower(),
+                                  (name or "").lower()) if n)
         apps.append(dict(index=i["index"], volume=percent(i), mute=i["mute"],
-                         label=p.get("application.name") or p.get("media.name") or "App",
-                         icon=p.get("application.icon_name") or p.get("application.process.binary")
-                         or (p.get("application.name") or "").lower()))
+                         label=name or p.get("media.name") or "App", icon=icons))
     return dict(default=default_sink, outputs=outputs, mic=mic, apps=apps,
                 source=default_source, inputs=inputs)
 
@@ -135,7 +143,9 @@ def build():
             self.loading = False
             self.button = Gtk.Button(css_classes=["slider-icon", "flat"])
             self.button.connect("clicked", lambda _b: self.pactl("mute", "toggle"))
-            if icon and theme.has_icon(icon):
+            icon = next((n for n in ((icon,) if isinstance(icon, str) else icon or ())
+                         if theme.has_icon(n)), None)
+            if icon:
                 self.button.set_child(Gtk.Image(icon_name=icon, pixel_size=18))
             else:
                 self.button.set_child(Gtk.Label())
