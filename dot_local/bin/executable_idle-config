@@ -14,8 +14,9 @@ runs in the background (hypr/vars.lua M.background) and restarts hypridle
 when the power source changes. Times come from settings.json (section
 "idle", seconds, 0 = never) on top of DEFAULTS.
 
-The lid ("lid" in "idle", one value for both sources: "suspend" or "on"):
-logind suspends on its own. For "on", `apply` holds a lid inhibitor in the
+The lid ("lid" per source: "suspend" or "on"; the power popup's switch sets
+both): logind suspends on its own. For "on", `apply` and `watch` hold a lid
+inhibitor in the
 user unit slate-lid.service, so logind leaves the lid to hypr/monitors.lua,
 which only darkens the panel (the screen keeps rendering: a Miracast stream
 goes on). The idle suspend step still applies, so a closed laptop in a bag
@@ -126,13 +127,13 @@ def write():
 LID_UNIT = "slate-lid.service"
 
 
-def lid_on():
-    return settings.get("idle").get("lid", "suspend") == "on"
+def lid_on(source):
+    return settings.get("idle").get(source, {}).get("lid", "suspend") == "on"
 
 
 def sync_lid():
-    """Hold the lid inhibitor exactly while the lid setting is "on"."""
-    want = lid_on()
+    """Hold the lid inhibitor exactly while the current source wants "on"."""
+    want = lid_on("ac" if on_ac() else "battery")
     held = subprocess.run(["systemctl", "--user", "is-active", "--quiet", LID_UNIT]).returncode == 0
     if want and not held:
         subprocess.run(["systemd-run", "--user", "--quiet", "--collect", "--unit", LID_UNIT,

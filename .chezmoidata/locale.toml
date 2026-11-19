@@ -101,6 +101,7 @@ keyboard = { de = "Tastaturlicht", en = "Keyboard light" }
 
 [strings.power]
 title          = { de = "Energie", en = "Power" }
+lid_on         = { de = "Zugeklappt weiterlaufen", en = "Keep running with lid closed" }
 saver          = { de = "Sparen", en = "Saver" }
 balanced       = { de = "Ausgewogen", en = "Balanced" }
 performance    = { de = "Leistung", en = "Performance" }
@@ -536,7 +537,7 @@ on_battery   = { de = "Mit Akku", en = "On battery" }
 lid          = { de = "Deckel zu", en = "Lid closed" }
 lid_sleep    = { de = "Ruhezustand", en = "Suspend" }
 lid_on       = { de = "Weiterlaufen", en = "Keep running" }
-lid_sub      = { de = "Weiterlaufen: nur der Bildschirm geht aus, z. B. zum Streamen auf den TV. Am Netzteil und mit Akku.", en = "Keep running: only the screen goes dark, e.g. to stream to a TV. Plugged in and on battery." }
+lid_sub      = { de = "Weiterlaufen: nur der Bildschirm geht aus, z. B. zum Streamen auf den TV", en = "Keep running: only the screen goes dark, e.g. to stream to a TV" }
 idle_tip     = { de = "Tipp: Bildschirm aus kurz nach dem Sperren spart Strom, eine Taste weckt ihn ohne zu tippen.", en = "Tip: screen off shortly after locking saves power, any key wakes it without typing." }
 
 [strings.cal]
