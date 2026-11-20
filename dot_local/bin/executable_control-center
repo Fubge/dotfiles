@@ -1,0 +1,465 @@
+#!/usr/bin/env python3
+"""Control center: the quick switches in one popup at the top right, opened
+by the sliders icon in the bar's dark pill (next to the bell).
+
+    control-center toggle    bar click: show it, or hide it when open
+    control-center --hidden  login autostart: waits hidden, opens instantly
+    control-center quit      stop it (it reloads on the next click)
+
+Laid out like a phone's control center, in the bar colors:
+
+    +---------------------+  +---------------------+
+    | (o) Wi-Fi     name  |  | (o) Do not disturb  |
+    | (o) Bluetooth on    |  +---------------------+
+    | (o) TV        off   |  +---------+ +---------+
+    +---------------------+  |night lt.| | picker  |
+                             +---------+ +---------+
+    [ screen brightness ---------o--------------- ]
+    [ sound ------------------o------------------ ]
+    [ screenshot:  area  |  window  |  screen     ]
+
+A round button switches (Wi-Fi radio, Bluetooth power, do not disturb, night
+light), the rest of a row opens its popup (Wi-Fi, Bluetooth) or starts the
+action (TV: Network Displays via ~/.local/bin/cast, screenshots and the
+color picker via ~/.local/bin/shot). The window closes first, so a
+screenshot never shows it. The states refresh every 2 s while it is open.
+"""
+import os
+import shutil
+import subprocess
+import sys
+import threading
+import time
+from pathlib import Path
+
+sys.path.insert(0, os.path.expanduser("~/.local/lib/popup"))
+import resident  # noqa: E402
+import settings  # noqa: E402
+import nightlight as nl  # noqa: E402
+import notif  # noqa: E402
+from backlight import read_percent, to_percent, to_raw, write_percent, icon as bl_icon  # noqa: E402
+from i18n import T  # noqa: E402
+
+BIN = os.path.expanduser("~/.local/bin/")
+CSS = Path.home() / ".config/popups/style.css"
+WIDTH = 396
+REFRESH_MS = 2000
+TICK = 0.14      # s between two feedback ticks of the sound slider (as sound-popup)
+TICK_SOUND = os.path.expanduser("~/.local/share/sounds/slate/tick.oga")
+
+I_WIFI, I_WIFI_OFF = "\U000F05A9", "\U000F05AA"
+I_BT, I_BT_OFF = "\U000F00AF", "\U000F00B2"
+I_CAST, I_CAST_LIVE = "\U000F0118", "\U000F0119"
+I_DND = "\U000F00A0"            # sleeping bell, as the bar bell with do not disturb
+I_NIGHT = "\U000F0594"
+I_PICKER = "\U000F020A"
+I_VOL, I_VOL_MUTED = "\U000F057E", "\U000F0581"
+I_SHOT = "\U000F0E51"
+SHOTS = [("area", "\U000F0A6D", T("shot.area")),
+         ("window", "\U000F05B2", T("shot.window")),
+         ("screen", "\U000F037A", T("shot.screen"))]
+
+
+def run(argv):
+    try:
+        return subprocess.run(argv, capture_output=True, text=True, timeout=3).stdout
+    except (OSError, subprocess.TimeoutExpired):
+        return ""
+
+
+def spawn(argv, delay_ms=0):
+    from gi.repository import GLib
+
+    def go():
+        subprocess.Popen(argv, start_new_session=True,
+                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        return False
+    GLib.timeout_add(delay_ms, go) if delay_ms else go()
+
+
+def read_states():
+    """Everything that needs a process, read in a thread."""
+    s = {}
+    radio = run(["nmcli", "-t", "-f", "WIFI", "radio"]).strip()
+    s["wifi_on"] = radio == "enabled"
+    act = run(["nmcli", "-t", "-f", "TYPE,NAME", "connection", "show", "--active"])
+    names = [ln.split(":", 1)[1] for ln in act.splitlines() if ln.startswith("802-11-wireless:")]
+    s["wifi"] = names[0] if names else (T("cc.not_connected") if s["wifi_on"] else T("common.off"))
+    bt = run(["busctl", "get-property", "org.bluez", "/org/bluez/hci0",
+              "org.bluez.Adapter1", "Powered"])
+    s["bt_on"] = "true" in bt
+    s["bt"] = T("common.on") if s["bt_on"] else T("common.off")
+    s["cast"] = run([BIN + "cast", "status"]).strip() or "off"
+    vol = run(["wpctl", "get-volume", "@DEFAULT_AUDIO_SINK@"]).split()
+    try:
+        s["volume"] = round(float(vol[1]) * 100)
+        s["muted"] = "[MUTED]" in vol
+    except (IndexError, ValueError):
+        s["volume"], s["muted"] = None, False
+    return s
+
+
+def dnd_on():
+    try:
+        return '"dnd"' in Path(notif.BAR_STATUS).read_text()
+    except OSError:
+        return False
+
+
+def build():
+    import gi
+
+    gi.require_version("Gtk", "4.0")
+    gi.require_version("Gdk", "4.0")
+    from gi.repository import Gdk, GLib, Gtk
+
+    def lbl(text="", *classes, **kw):
+        return Gtk.Label(label=text, css_classes=list(classes), **kw)
+
+    class Popup(Gtk.Window):
+        popup_width = WIDTH       # resident.place() puts it under the mouse
+
+        def __init__(self):
+            super().__init__(title=T("cc.title"))
+            for c in ("popup", "menu", "cc"):
+                self.add_css_class(c)
+            self.set_decorated(False)
+            self.set_default_size(WIDTH, 1)
+            self.timer = None
+            self.loading = False
+            self.pending_light = None
+            self.ticked = 0.0
+            self.last_tick = None
+            self.moved_at = 0.0       # last slider drag: don't refresh under the finger
+
+            box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10, css_classes=["cc-box"])
+            box.append(lbl(T("cc.title"), "menu-title", xalign=0))
+
+            # ---- top: connections (left), switches (right)
+            top = Gtk.Box(spacing=10, homogeneous=True)
+            conn = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2,
+                           css_classes=["cc-card", "cc-list"])
+            self.wifi = self.list_row(conn, I_WIFI, T("wifi.title"), self.toggle_wifi,
+                                      lambda: self.open_popup("wifi-popup"))
+            self.bt = self.list_row(conn, I_BT, "Bluetooth", self.toggle_bt,
+                                    lambda: self.open_popup("bluetooth-popup"))
+            self.cast = self.list_row(conn, I_CAST, T("cc.tv"), self.open_cast, self.open_cast)
+            top.append(conn)
+
+            right = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+            self.dnd = self.tile(I_DND, T("cc.dnd"), self.toggle_dnd, wide=True)
+            right.append(self.dnd)
+            pair = Gtk.Box(spacing=10, homogeneous=True, vexpand=True)
+            self.night = self.tile(I_NIGHT, T("cc.night"), self.toggle_night)
+            self.picker = self.tile(I_PICKER, T("cc.picker"), self.pick_color)
+            pair.append(self.night)
+            pair.append(self.picker)
+            right.append(pair)
+            top.append(right)
+            box.append(top)
+
+            # ---- sliders
+            self.light_icon, self.light, self.light_value = self.slider_card(
+                box, T("cc.display"), self.on_light, None)
+            self.vol_icon, self.vol, self.vol_value = self.slider_card(
+                box, T("cc.sound"), self.on_volume, self.toggle_mute)
+
+            # ---- screenshots
+            shots = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8,
+                            css_classes=["cc-card", "cc-shots"])
+            head = Gtk.Box(spacing=8)
+            head.append(lbl(I_SHOT, "cc-card-icon"))
+            head.append(lbl(T("shot.title"), "cc-card-title", xalign=0, hexpand=True))
+            head.append(lbl(T("cc.shot_hint"), "cc-hint"))
+            shots.append(head)
+            row = Gtk.Box(spacing=8, homogeneous=True)
+            for mode, glyph, name in SHOTS:
+                b = Gtk.Button(css_classes=["cc-shot", "flat"])
+                inner = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
+                inner.append(lbl(glyph, "cc-shot-icon"))
+                inner.append(lbl(name, "cc-shot-name"))
+                b.set_child(inner)
+                b.connect("clicked", lambda _b, m=mode: self.later(["shot", m]))
+                row.append(b)
+            shots.append(row)
+            box.append(shots)
+            self.set_child(box)
+
+            keys = Gtk.EventControllerKey()
+            keys.connect("key-pressed", self.on_key)
+            self.add_controller(keys)
+            self.connect("notify::visible", self.on_visible)
+
+        # ------------------------------------------------------------ parts
+        def list_row(self, parent, glyph, name, on_circle, on_row):
+            row = Gtk.Box(spacing=10, css_classes=["cc-row"])
+            circle = Gtk.Button(label=glyph, css_classes=["cc-circle", "flat"],
+                                valign=Gtk.Align.CENTER)
+            circle.connect("clicked", lambda _b: on_circle())
+            text = Gtk.Button(css_classes=["cc-row-text", "flat"], hexpand=True)
+            inner = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+            inner.append(lbl(name, "cc-name", xalign=0))
+            status = lbl(" ", "cc-status", xalign=0, ellipsize=3, max_width_chars=12)
+            inner.append(status)
+            text.set_child(inner)
+            text.connect("clicked", lambda _b: on_row())
+            row.append(circle)
+            row.append(text)
+            parent.append(row)
+            row.circle, row.status = circle, status
+            return row
+
+        def tile(self, glyph, name, on_click, wide=False):
+            b = Gtk.Button(css_classes=["cc-card", "cc-tile", "flat"] + (["wide"] if wide else []))
+            if wide:
+                inner = Gtk.Box(spacing=10)
+                circle = lbl(glyph, "cc-circle", valign=Gtk.Align.CENTER)
+                texts = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, valign=Gtk.Align.CENTER)
+                texts.append(lbl(name, "cc-name", xalign=0))
+                status = lbl(" ", "cc-status", xalign=0, ellipsize=3, max_width_chars=12)
+                texts.append(status)
+                inner.append(circle)
+                inner.append(texts)
+            else:
+                inner = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4,
+                                valign=Gtk.Align.CENTER)
+                circle = lbl(glyph, "cc-circle", halign=Gtk.Align.CENTER)
+                inner.append(circle)
+                inner.append(lbl(name, "cc-name", "small", ellipsize=3))
+                status = lbl(" ", "cc-status", ellipsize=3)
+                inner.append(status)
+            b.set_child(inner)
+            b.connect("clicked", lambda _b: on_click())
+            b.circle, b.status = circle, status
+            return b
+
+        def slider_card(self, parent, name, on_change, on_icon):
+            card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2,
+                           css_classes=["cc-card", "cc-slider"])
+            card.append(lbl(name, "cc-card-title", xalign=0))
+            row = Gtk.Box(spacing=10)
+            if on_icon:
+                icon = Gtk.Button(label=" ", css_classes=["cc-slider-icon", "flat"])
+                icon.connect("clicked", lambda _b: on_icon())
+            else:
+                icon = lbl(" ", "cc-slider-icon")
+            scale = Gtk.Scale.new_with_range(Gtk.Orientation.HORIZONTAL, 0, 100, 1)
+            scale.set_draw_value(False)
+            scale.set_hexpand(True)
+            scale.connect("value-changed", on_change)
+            value = lbl("", "cc-slider-value", xalign=1)
+            for w in (icon, scale, value):
+                row.append(w)
+            card.append(row)
+            parent.append(card)
+            return icon, scale, value
+
+        def set_on(self, widget, on, glyphs=None):
+            (widget.add_css_class if on else widget.remove_css_class)("on")
+            if glyphs:
+                widget.circle.set_label(glyphs[0 if on else 1])
+
+        # ------------------------------------------------------------ show / refresh
+        def show_up(self):
+            self.loading = True
+            percent = read_percent()
+            self.light.set_range(1, 100)
+            self.light.set_value(percent)
+            self.loading = False
+            self.light_labels()
+            self.quick_states()
+            self.set_default_size(WIDTH, 1)
+            self.present()
+            self.refresh()
+            if self.timer is None:
+                self.timer = GLib.timeout_add(REFRESH_MS, self.tick_refresh)
+
+        def on_visible(self, *_a):
+            if not self.get_visible() and self.timer is not None:
+                GLib.source_remove(self.timer)
+                self.timer = None
+
+        def tick_refresh(self):
+            if not self.get_visible():
+                self.timer = None
+                return False
+            self.quick_states()
+            self.refresh()
+            return True
+
+        def quick_states(self):
+            """No processes: files and settings."""
+            self.set_on(self.dnd, dnd_on())
+            self.dnd.status.set_text(T("common.on") if dnd_on() else T("common.off"))
+            c = nl.config()
+            self.set_on(self.night, c.get("mode", "off") != "off")
+            self.night.status.set_text(nl.status(c) if shutil.which("hyprsunset")
+                                       else T("cc.missing"))
+            have = shutil.which("hyprpicker") is not None
+            self.picker.status.set_text(T("cc.picker_sub") if have else T("cc.missing"))
+            (self.picker.remove_css_class if have else self.picker.add_css_class)("missing")
+
+        def refresh(self):
+            threading.Thread(target=lambda: GLib.idle_add(self.show_states, read_states()),
+                             daemon=True).start()
+
+        def show_states(self, s):
+            self.set_on(self.wifi, s["wifi_on"], (I_WIFI, I_WIFI_OFF))
+            self.wifi.status.set_text(s["wifi"])
+            self.set_on(self.bt, s["bt_on"], (I_BT, I_BT_OFF))
+            self.bt.status.set_text(s["bt"])
+            live = s["cast"] == "live"
+            self.set_on(self.cast, live, (I_CAST_LIVE, I_CAST))
+            self.cast.status.set_text(T("cc.tv_" + s["cast"]))
+            if s["volume"] is not None and time.monotonic() - self.moved_at > 1.5:
+                self.loading = True
+                self.vol.set_value(min(100, s["volume"]))
+                self.loading = False
+                self.muted = s["muted"]
+                self.vol_labels()
+            return False
+
+        # ------------------------------------------------------------ actions
+        def later(self, argv, delay_ms=250):
+            """Close first, then act (screenshots must not show this window)."""
+            self.close()
+            spawn([BIN + argv[0], *argv[1:]], delay_ms)
+
+        def open_popup(self, script):
+            self.close()
+            spawn([BIN + "popup-cmd", script, "show"], 90)
+
+        def toggle_wifi(self):
+            on = not self.wifi.has_css_class("on")
+            self.set_on(self.wifi, on, (I_WIFI, I_WIFI_OFF))
+            spawn(["nmcli", "radio", "wifi", "on" if on else "off"])
+
+        def toggle_bt(self):
+            on = not self.bt.has_css_class("on")
+            self.set_on(self.bt, on, (I_BT, I_BT_OFF))
+            self.bt.status.set_text(T("common.on") if on else T("common.off"))
+            spawn(["busctl", "set-property", "org.bluez", "/org/bluez/hci0",
+                   "org.bluez.Adapter1", "Powered", "b", "true" if on else "false"])
+
+        def open_cast(self):
+            self.close()
+            spawn([BIN + "cast", "open"], 90)
+
+        def toggle_dnd(self):
+            spawn([BIN + "notifications", "dnd"])
+            on = not self.dnd.has_css_class("on")
+            self.set_on(self.dnd, on)
+            self.dnd.status.set_text(T("common.on") if on else T("common.off"))
+            self.pop(self.dnd)
+
+        def toggle_night(self):
+            if not shutil.which("hyprsunset"):
+                self.shake(self.night)
+                return
+            c = nl.config()
+            mode = c.get("mode", "off")
+            if mode != "off":
+                settings.update("nightlight", {"mode": "off", "last": mode})
+            else:
+                settings.update("nightlight", {"mode": c.get("last") or "sunset"})
+            subprocess.Popen([BIN + "nightlight", "refresh"], stdout=subprocess.DEVNULL,
+                             stderr=subprocess.DEVNULL)
+            self.quick_states()
+            self.pop(self.night)
+
+        def pick_color(self):
+            if not shutil.which("hyprpicker"):
+                self.shake(self.picker)
+                return
+            self.later(["shot", "pick"])
+
+        def pop(self, w):
+            w.remove_css_class("bump")
+            GLib.idle_add(lambda: w.add_css_class("bump") and False)
+            GLib.timeout_add(400, lambda: w.remove_css_class("bump") and False)
+
+        def shake(self, w):
+            w.remove_css_class("shake")
+            GLib.idle_add(lambda: w.add_css_class("shake") and False)
+            GLib.timeout_add(400, lambda: w.remove_css_class("shake") and False)
+
+        # ------------------------------------------------------------ sliders
+        def light_labels(self):
+            percent = to_percent(to_raw(max(1, int(self.light.get_value()))))
+            self.light_value.set_text(f"{percent}%")
+            self.light_icon.set_text(bl_icon(percent))
+
+        def on_light(self, _s):
+            if self.loading:
+                return
+            self.light_labels()
+            if self.pending_light is None:      # at most every 30 ms while dragging
+                self.pending_light = GLib.timeout_add(30, self.apply_light)
+
+        def apply_light(self):
+            write_percent(max(1, int(self.light.get_value())))
+            self.pending_light = None
+            return False
+
+        muted = False
+
+        def vol_labels(self):
+            v = int(self.vol.get_value())
+            self.vol_value.set_text(f"{v}%")
+            self.vol_icon.set_label(I_VOL_MUTED if self.muted or v == 0 else I_VOL)
+            for w in (self.vol_icon, self.vol_value):
+                (w.add_css_class if self.muted else w.remove_css_class)("muted")
+
+        def on_volume(self, _s):
+            if self.loading:
+                return
+            self.moved_at = time.monotonic()
+            v = int(self.vol.get_value())
+            subprocess.Popen(["wpctl", "set-volume", "-l", "1.0", "@DEFAULT_AUDIO_SINK@", f"{v}%"])
+            if self.muted:
+                self.muted = False
+                subprocess.Popen(["wpctl", "set-mute", "@DEFAULT_AUDIO_SINK@", "0"])
+            self.vol_labels()
+            self.tick()
+
+        def tick(self, last=False):
+            """Hear how loud it is: a short tick, at most every TICK s while
+            dragging and one more when the slider rests (as sound-popup)."""
+            if self.last_tick:
+                GLib.source_remove(self.last_tick)
+                self.last_tick = None
+            now = time.monotonic()
+            if last or now - self.ticked >= TICK:
+                self.ticked = now
+                if os.path.exists(TICK_SOUND):
+                    subprocess.Popen(["pw-play", "--media-role", "event", TICK_SOUND],
+                                     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            if not last:
+                def rest():
+                    self.last_tick = None
+                    if time.monotonic() - self.ticked > 0.1:
+                        self.tick(last=True)
+                    return False
+                self.last_tick = GLib.timeout_add(200, rest)
+
+        def toggle_mute(self):
+            self.muted = not self.muted
+            subprocess.Popen(["wpctl", "set-mute", "@DEFAULT_AUDIO_SINK@", "1" if self.muted else "0"])
+            self.moved_at = time.monotonic()
+            self.vol_labels()
+
+        def on_key(self, _ctrl, keyval, _code, _state):
+            if keyval == Gdk.KEY_Escape:
+                self.close()
+                return True
+            return False
+
+    provider = Gtk.CssProvider()
+    provider.load_from_path(str(CSS))
+    Gtk.StyleContext.add_provider_for_display(
+        Gdk.Display.get_default(), provider, Gtk.STYLE_PROVIDER_PRIORITY_USER)
+    return Popup()
+
+
+if __name__ == "__main__":
+    resident.main("popup.control", build, __doc__)

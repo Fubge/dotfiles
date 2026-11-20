@@ -232,9 +232,9 @@
         "return-type": "json",
         "tooltip": false
     },
-    // Screen share (Miracast to a TV): click opens Network Displays on
-    // workspace 6, where you pick the TV. Dim while it is closed, orange while
-    // a TV is attached (~/.local/bin/cast)
+    // Screen share (Miracast to a TV): an orange icon only while a TV is
+    // attached (~/.local/bin/cast); started from the control center. Click:
+    // Network Displays (to stop it)
     "custom/cast": {
         "exec": "~/.local/bin/cast watch",
         "return-type": "json",
@@ -249,10 +249,17 @@
         "spacing": 18                       // the same 18 px gap as between the icons (style.css)
     },
 
-    // Far right, one dark pill: notification bell and power
+    // Far right, one dark pill: control center, notification bell and power
     "group/session": {
         "orientation": "horizontal",
-        "modules": ["custom/notifications", "custom/power"]
+        "modules": ["custom/control", "custom/notifications", "custom/power"]
+    },
+    // Control center (~/.local/bin/control-center): Wi-Fi, Bluetooth, TV,
+    // do not disturb, night light, color picker, brightness, sound, screenshots
+    "custom/control": {
+        "format": "\udb81\ude2e",
+        "tooltip-format": {{ index .strings.cc.bar_tip (dig "machine" "lang" "en" .) | toJson }},
+        "on-click": "~/.local/bin/popup-cmd control-center toggle"
     },
     "custom/notifications": {
         "exec": "~/.local/bin/notification-bell",     // follows the daemon's D-Bus signal, no polling

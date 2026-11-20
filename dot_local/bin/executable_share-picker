@@ -6,6 +6,16 @@
 # SIGABRT). The portal treats the crash as "cancelled" and drops the choice,
 # so sharing never starts. This passes the choice on and reports success
 # whenever the picker printed one.
+# Network Displays started from the control center (~/.local/bin/cast open)
+# needs no picker: the TV shows the screen under the mouse. The autopick file
+# only counts for one request within a minute.
+autopick="${XDG_RUNTIME_DIR:-/tmp}/cast-autopick"
+if [[ -n $(find "$autopick" -mmin -1 2>/dev/null) ]]; then
+    rm -f "$autopick"
+    screen=$(hyprctl monitors -j | jq -r '.[] | select(.focused) | .name')
+    [[ -n $screen ]] && { echo "[SELECTION]/screen:$screen"; exit 0; }
+fi
+rm -f "$autopick"
 out=$(hyprland-share-picker "$@" 2>/dev/null)
 printf '%s\n' "$out"
 [[ $out == *"[SELECTION]"* ]]

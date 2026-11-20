@@ -29,6 +29,8 @@
 # {{ include "dot_local/bin/executable_calendar-remind" | sha256sum }}
 # {{ include "dot_local/lib/popup/cal.py" | sha256sum }}
 # {{ include "dot_local/bin/executable_system-menu" | sha256sum }}
+# {{ include "dot_local/bin/executable_control-center" | sha256sum }}
+# {{ include "dot_local/lib/popup/backlight.py" | sha256sum }}
 # {{ include "dot_local/lib/popup/settings.py" | sha256sum }}
 # {{ include "dot_local/lib/popup/nightlight.py" | sha256sum }}
 # {{ include "dot_local/bin/executable_nightlight" | sha256sum }}
@@ -41,7 +43,7 @@
 set -uo pipefail
 [[ -n ${HYPRLAND_INSTANCE_SIGNATURE-} ]] || exit 0    # not in a session (bootstrap)
 
-popups=(list-menu-popup sound-popup bluetooth-popup wifi-popup power-popup session-popup brightness-popup pet-picker keybinds clipboard-popup notification-center task-popup calendar-popup event-popup timer-popup system-menu)
+popups=(list-menu-popup sound-popup bluetooth-popup wifi-popup power-popup session-popup brightness-popup pet-picker keybinds clipboard-popup notification-center task-popup calendar-popup event-popup timer-popup system-menu control-center)
 for p in "${popups[@]}"; do
     "$HOME/.local/bin/$p" quit
 done

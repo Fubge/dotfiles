@@ -24,35 +24,14 @@ from pathlib import Path
 sys.path.insert(0, os.path.expanduser("~/.local/lib/popup"))
 import resident  # noqa: E402
 from i18n import T  # noqa: E402
+from backlight import read_percent, to_percent, to_raw, write_percent, icon  # noqa: E402
 
-# first backlight device (intel_backlight, amdgpu_bl0, ...)
-DEVICE = next(Path("/sys/class/backlight").iterdir(), Path("/sys/class/backlight/none"))
-EXPONENT = 2
 CSS = Path.home() / ".config/popups/style.css"
-ICONS = ["\U000F0594", "\U000F0595", "\U000F05A8"]  # moon / cloud / sun, as in the bar
 I_KEYBOARD = "\U000F030C"
 WIDTH = 300
 # keyboard backlight LED (tpacpi::kbd_backlight, asus::kbd_backlight, ...)
 KBD = next(Path("/sys/class/leds").glob("*kbd_backlight"), None)
 KBD_STEPS = 3        # up to this many levels: buttons, more: a slider
-
-
-def to_percent(raw):
-    top = int((DEVICE / "max_brightness").read_text())
-    return int((max(0, raw - 1) / (top - 1)) ** (1 / EXPONENT) * 99 + 1.5)
-
-
-def read_percent():
-    return to_percent(int((DEVICE / "brightness").read_text()))
-
-
-def to_raw(percent):
-    top = int((DEVICE / "max_brightness").read_text())
-    return 1 + round((top - 1) * ((percent - 1) / 99) ** EXPONENT)
-
-
-def write_percent(percent):
-    subprocess.run(["brightnessctl", "-q", "set", str(to_raw(percent))], check=False)
 
 
 def kbd_read():
@@ -157,7 +136,7 @@ def build():
             # the value that really gets set (the darkest hardware steps are coarse)
             percent = to_percent(to_raw(int(self.scale.get_value())))
             self.value.set_text(f"{percent}%")
-            self.icon.set_text(ICONS[0 if percent <= 33 else 1 if percent <= 66 else 2])
+            self.icon.set_text(icon(percent))
 
         def on_change(self, _scale):
             if self.loading:

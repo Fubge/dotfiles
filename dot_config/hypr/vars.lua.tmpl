@@ -78,6 +78,7 @@ M.background = {
     M.bin .. "event-popup --hidden",      -- new event (SUPER+SHIFT+K), same
     M.bin .. "timer-popup --hidden",      -- kitchen timers (SUPER+SHIFT+T); also rings them
     M.bin .. "system-menu --hidden",      -- system menu / settings (SUPER+ALT+Space), same
+    M.bin .. "control-center --hidden",   -- control center (bar, top right), same
     M.bin .. "idle-config watch",         -- idle times follow the power source (charger / battery)
     M.bin .. "nightlight watch",          -- warmer colors in the evening (hyprsunset)
     M.bin .. "calendar-remind",           -- calendar reminders as notifications
@@ -141,6 +142,7 @@ M.popup = {
         "popup.event",   -- new event in one line; centered (~/.local/bin/event-popup)
         "popup.timer",   -- kitchen timers; centered (~/.local/bin/timer-popup)
         "popup.system",  -- system menu / settings; centered (~/.local/bin/system-menu)
+        "popup.control", -- control center, bar top right (~/.local/bin/control-center)
     },
     top = 46,   -- bar margin (8) + bar height (30) + gap (8), also in resident.py
 }

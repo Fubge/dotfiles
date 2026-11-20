@@ -345,10 +345,34 @@ shortcuts  = { de = "Tastenkürzel", en = "Shortcuts" }
 brightness = { de = "Helligkeit", en = "Brightness" }
 cast       = { de = "Fernseher", en = "TV" }
 
-[strings.cast]  # screen share button in the bar (~/.local/bin/cast)
-off  = { de = "Auf den Fernseher streamen\nKlick: Fernseher wählen", en = "Stream to a TV\nClick: pick the TV" }
-open = { de = "Network Displays ist offen\nKlick: hinspringen", en = "Network Displays is open\nClick: jump there" }
+[strings.cast]  # screen share icon in the bar while streaming (~/.local/bin/cast)
 live = { de = "Streamt auf den Fernseher\nKlick: Network Displays (beenden)", en = "Streaming to the TV\nClick: Network Displays (to stop)" }
+
+[strings.cc]  # control center (~/.local/bin/control-center)
+title         = { de = "Kontrollzentrum", en = "Control center" }
+tv            = { de = "Fernseher", en = "TV" }
+tv_off        = { de = "Bild senden", en = "Send the picture" }
+tv_open       = { de = "Fernseher wählen", en = "Pick the TV" }
+tv_live       = { de = "Streamt", en = "Streaming" }
+not_connected = { de = "nicht verbunden", en = "not connected" }
+dnd           = { de = "Nicht stören", en = "Do not disturb" }
+night         = { de = "Nachtlicht", en = "Night light" }
+picker        = { de = "Pipette", en = "Color picker" }
+picker_sub    = { de = "Farbe kopieren", en = "Copy a color" }
+missing       = { de = "fehlt", en = "missing" }
+display       = { de = "Bildschirm", en = "Display" }
+sound         = "Sound"
+shot_hint     = { de = "Esc bricht ab", en = "Esc cancels" }
+bar_tip       = { de = "Kontrollzentrum", en = "Control center" }
+
+[strings.shot]  # screenshots and color picker (~/.local/bin/shot)
+title     = { de = "Bildschirmfoto", en = "Screenshot" }
+area      = { de = "Bereich", en = "Area" }
+window    = { de = "Fenster", en = "Window" }
+screen    = { de = "Bildschirm", en = "Screen" }
+saved     = { de = "In der Zwischenablage und in Bilder/Screenshots", en = "In the clipboard and in Pictures/Screenshots" }
+color     = { de = "Farbe kopiert", en = "Color copied" }
+no_picker = { de = "hyprpicker fehlt noch:  sudo pacman -S hyprpicker", en = "hyprpicker is missing:  sudo pacman -S hyprpicker" }
 
 [strings.claude]
 off        = { de = "Claude läuft nicht", en = "Claude is not running" }

@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+# shot: screenshots, from the control center (~/.local/bin/control-center)
+#   shot area     drag a rectangle
+#   shot window   click a window (all windows on the visible workspaces)
+#   shot screen   the screen under the mouse
+#   shot pick     color picker: the hex value goes to the clipboard (hyprpicker)
+# A screenshot lands in ~/Pictures/Screenshots AND in the clipboard; a
+# notification shows it. Escape while choosing cancels quietly.
+set -uo pipefail
+dir="$HOME/Pictures/Screenshots"
+# texts from the language file (.chezmoidata/locale.toml)
+mapfile -t t < <(jq -r '."shot.title", ."shot.saved", ."shot.color", ."shot.no_picker"' \
+    ~/.config/popups/strings.json 2>/dev/null)
+((${#t[@]} == 4)) || t=("Screenshot" "In the clipboard and in Pictures/Screenshots" \
+                        "Color copied" "hyprpicker is missing: sudo pacman -S hyprpicker")
+
+windows() {   # "x,y wxh" of every window on a workspace that is shown right now
+    local active
+    active=$(hyprctl monitors -j | jq -c '[.[] | .activeWorkspace.id, .specialWorkspace.id]')
+    hyprctl clients -j | jq -r --argjson ws "$active" \
+        '.[] | select(.hidden | not) | select(.workspace.id as $w | $ws | index($w))
+             | "\(.at[0]),\(.at[1]) \(.size[0])x\(.size[1])"'
+}
+
+shoot() {   # grim arguments -> file + clipboard + notification
+    mkdir -p "$dir"
+    local file
+    file="$dir/$(date +%F_%H-%M-%S).png"
+    grim "$@" "$file" || exit 1
+    wl-copy --type image/png < "$file"
+    notify-send -a "${t[0]}" -i "$file" "${t[0]}" "${t[1]}"
+}
+
+case ${1-} in
+area)   geo=$(slurp -d) || exit 0; shoot -g "$geo" ;;
+window) geo=$(windows | slurp -r) || exit 0; shoot -g "$geo" ;;
+screen) shoot -o "$(hyprctl monitors -j | jq -r '.[] | select(.focused) | .name')" ;;
+pick)
+    command -v hyprpicker >/dev/null || { notify-send -a "${t[0]}" "${t[3]}"; exit 1; }
+    color=$(hyprpicker -f hex) || exit 0
+    [[ -n $color ]] || exit 0
+    wl-copy "$color"
+    notify-send -a "${t[2]}" "${t[2]}" "$color"
+    ;;
+*) echo "usage: shot area|window|screen|pick" >&2; exit 2 ;;
+esac

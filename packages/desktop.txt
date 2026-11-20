@@ -39,6 +39,7 @@ wl-clipboard
 cliphist
 grim
 slurp
+hyprpicker      # color picker in the control center (~/.local/bin/shot pick)
 brightnessctl
 playerctl
 cava

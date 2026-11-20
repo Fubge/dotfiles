@@ -63,7 +63,7 @@ BLINKS = 3          # caret blinks after typing, then it goes away
 ROW_CLASSES = ("sound-row", "slider-row", "item-card", "section", "note", "app-name",
                "segment", "battery", "more", "pet-card", "sound-sep", "menu-search",
                "menu-info", "card", "center-entry", "center-empty",
-               "sys-tile", "sys-card", "sys-screens", "sys-segments")
+               "sys-tile", "sys-card", "sys-screens", "sys-segments", "cc-card")
 
 
 def sock_path(app_id):

@@ -1812,3 +1812,103 @@ progressbar.osd-bar progress {
 .osd-icon.bump1 { animation: osd-bump1 300ms ease-out 1; }
 .osd.muted .osd-icon.bump0 { animation: osd-shake0 320ms ease-in-out 1; }
 .osd.muted .osd-icon.bump1 { animation: osd-shake1 320ms ease-in-out 1; }
+
+/* ---------------------------------------------------------------- control center
+   ~/.local/bin/control-center: rounded cards on the popup, round switches.
+   A switch that is on fills orange (like the active workspace); a card
+   under the mouse lightens; switching gives a little bounce. */
+.cc-box { padding: 14px; }
+.cc-card {
+    border-radius: 18px;
+    background-color: alpha({{ .palette.bg_alt }}, 0.8);
+    padding: 10px 12px;
+    transition: background-color 160ms ease, transform 180ms ease;
+}
+.cc-list { padding: 8px 8px; }
+button.cc-tile {
+    min-height: 0;
+    border: none;
+    box-shadow: none;
+    outline: none;
+}
+button.cc-tile:hover, button.cc-tile:focus-visible,
+.cc-row:hover { background-color: alpha({{ .palette.steel }}, 0.35); }
+.cc-row { border-radius: 14px; padding: 4px; transition: background-color 160ms ease; }
+button.cc-tile:active { transform: scale(0.96); }
+
+.cc-circle {
+    min-width: 34px;
+    min-height: 34px;
+    padding: 0;
+    border: none;
+    border-radius: 99px;
+    font-family: "{{ .design.font }}";
+    font-size: 14pt;
+    background-color: alpha({{ .palette.steel }}, 0.35);
+    color: {{ .palette.fg_muted }};
+    box-shadow: none;
+    transition: background-color 180ms ease, color 180ms ease, transform 200ms ease,
+                box-shadow 200ms ease;
+}
+button.cc-circle:hover { transform: scale(1.08); }
+button.cc-circle:active { transform: scale(0.9); }
+.on .cc-circle, .cc-row.on .cc-circle {
+    background-color: {{ .palette.accent }};
+    color: {{ .palette.bg }};
+    box-shadow: 0 0 14px alpha({{ .palette.accent }}, 0.35);
+}
+button.cc-row-text { padding: 0 2px; min-height: 0; border: none; box-shadow: none; background: none; }
+.cc-name { font-size: 10.5pt; font-weight: 600; color: {{ .palette.fg }}; }
+.cc-name.small { font-size: 9.5pt; }
+button.cc-tile:not(.wide) { padding: 10px 2px 8px 2px; }
+.cc-status { font-size: 8.5pt; color: {{ .palette.comment }}; }
+.on .cc-status { color: {{ .palette.fg_muted }}; }
+.cc-tile.wide { padding: 10px 12px; }
+.cc-tile.missing .cc-circle { opacity: 0.4; }
+.cc-tile.missing .cc-status { color: {{ .palette.yellow }}; }
+
+@keyframes cc-bump {
+    0%   { transform: scale(1); }
+    40%  { transform: scale(1.05); }
+    100% { transform: scale(1); }
+}
+.cc-card.bump { animation: cc-bump 300ms ease-out 1; }
+.cc-card.shake { animation: shake 380ms ease-in-out 1; }
+
+.cc-card-title { font-size: 10pt; font-weight: 600; color: {{ .palette.fg }}; }
+.cc-card-icon { color: {{ .palette.accent }}; font-family: "{{ .design.font }}"; font-size: 13pt; }
+.cc-hint { font-size: 8pt; color: {{ .palette.comment }}; }
+.cc-slider { padding: 9px 14px 6px 14px; }
+.cc-slider-icon {
+    min-width: 22px;
+    min-height: 0;
+    padding: 0;
+    border: none;
+    box-shadow: none;
+    background: none;
+    color: {{ .palette.accent }};
+    font-family: "{{ .design.font }}";
+    font-size: 13pt;
+}
+.cc-slider-icon.muted, .cc-slider-value.muted { color: {{ .palette.comment }}; }
+.cc-slider-value {
+    min-width: 40px;
+    font-family: "{{ .design.font }}";
+    font-size: 9.5pt;
+    color: {{ .palette.fg_muted }};
+}
+button.cc-shot {
+    min-height: 0;
+    padding: 8px 4px 6px 4px;
+    border: none;
+    border-radius: 14px;
+    box-shadow: none;
+    background-color: alpha({{ .palette.steel }}, 0.25);
+    transition: background-color 160ms ease, transform 180ms ease;
+}
+button.cc-shot:hover, button.cc-shot:focus-visible { background-color: {{ .palette.accent }}; }
+button.cc-shot:hover label, button.cc-shot:focus-visible label { color: {{ .palette.bg }}; }
+button.cc-shot:active { transform: scale(0.94); }
+.cc-shot-icon { font-family: "{{ .design.font }}"; font-size: 16pt; color: {{ .palette.accent }}; }
+.cc-shot-name { font-size: 9pt; color: {{ .palette.fg_muted }}; }
+button.cc-shot:hover .cc-shot-icon { animation: icon-wiggle 380ms ease-in-out 1; }

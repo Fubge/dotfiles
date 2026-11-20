@@ -216,11 +216,25 @@ hl.window_rule({
 
 -- Screen share (Miracast to a TV): Network Displays has its own workspace 6
 -- (retro TV in the bar) and you follow it there to pick the TV. Started from
--- the cast button in the bar (~/.local/bin/cast) or the launcher.
+-- the control center (~/.local/bin/cast) or the launcher. It floats in the
+-- middle at a fixed size: tiled, its short list stretched over the screen.
 hl.window_rule({
     name = "network-displays",
     match = { class = "^org\\.gnome\\.NetworkDisplays$" },
     workspace = "6",
+    float = true,
+    size = { 520, 380 },
+    center = true,
+})
+
+-- The screen share picker (Discord, browsers; ~/.local/bin/share-picker)
+-- floats in the middle of the screen, not wherever it pops up
+hl.window_rule({
+    name = "share-picker",
+    match = { class = "^hyprland-share-picker$" },
+    float = true,
+    size = { 720, 520 },
+    center = true,
 })
 
 -- Obsidian (notes, vault in ~/Nextcloud/Obsidian) has its own workspace 8,

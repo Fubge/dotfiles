@@ -46,9 +46,10 @@ asks before building. One stops starting after a system update? `aur-update --re
 
 ## Stream to a TV
 
-Miracast (Samsung "Screen Mirroring", most smart TVs): click the cast icon in the
-bar (next to Bluetooth). **Network Displays** opens on its own workspace 6 (retro
-TV); pick the TV, confirm on the TV. The icon turns orange while streaming. Picture and sound both
+Miracast (Samsung "Screen Mirroring", most smart TVs): control center (sliders
+icon, top right in the bar) -> **TV**. Network Displays opens on its own
+workspace 6 (retro TV), already set to send the screen under the mouse; pick
+the TV, confirm on the TV. An orange cast icon sits in the bar while streaming. Picture and sound both
 go to the TV, so they stay in sync. Hotel TVs often block it: take an HDMI cable.
 Keep watching with the lid closed: power popup -> "Keep running with lid closed"
 (screen goes dark; the Wi-Fi antennas sit in the lid, so leave it a crack open
@@ -117,6 +118,13 @@ Files ending in `.tmpl` are generated from these values.
   settings" (nm-connection-editor).
 - **Power** (`SUPER+P` or a click on the profile or battery icon): battery level, time
   left / until full, draw, health and charge limit; the three power profiles.
+- **Control center** (sliders icon in the dark pill, left of the bell), at the top
+  right like on a phone: Wi-Fi, Bluetooth and TV in one card (the round button
+  switches, the rest of the row opens the popup / Network Displays), do not
+  disturb, night light, color picker (`hyprpicker`, hex value to the clipboard),
+  brightness and sound sliders, screenshots of an area, a clicked window or the
+  screen (`shot`: file in `~/Pictures/Screenshots` and the clipboard, Escape
+  cancels). States refresh every 2 s while it is open.
 - **Session** (`SUPER+Escape` or the power button at the right end of the bar), always in
   the middle of the screen: the greeting types itself like on the lock screen, round
   buttons for Lock, Suspend, Log out, Reboot, Shut down (keys L S E R P). The last three
