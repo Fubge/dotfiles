@@ -77,7 +77,9 @@ PAGES = {
     "idle": (T("sys.idle"), T("sys.idle_sub")),
 }
 
-SCALES = [1.0, 1.25, 1.5, 1.75, 2.0]
+# steps that divide 2880x1800 and 2560x1440 evenly (1.75 does neither;
+# Hyprland would round it to an odd value)
+SCALES = [1.0, 1.25, 1.5, 1.6, 2.0]
 VRR = [(0, T("common.off")), (2, T("sys.vrr_games")), (1, T("sys.always"))]
 POSITIONS = [("left", T("sys.left")), ("right", T("sys.right")), ("above", T("sys.above")),
              ("below", T("sys.below")), ("mirror", T("sys.mirror")), ("off", T("common.off"))]
