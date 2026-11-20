@@ -10,6 +10,7 @@ only fstab and the GRUB tweaks come from the base install and the GRUB theme scr
 | Managed file (from `system/`, `system-boot/`) | Purpose |
 |---|---|
 | `/etc/NetworkManager/conf.d/wifi-backend.conf` | Wi-Fi backend `wpa_supplicant` (Wi-Fi Direct for Miracast); `iwd.service` disabled, never stopped: switches at the next reboot |
+| `/etc/NetworkManager/conf.d/wifi-powersave.conf` | Wi-Fi power saving off (less Miracast lag and stutter); takes effect at the next reboot |
 | `/usr/local/bin/wifi-backend` | `sudo wifi-backend iwd\|wpa_supplicant`: switch back offline (from a TTY), takes effect at reboot |
 | `/usr/local/bin/power-profile-auto` | performance on AC, power-saver on battery |
 | `/etc/udev/rules.d/99-power-profile.rules` | runs it when the charger is plugged in/out |

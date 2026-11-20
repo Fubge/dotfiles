@@ -3,7 +3,9 @@
 #   cast status  -> state for the control center: off | open | live
 #   cast watch   -> JSON lines for the waybar module: the "casting" icon in
 #                   orange while a TV is attached, nothing otherwise (the
-#                   control center, ~/.local/bin/control-center, starts it)
+#                   control center, ~/.local/bin/control-center, starts it).
+#                   While live it also lifts power-saver to balanced, see boost
+
 #   cast open    -> jump to Network Displays (workspace 6, hypr/rules.lua),
 #                   start it first if needed; there you pick the TV
 # A stream runs over a Wi-Fi Direct group, which shows up as its own network
@@ -37,13 +39,33 @@ json() {
     fi
 }
 
+# Network Displays scales the 2880x1800 screen down to 1080p on the CPU, which
+# lags on power-saver (battery). While a TV is attached: power-saver ->
+# balanced. Afterwards the normal rule (/usr/local/bin/power-profile-auto:
+# charger -> performance, battery -> power-saver) picks the profile again, but
+# only if it is still ours (balanced), so GameMode or a manual pick stays.
+boost="${XDG_RUNTIME_DIR:-/tmp}/cast-boost"
+boost() {
+    if [[ $1 == on ]]; then
+        [[ $(powerprofilesctl get 2>/dev/null) == power-saver ]] || return 0
+        powerprofilesctl set balanced && touch "$boost"
+    elif [[ -e $boost ]]; then
+        rm -f "$boost"
+        [[ $(powerprofilesctl get 2>/dev/null) == balanced ]] && /usr/local/bin/power-profile-auto
+    fi
+}
+
 case ${1-status} in
 status) state ;;
 watch)
     last=""
     while :; do   # cheap: one pgrep every 2 s, a line only on change
         now=$(state)
-        [[ $now != "$last" ]] && { json "$now"; last=$now; }
+        if [[ $now != "$last" ]]; then
+            json "$now"
+            if [[ $now == live ]]; then boost on; else boost off; fi
+            last=$now
+        fi
         sleep 2
     done
     ;;
