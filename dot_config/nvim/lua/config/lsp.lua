@@ -3,6 +3,10 @@
 -- :checkhealth vim.lsp   shows which servers are attached to the current file.
 
 vim.lsp.enable({ "lua_ls", "bashls", "taplo", "yamlls" })
+-- C#: only once csharp-ls is installed (needs dotnet-sdk, see lsp/csharp_ls.lua)
+if vim.fn.executable(vim.fn.expand("~/.dotnet/tools/csharp-ls")) == 1 then
+    vim.lsp.enable("csharp_ls")
+end
 
 -- Built-in keys (no setup needed, available whenever a server is attached):
 --   K      hover docs            grn  rename            gra  code action
