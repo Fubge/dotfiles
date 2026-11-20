@@ -133,7 +133,7 @@ def build():
             self.moved_at = 0.0       # last slider drag: don't refresh under the finger
 
             box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10, css_classes=["cc-box"])
-            box.append(lbl(T("cc.title"), "menu-title", xalign=0))
+            box.append(lbl(T("cc.title"), "menu-title"))
 
             # ---- top: connections (left), switches (right)
             top = Gtk.Box(spacing=10, homogeneous=True)
