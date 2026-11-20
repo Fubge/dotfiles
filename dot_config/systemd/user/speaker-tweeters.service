@@ -1,0 +1,12 @@
+[Unit]
+Description=Unmute the tweeter output of the built-in speakers
+# WirePlumber sets up the card first; afterwards the switch stays as we leave it
+After=wireplumber.service
+PartOf=graphical-session.target
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/bin/speaker-tweeters
+
+[Install]
+WantedBy=graphical-session.target

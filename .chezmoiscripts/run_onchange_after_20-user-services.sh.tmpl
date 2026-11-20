@@ -4,12 +4,14 @@
 # units: {{ include "dot_config/systemd/user/wallpaper-random.service" | sha256sum }}
 # {{ include "dot_config/systemd/user/vdirsyncer.timer.d/interval.conf" | sha256sum }}
 # {{ include "dot_config/systemd/user/hypridle.service.d/override.conf" | sha256sum }}
+# {{ include "dot_config/systemd/user/speaker-tweeters.service" | sha256sum }}
 set -euo pipefail
 systemctl --user daemon-reload
 services=(hyprpaper hypridle hyprpolkitagent waybar)
 systemctl --user enable "${services[@]}"
 systemctl --user enable --now wallpaper-shuffle.timer
 systemctl --user enable wallpaper-random.service   # new random images at every login
+systemctl --user enable speaker-tweeters.service   # X9 tweeters start muted otherwise
 systemctl --user enable --now vdirsyncer.timer      # Nextcloud calendars, every 5 min
 
 # Start them right away if a graphical session is already running

@@ -1,0 +1,34 @@
+#!/usr/bin/env python3
+"""Switch on the tweeter output of the ThinkPad X9-15p built-in speakers.
+
+The four CS35L57 amps only play the woofer band (their tuning has a 3 kHz
+crossover); the tweeters hang off the CS42L43's own speaker output. Its
+"Digital Switch" starts muted after boot and nothing unmutes it, so the
+speakers sound muffled. Sets the control directly via libasound, so no
+alsa-utils needed. Does nothing on machines without that control.
+"""
+import ctypes as C
+import sys
+
+CONTROL = b"cs42l43 Speaker Digital Switch"
+CARD = b"hw:sofsoundwire"
+
+asound = C.CDLL("libasound.so.2")
+ctl = C.c_void_p()
+if asound.snd_ctl_open(C.byref(ctl), CARD, 0) < 0:
+    sys.exit(0)  # no such card
+
+elem_id = C.c_void_p()
+value = C.c_void_p()
+asound.snd_ctl_elem_id_malloc(C.byref(elem_id))
+asound.snd_ctl_elem_value_malloc(C.byref(value))
+asound.snd_ctl_elem_id_set_interface(elem_id, 2)  # SND_CTL_ELEM_IFACE_MIXER
+asound.snd_ctl_elem_id_set_name(elem_id, CONTROL)
+asound.snd_ctl_elem_value_set_id(value, elem_id)
+
+if asound.snd_ctl_elem_read(ctl, value) < 0:
+    sys.exit(0)  # control missing: other hardware
+for channel in (0, 1):
+    asound.snd_ctl_elem_value_set_boolean(value, channel, 1)
+if asound.snd_ctl_elem_write(ctl, value) < 0:
+    sys.exit("speaker-tweeters: could not write control")
