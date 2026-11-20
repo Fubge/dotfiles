@@ -474,6 +474,9 @@ def main():
             if button == 1:
                 if "default" in self.actions:
                     self.invoke("default")
+                    # apps whose own focus request is ignored (Discord,
+                    # rules.lua) still come to the front
+                    focus_app(self.names)
                     return
                 self.opened()
                 focus_app(self.names)
@@ -647,7 +650,7 @@ def main():
             item = next((i for i in items if i["id"] == nid), None)
             if item and item.get("default"):
                 emit("ActionInvoked", GLib.Variant("(us)", (nid, "default")))
-            elif item:
+            if item:
                 focus_app((item["app"], item["entry"]))
             forget(nid)
             if nid in live:

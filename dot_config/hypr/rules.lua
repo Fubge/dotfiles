@@ -204,6 +204,16 @@ hl.window_rule({
     workspace = "7 silent",
 })
 
+-- Discord asks for focus once it has loaded; with misc.focus_on_activate that
+-- pulled you to workspace 7 right after login. Ignore its focus requests
+-- (SUPER+D and notification clicks still jump there). "maximize" repeats the
+-- global rule below, so it holds whichever rule wins.
+hl.window_rule({
+    name = "discord-no-activate",
+    match = { class = "^discord$" },
+    suppress_event = "maximize activate activatefocus",
+})
+
 -- Obsidian (notes, vault in ~/Nextcloud/Obsidian) has its own workspace 8,
 -- SUPER+O jumps there and starts it if needed (focus-or-run)
 hl.window_rule({
