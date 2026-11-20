@@ -18,6 +18,7 @@ vim.api.nvim_create_autocmd("PackChanged", {
 require("nvim-treesitter").install({
     "bash",
     "c",
+    "c_sharp",
     "css",
     "diff",
     "gitcommit",
