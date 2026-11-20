@@ -180,7 +180,7 @@ tooltip {
    a wide cup next to a slim leaf then still looked further apart; the mono
    font let wide icons hang out to the right, 27-57 px gaps). */
 #idle_inhibitor, #custom-power-profile, #custom-brightness, #custom-battery,
-#wireplumber, #network, #bluetooth,
+#wireplumber, #network, #bluetooth, #custom-cast,
 #custom-notifications, #custom-power {
     font-family: "JetBrainsMono Nerd Font Propo", "Symbols Nerd Font";
     padding: 0 9px;
@@ -220,6 +220,8 @@ tooltip {
 #wireplumber.muted, #bluetooth.disabled, #bluetooth.off,
 #network.disconnected               { color: alpha(@fg, 0.45); }
 #bluetooth.connected                { color: {{ .palette.blue }}; }
+#custom-cast.off                    { color: alpha(@fg, 0.45); }
+#custom-cast.live                   { color: @accent; }
 /* Brightness tells the time of day: cool moon, plain cloud, warm sun */
 #custom-brightness.night            { color: {{ .palette.cyan_bright }}; }
 #custom-brightness.sun              { color: {{ .palette.yellow }}; }
@@ -239,7 +241,7 @@ tooltip {
 #workspaces button, #custom-window, #clock.date, #custom-music,
 #cpu, #temperature, #memory,
 #idle_inhibitor, #custom-power-profile, #custom-brightness, #custom-battery,
-#wireplumber, #network, #bluetooth, #custom-notifications, #custom-power {
+#wireplumber, #network, #bluetooth, #custom-cast, #custom-notifications, #custom-power {
     transition: all 250ms ease;
     border-radius: 12px;
 }
@@ -247,7 +249,7 @@ tooltip {
 #clock.date:hover, #custom-music:hover,
 #cpu:hover, #temperature:hover, #memory:hover,
 #idle_inhibitor:hover, #custom-power-profile:hover, #custom-brightness:hover, #custom-battery:hover,
-#wireplumber:hover, #network:hover, #bluetooth:hover, #custom-notifications:hover {
+#wireplumber:hover, #network:hover, #bluetooth:hover, #custom-cast:hover, #custom-notifications:hover {
     color: @accent;
     background: alpha(@dark, 0.3);
 }

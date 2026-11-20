@@ -29,7 +29,7 @@
     },
     "group/connect": {
         "orientation": "horizontal",
-        "modules": ["wireplumber", "network", "custom/wifi-name", "bluetooth", "tray"]
+        "modules": ["wireplumber", "network", "custom/wifi-name", "bluetooth", "custom/cast", "tray"]
     },
 
     // ---------------------------------------------------------------- left
@@ -38,17 +38,17 @@
         // 1-8 are persistent via Hyprland workspace rules (hypr/monitors.lua),
         // so each bar only shows the workspaces on its own screen
         // Solid logo-style glyphs: 1 desktop (Arch), 2 browser (Firefox logo),
-        // 3 Neovim, 4 YouTube, 5 games (ghost), 6 free (Pac-Man, chases
-        // the ghost), 7 chat (Discord), 8 notes (Obsidian). With an external
-        // main screen the laptop keeps two of its own: 9 (laptop) and 10
-        // (space invader, the third arcade icon)
+        // 3 Neovim, 4 YouTube, 5 games (ghost), 6 screen share (retro TV:
+        // Network Displays opens there, hypr/rules.lua), 7 chat (Discord),
+        // 8 notes (Obsidian). With an external main screen the laptop keeps
+        // two of its own: 9 (laptop) and 10 (space invader, arcade like the ghost)
         "format-icons": {
             "1": "\uf303",
             "2": "\uf269",
             "3": "\uf36f",
             "4": "\uf16a",
             "5": "\udb80\udea0",
-            "6": "\udb82\udfaf",
+            "6": "\udb81\udff4",
             "7": "\udb81\ude6f",
             "8": "\ue6bb",
             "9": "\udb80\udf22",
@@ -231,6 +231,14 @@
         "exec": "~/.local/bin/bar-flair wifi",
         "return-type": "json",
         "tooltip": false
+    },
+    // Screen share (Miracast to a TV): click opens Network Displays on
+    // workspace 6, where you pick the TV. Dim while it is closed, orange while
+    // a TV is attached (~/.local/bin/cast)
+    "custom/cast": {
+        "exec": "~/.local/bin/cast watch",
+        "return-type": "json",
+        "on-click": "~/.local/bin/cast open"
     },
     "tray": {
         "icon-size": 17,

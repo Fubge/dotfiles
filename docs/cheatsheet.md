@@ -46,8 +46,9 @@ asks before building. One stops starting after a system update? `aur-update --re
 
 ## Stream to a TV
 
-Miracast (Samsung "Screen Mirroring", most smart TVs): open **Network Displays**
-(`gnome-network-displays`), pick the TV, confirm on the TV. Picture and sound both
+Miracast (Samsung "Screen Mirroring", most smart TVs): click the cast icon in the
+bar (next to Bluetooth). **Network Displays** opens on its own workspace 6 (retro
+TV); pick the TV, confirm on the TV. The icon turns orange while streaming. Picture and sound both
 go to the TV, so they stay in sync. Hotel TVs often block it: take an HDMI cable.
 Keep watching with the lid closed: power popup -> "Keep running with lid closed"
 (screen goes dark; the Wi-Fi antennas sit in the lid, so leave it a crack open

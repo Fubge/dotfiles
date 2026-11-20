@@ -214,6 +214,15 @@ hl.window_rule({
     suppress_event = "maximize activate activatefocus",
 })
 
+-- Screen share (Miracast to a TV): Network Displays has its own workspace 6
+-- (retro TV in the bar) and you follow it there to pick the TV. Started from
+-- the cast button in the bar (~/.local/bin/cast) or the launcher.
+hl.window_rule({
+    name = "network-displays",
+    match = { class = "^org\\.gnome\\.NetworkDisplays$" },
+    workspace = "6",
+})
+
 -- Obsidian (notes, vault in ~/Nextcloud/Obsidian) has its own workspace 8,
 -- SUPER+O jumps there and starts it if needed (focus-or-run)
 hl.window_rule({

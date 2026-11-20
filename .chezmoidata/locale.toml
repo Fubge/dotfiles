@@ -343,6 +343,12 @@ volume     = { de = "Lautstärke", en = "Volume" }
 files      = { de = "Dateien", en = "Files" }
 shortcuts  = { de = "Tastenkürzel", en = "Shortcuts" }
 brightness = { de = "Helligkeit", en = "Brightness" }
+cast       = { de = "Fernseher", en = "TV" }
+
+[strings.cast]  # screen share button in the bar (~/.local/bin/cast)
+off  = { de = "Auf den Fernseher streamen\nKlick: Fernseher wählen", en = "Stream to a TV\nClick: pick the TV" }
+open = { de = "Network Displays ist offen\nKlick: hinspringen", en = "Network Displays is open\nClick: jump there" }
+live = { de = "Streamt auf den Fernseher\nKlick: Network Displays (beenden)", en = "Streaming to the TV\nClick: Network Displays (to stop)" }
 
 [strings.claude]
 off        = { de = "Claude läuft nicht", en = "Claude is not running" }

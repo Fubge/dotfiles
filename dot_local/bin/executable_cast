@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+# cast: the screen share (Miracast to a TV) button in the bar.
+#   cast watch   -> JSON lines for the waybar module: the cast icon, dimmed
+#                   while Network Displays is closed, white while it is open,
+#                   orange "connected" icon while a TV is attached
+#   cast open    -> jump to Network Displays (workspace 6, hypr/rules.lua),
+#                   start it first if needed; there you pick the TV
+# A stream runs over a Wi-Fi Direct group, which shows up as its own network
+# interface (p2p-wlan0-0); that is how "connected" is detected.
+set -uo pipefail
+app=gnome-network-displays
+class=org.gnome.NetworkDisplays
+# tooltips from the language file (.chezmoidata/locale.toml)
+# (line breaks stay escaped: the text goes into JSON as is)
+mapfile -t tips < <(jq -r '."cast.off", ."cast.open", ."cast.live" | gsub("\n"; "\\n")' \
+    ~/.config/popups/strings.json 2>/dev/null)
+((${#tips[@]} == 3)) || tips=("Stream to a TV" "Network Displays is open" "Streaming to the TV")
+icon_cast=$'\U000F0118'
+icon_live=$'\U000F0119'
+
+status() {
+    local live=(/sys/class/net/p2p-*)
+    if [[ -e ${live[0]} ]]; then
+        printf '{"text": "%s", "tooltip": "%s", "class": "live"}\n' "$icon_live" "${tips[2]}"
+    elif pgrep -f "(^|/)$app( |$)" >/dev/null; then
+        printf '{"text": "%s", "tooltip": "%s", "class": "open"}\n' "$icon_cast" "${tips[1]}"
+    else
+        printf '{"text": "%s", "tooltip": "%s", "class": "off"}\n' "$icon_cast" "${tips[0]}"
+    fi
+}
+
+case ${1-status} in
+status) status ;;
+watch)
+    last=""
+    while :; do   # cheap: one pgrep every 2 s, a line only on change
+        now=$(status)
+        [[ $now != "$last" ]] && { printf '%s\n' "$now"; last=$now; }
+        sleep 2
+    done
+    ;;
+open) exec ~/.local/bin/focus-or-run "$class" "$app" ;;
+*) echo "usage: cast [status|watch|open]" >&2; exit 2 ;;
+esac

@@ -32,6 +32,7 @@ NAMES = [
     (r"kitty|popup-term|dropdown_terminal", "Terminal"),
     (r"discord", "Discord"),
     (r"obsidian", "Obsidian"),
+    (r"org\.gnome\.NetworkDisplays", T("flair.cast")),
     (r"claude_pad", "Claude"),
     (r"[Ss]potify", "Spotify"),
     (r"popup\.keybinds", T("flair.shortcuts")),
