@@ -154,13 +154,29 @@ end
 
 -- Laptop panel off while an external screen is on (menu switch), back on as
 -- soon as it is alone. The lid does the same below.
+-- A closed lid counts too: without this a config reload (hyprctl reload,
+-- chezmoi apply) turned the panel back on behind the closed lid and the
+-- mouse could wander off onto it.
+local function lid_closed()
+    local f = io.open("/proc/acpi/button/lid/LID/state")
+    if not f then return false end
+    local state = f:read("a") or ""
+    f:close()
+    return state:find("closed") ~= nil
+end
+
 local function internal_needed()
     local d = s.get("displays").internal or {}
-    return not (d.off_with_external and #externals() > 0)
+    if #externals() == 0 then return true end
+    return not (d.off_with_external or lid_closed())
 end
 
 local function setup()
-    internal_on()
+    if internal_needed() then
+        internal_on()
+    else
+        hl.monitor({ output = internal, disabled = true })
+    end
     screen_rules()
 end
 setup()
