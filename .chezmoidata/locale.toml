@@ -312,8 +312,8 @@ resize            = { de = "Fenstergröße ändern", en = "Resize window" }
 minimize          = { de = "Fenster minimieren / zurückholen", en = "Minimize / restore window" }
 minimized         = { de = "Minimierte Fenster", en = "Minimized windows" }
 dropdown          = { de = "Dropdown-Terminal", en = "Dropdown terminal" }
-shot_area         = { de = "Bereich in die Zwischenablage", en = "Area to clipboard" }
-shot_screen       = { de = "Bildschirm als Datei", en = "Screen to file" }
+shot_area         = { de = "Bereich (Datei + Zwischenablage)", en = "Area (file + clipboard)" }
+shot_screen       = { de = "Ganzer Bildschirm (Datei + Zwischenablage)", en = "Whole screen (file + clipboard)" }
 ptt               = { de = "Discord Push-to-Talk (^ halten)", en = "Discord push-to-talk (hold ^)" }
 
 [strings.greet]

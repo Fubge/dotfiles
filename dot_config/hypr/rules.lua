@@ -386,3 +386,11 @@ hl.layer_rule({
     blur = true,
     ignore_alpha = 0.5,
 })
+
+-- Screenshot selection (slurp, ~/.local/bin/shot): no fade-in, the overlay is
+-- there at once and the drag works from the first frame
+hl.layer_rule({
+    name = "slurp",
+    match = { namespace = "^selection$" },
+    no_anim = true,
+})

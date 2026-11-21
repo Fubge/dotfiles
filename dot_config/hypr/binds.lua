@@ -163,13 +163,13 @@ bind(mod .. " + Tab", function()
 end, S.dropdown)
 
 group(S.group_screenshots)
--- Screenshots: Home = select area -> clipboard, SHIFT+Home = whole screen -> file
-bind("Home", hl.dsp.exec_cmd([[grim -g "$(slurp -d)" - | wl-copy]]), S.shot_area)
-bind(
-    "SHIFT + Home",
-    hl.dsp.exec_cmd("mkdir -p " .. v.screenshotDir .. " && grim " .. v.screenshotDir .. "/$(date +%F_%H-%M-%S).png"),
-    S.shot_screen
-)
+-- Screenshots through ~/.local/bin/shot (file + clipboard + notification):
+-- Print (the Keychron screenshot key) or Home = select an area,
+-- SHIFT = the whole screen under the mouse
+for _, key in ipairs({ "Print", "Home" }) do
+    bind(key, hl.dsp.exec_cmd("shot area"), S.shot_area)
+    bind("SHIFT + " .. key, hl.dsp.exec_cmd("shot screen"), S.shot_screen)
+end
 
 -- Discord push-to-talk on ^ (the key left of 1, by keycode so the layout does
 -- not matter). Discord registers the shortcut through the portal; Hyprland has
