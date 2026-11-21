@@ -271,5 +271,7 @@ hl.bind("switch:off:Lid Switch", function()
         lid_dark = false
         hl.dispatch(hl.dsp.exec_cmd("brightnessctl -r; brightnessctl -rd tpacpi::kbd_backlight"))
     end
-    if internal_needed() then internal_on() end
+    -- the screen rules again too: "left"/"right" are relative to the panel,
+    -- and while it was off Hyprland laid the others out without it
+    if internal_needed() then setup() end
 end, { locked = true })
