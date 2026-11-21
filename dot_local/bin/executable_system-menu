@@ -211,6 +211,14 @@ def derive_position(m, mons):
     return "below"
 
 
+def tile_pos(frame, tile):
+    """Where a tile sits in its Gtk.Fixed. (Gtk.Fixed.get_child_position
+    always reads 0, 0 through PyGObject: the tile jumped to the corner on
+    every drag.)"""
+    t = frame.get_child_transform(tile)
+    return tuple(t.to_translate()) if t else (0.0, 0.0)
+
+
 def geo(m):
     """x, y, width, height in layout (logical) pixels."""
     return m["x"], m["y"], m["width"] / m["scale"], m["height"] / m["scale"]
@@ -726,9 +734,10 @@ def build():
 
         def screens_preview(self, mons, main):
             """The screens to scale, as they stand. Click one to set it up,
-            drag an external one to where it stands on the desk: on release it
-            snaps to the nearest edge of another screen (top, middle or bottom
-            aligned when close) and is stored with exact coordinates."""
+            drag any one to where it stands on the desk: on release it snaps to
+            the nearest edge of another screen (top, middle or bottom aligned
+            when close) and is stored with exact coordinates. The laptop panel
+            always sits at 0x0, so dragging it moves the others instead."""
             W, H, PAD = WIDTH - 52, 132, 14
             frame = Gtk.Fixed(css_classes=["sys-screens"])
             frame.set_size_request(W, H)
@@ -770,17 +779,28 @@ def build():
                     f"{m['width']}×{m['height']} · {round(m['refreshRate'])} Hz" if h > 44 else "")
             tile.append(Gtk.Label(label=info, css_classes=["sys-screen-info"], ellipsize=3,
                                   vexpand=True, valign=Gtk.Align.START))
-            movable = (view is not None and m["name"] != INTERNAL and len(view["on"]) > 1)
+            movable = view is not None and len(view["on"]) > 1
             tile.set_cursor_from_name("grab" if movable else "pointer")
             drag = Gtk.GestureDrag()
             state = {}
 
             def begin(_g, _x, _y):
-                p = view["frame"].get_child_position(tile) if view else (0, 0)
+                p = tile_pos(view["frame"], tile) if view else (0, 0)
                 state.update(home=p, moved=False)
 
+            def offset(dx, dy):
+                # the gesture measures in the tile's own coordinates, and the
+                # tile moves with the pointer: without adding its own travel
+                # back, every step undid half of the last one (jitter)
+                hx, hy = state["home"]
+                cx, cy = tile_pos(view["frame"], tile)
+                return dx + cx - hx, dy + cy - hy
+
             def update(_g, dx, dy):
-                if not movable or (not state["moved"] and abs(dx) + abs(dy) < 5):
+                if not movable:
+                    return
+                dx, dy = offset(dx, dy)
+                if not state["moved"] and abs(dx) + abs(dy) < 5:
                     return
                 if not state["moved"]:
                     state["moved"] = True
@@ -794,6 +814,7 @@ def build():
                     self.mon_sel = m["description"]
                     self.render("displays")
                     return
+                dx, dy = offset(dx, dy)
                 k = view["k"]
                 hx, hy = state["home"]
                 # preview pixels -> layout coordinates (logical px)
@@ -804,7 +825,13 @@ def build():
                 if spot is None or spot == (m["x"], m["y"]):
                     self.render("displays")          # back to where it was
                     return
-                self.set_screen(m, view["mons"], position=f"{spot[0]}x{spot[1]}")
+                if m["name"] == INTERNAL:
+                    # the panel stays at 0x0: everything else moves the other way
+                    self.set_positions(view["mons"], {
+                        o["description"]: f"{o['x'] - spot[0]}x{o['y'] - spot[1]}"
+                        for o in view["on"] if o["name"] != INTERNAL})
+                else:
+                    self.set_screen(m, view["mons"], position=f"{spot[0]}x{spot[1]}")
                 self.render("displays")
             drag.connect("drag-begin", begin)
             drag.connect("drag-update", update)
@@ -829,6 +856,33 @@ def build():
                 self.set_internal(**change)
                 return
             screens = saved.get("screens", {})
+            screens[m["description"]] = self.screen_entry(screens, m, mons, change)
+            apply("displays", {"screens": screens})
+            self.after_display_change(old, risky=self.risky(change))
+
+        def set_positions(self, mons, spots):
+            """Move several external screens at once (the laptop was dragged)."""
+            old = settings.load()
+            screens = settings.get("displays").get("screens", {})
+            for m in mons:
+                if m["description"] in spots and m["name"] != INTERNAL:
+                    screens[m["description"]] = self.screen_entry(
+                        screens, m, mons, {"position": spots[m["description"]]})
+            apply("displays", {"screens": screens})
+            self.after_display_change(old, risky=False)
+
+        @staticmethod
+        def risky(change):
+            """Changes that can leave you without a usable picture ask to be
+            kept. Moving a screen cannot (it only shifts the layout), and a
+            countdown that reverts it after 15 s looked like the arrangement
+            forgetting itself."""
+            safe = change.get("position") not in (None, "off", "mirror")
+            return bool(set(change) - {"vrr", "position"}) or (
+                "position" in change and not safe)
+
+        @staticmethod
+        def screen_entry(screens, m, mons, change):
             cur = screens.get(m["description"]) or {}
             if not cur:
                 # store the whole current state, so it stays as it is now
@@ -838,9 +892,7 @@ def build():
             if change.get("position") not in (None, "off", "mirror") and "mode" not in cur:
                 cur.update(mode="preferred", scale="auto")
             cur.update(change)
-            screens[m["description"]] = cur
-            apply("displays", {"screens": screens})
-            self.after_display_change(old, risky=set(change) != {"vrr"})
+            return cur
 
         def set_internal(self, **change):
             old = settings.load()
