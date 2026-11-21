@@ -195,13 +195,35 @@ end
 
 -- The menu changed something: new rules apply at once. Workspaces only move
 -- when the main screen changed (otherwise every scale tweak would jump to 1).
+-- The pointer stays at the same layout coordinates when screens move, so
+-- dragging the Dell to the other side left it on the laptop (or wherever those
+-- coordinates now are). Remember where on which screen it was, put it back.
+local function cursor_spot()
+    local p, m = hl.get_cursor_pos(), hl.get_monitor_at_cursor()
+    if not (p and m) then return nil end
+    return { name = m.name, dx = p.x - m.x, dy = p.y - m.y }
+end
+
+local function cursor_back(spot)
+    local m = spot and hl.get_monitor(spot.name)
+    if not m or m.disabled then return end
+    local w, h = m.width / m.scale, m.height / m.scale
+    if m.transform % 2 == 1 then w, h = h, w end
+    local x = m.x + math.max(0, math.min(spot.dx, w - 1))
+    local y = m.y + math.max(0, math.min(spot.dy, h - 1))
+    hl.dispatch(hl.dsp.cursor.move({ x = math.floor(x), y = math.floor(y) }))
+end
+
 s.on_apply("displays", function()
+    local spot = cursor_spot()
     setup()
+    cursor_back(spot)
     hl.timer(function()
         if not internal_needed() then
             hl.monitor({ output = internal, disabled = true })
         end
         if main_monitor() ~= current_main then arrange() end
+        cursor_back(spot)
     end, { timeout = 400, type = "oneshot" })
 end)
 
