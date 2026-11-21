@@ -24,6 +24,17 @@ local function bind(keys, action, desc, opts)
 end
 
 group(S.group_apps)
+-- Jump to an app window wherever it is (the user may have moved it to another
+-- workspace or monitor). no_warps keeps the pointer put (input.lua), so when the
+-- window sits on another monitor the pointer follows it to its middle: clicks
+-- and scrolling then land there too, not on the screen left behind
+local function jump(w)
+    hl.dispatch(hl.dsp.focus({ window = w }))
+    local here = hl.get_monitor_at_cursor()
+    if w.monitor and here and w.monitor.name ~= here.name and w.at and w.size then
+        hl.dispatch(hl.dsp.cursor.move({ x = w.at.x + w.size.x // 2, y = w.at.y + w.size.y // 2 }))
+    end
+end
 -- the terminal only asks the running kitty server for a window (vars.lua):
 -- nothing to put into a scope, so it starts directly like the menus
 bind(mod .. " + Q", menu(v.terminal), S.terminal)
@@ -34,7 +45,7 @@ bind(mod .. " + E", run(v.fileManager), S.files)
 bind(mod .. " + D", function()
     for _, w in ipairs(hl.get_windows()) do
         if w.class == "discord" and not w.workspace.special then
-            hl.dispatch(hl.dsp.focus({ window = w }))
+            jump(w)
             return
         end
     end
@@ -49,20 +60,22 @@ local obsidianVault = "obsidian://open?vault=Obsidian"
 bind(mod .. " + O", function()
     for _, w in ipairs(hl.get_windows()) do
         if w.class == "md.obsidian.Obsidian" and not w.workspace.special then
-            hl.dispatch(hl.dsp.focus({ window = w }))
+            jump(w)
             return
         end
     end
     hl.dispatch(run(v.bin .. "focus-or-run md.obsidian.Obsidian obsidian '" .. obsidianVault .. "'"))
 end, S.obsidian)
--- YouTube: workspace 4; reopens the Vivaldi app window if it was closed
--- (rules.lua puts it on workspace 4, so switching there right away is enough)
+-- YouTube: jump to its Vivaldi app window, wherever it was moved (it starts on
+-- workspace 4, rules.lua); if it was closed, reopen it and switch to workspace 4
 bind(mod .. " + Y", function()
-    local open = false
     for _, w in ipairs(hl.get_windows()) do
-        if w.class and w.class:find("^vivaldi%-www%.youtube%.com__") then open = true end
+        if w.class and w.class:find("^vivaldi%-www%.youtube%.com__") and not w.workspace.special then
+            jump(w)
+            return
+        end
     end
-    if not open then hl.dispatch(run(v.browser .. " --app=https://www.youtube.com")) end
+    hl.dispatch(run(v.browser .. " --app=https://www.youtube.com"))
     hl.dispatch(hl.dsp.focus({ workspace = "4" }))
 end, S.youtube)
 bind(mod .. " + space", menu(v.menu), S.launcher)
