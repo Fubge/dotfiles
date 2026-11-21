@@ -211,6 +211,30 @@ def derive_position(m, mons):
     return "below"
 
 
+def refit_position(entry, m, mons):
+    """A new mode or scale changes a screen's logical size. Exact coordinates
+    were set for the old size: keep the edge that touches the laptop flush and
+    the alignment along it, so the screens neither overlap nor drift apart."""
+    try:
+        x, y = (int(v) for v in str(entry.get("position", "")).split("x"))
+        w, h = (int(v) for v in str(entry["mode"]).split("@")[0].split("x"))
+        scale = float(entry["scale"])
+    except (KeyError, ValueError):
+        return                       # named spot, "preferred" or "auto": Hyprland places it
+    side = derive_position(m, mons)
+    ow, oh = m["width"] / m["scale"], m["height"] / m["scale"]
+    nw, nh = w / scale, h / scale
+    if side in ("left", "right"):
+        if side == "left":
+            x += ow - nw
+        y += (oh - nh) / 2
+    elif side in ("above", "below"):
+        if side == "above":
+            y += oh - nh
+        x += (ow - nw) / 2
+    entry["position"] = f"{round(x)}x{round(y)}"
+
+
 def tile_pos(frame, tile):
     """Where a tile sits in its Gtk.Fixed. (Gtk.Fixed.get_child_position
     always reads 0, 0 through PyGObject: the tile jumped to the corner on
@@ -891,7 +915,10 @@ def build():
                     cur.update(mode=current_mode(m), scale=m["scale"])
             if change.get("position") not in (None, "off", "mirror") and "mode" not in cur:
                 cur.update(mode="preferred", scale="auto")
+            moved = ({"mode", "scale"} & set(change)) and "position" not in change
             cur.update(change)
+            if moved:
+                refit_position(cur, m, mons)
             return cur
 
         def set_internal(self, **change):
