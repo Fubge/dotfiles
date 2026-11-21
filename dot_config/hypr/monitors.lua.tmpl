@@ -57,6 +57,9 @@ local function internal_on()
         position = "0x0",
         scale = d.scale or {{ if eq .machine.monitor_scale "auto" }}"auto"{{ else }}{{ .machine.monitor_scale }}{{ end }},
         vrr = d.vrr or 0,
+        -- explicit: a rule without it keeps an earlier "disabled = true"
+        -- (lid closed, menu switch) and the panel stays dark
+        disabled = false,
     })
 end
 
