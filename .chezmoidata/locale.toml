@@ -528,8 +528,8 @@ vrr          = "Adaptive Sync"
 vrr_sub      = { de = "gegen Ruckeln, wenn Spiele schwanken", en = "against stutter when games fluctuate" }
 battery_60     = { de = "Auf Akku nur 60 Hz", en = "Only 60 Hz on battery" }
 battery_60_sub = { de = "spart Strom; aus = immer die gewählte Rate, flüssiger", en = "saves power; off = always the chosen rate, smoother" }
-lid_off      = { de = "Aus, solange ein Bildschirm dran ist", en = "Off while a display is plugged in" }
-lid_off_sub  = { de = "Zuklappen macht das sowieso", en = "Closing the lid does that anyway" }
+lid_off      = { de = "Nur externen Bildschirm nutzen", en = "Use external display only" }
+lid_off_sub  = { de = "Laptop-Bildschirm aus, solange einer angesteckt ist. Zugeklappt ist er sowieso aus.", en = "Laptop screen off while one is plugged in. With the lid closed it is off anyway." }
 disabled_note = { de = "Ausgeschaltet. Wähle oben, wo er stehen soll, dann geht er wieder an.", en = "Switched off. Pick where it should sit above, and it comes back on." }
 confirm      = { de = "Alles gut so? Sonst geht's in {n} s zurück", en = "All good? Otherwise it goes back in {n} s" }
 mouse_card   = { de = "Maus", en = "Mouse" }
