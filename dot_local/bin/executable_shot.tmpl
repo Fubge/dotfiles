@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # shot: screenshots, from the control center (~/.local/bin/control-center)
-#   shot area     drag a rectangle
+#   shot area     drag a rectangle (on a frozen picture of the screen)
 #   shot window   click a window (all windows on the visible workspaces)
 #   shot screen   the screen under the mouse
 #   shot pick     color picker: the hex value goes to the clipboard (hyprpicker)
@@ -23,13 +23,35 @@ windows() {   # "x,y wxh" of every window on a workspace that is shown right now
              | "\(.at[0]),\(.at[1]) \(.size[0])x\(.size[1])"'
 }
 
-shoot() {   # grim arguments -> file + clipboard + notification
+newfile() {
     mkdir -p "$dir"
-    local file
-    file="$dir/$(date +%F_%H-%M-%S).png"
-    grim "$@" "$file" || exit 1
-    wl-copy --type image/png < "$file"
-    notify-send -h boolean:transient:true -a "${t[0]}" -i "$file" "${t[0]}" "${t[1]}"
+    echo "$dir/$(date +%F_%H-%M-%S).png"
+}
+
+done_with() {   # file -> clipboard + notification
+    wl-copy --type image/png < "$1"
+    notify-send -h boolean:transient:true -a "${t[0]}" -i "$1" "${t[0]}" "${t[1]}"
+}
+
+# Area and window shots freeze the screen first: the whole layout is taken
+# before slurp opens, then the choice is cut out of that picture. Popups close
+# as soon as slurp takes the click, so shooting afterwards would miss them.
+# grim renders the layout at the highest scale; logical -> pixel coordinates.
+frozen() {   # slurp arguments -> file
+    local snap geo scale ox oy x y w h file
+    snap=$(mktemp --suffix=.png) || exit 1
+    trap 'rm -f "$snap"' EXIT
+    read -r scale ox oy < <(hyprctl monitors -j |
+        jq -r '"\(map(.scale) | max) \(map(.x) | min) \(map(.y) | min)"')
+    grim -s "$scale" "$snap" || exit 1
+    geo=$(pick_area "$@") || exit 0
+    read -r x y w h < <(tr ',x' '  ' <<<"$geo")
+    file=$(newfile)
+    magick "$snap" -crop "$(awk -v s="$scale" -v x="$x" -v y="$y" -v w="$w" -v h="$h" \
+        -v ox="$ox" -v oy="$oy" 'BEGIN {
+            printf "%dx%d+%d+%d", w*s+0.5, h*s+0.5, (x-ox)*s+0.5, (y-oy)*s+0.5 }')" \
+        +repage "$file" || exit 1
+    done_with "$file"
 }
 
 # slurp: dark veil instead of the default white one, accent border.
@@ -42,9 +64,11 @@ pick_area() {
 }
 
 case ${1-} in
-area)   geo=$(pick_area -d) || exit 0; shoot -g "$geo" ;;
-window) geo=$(windows | pick_area -r) || exit 0; shoot -g "$geo" ;;
-screen) shoot -o "$(hyprctl monitors -j | jq -r '.[] | select(.focused) | .name')" ;;
+area)   frozen -d ;;
+window) windows | frozen -r ;;
+screen) file=$(newfile)
+        grim -o "$(hyprctl monitors -j | jq -r '.[] | select(.focused) | .name')" "$file" || exit 1
+        done_with "$file" ;;
 pick)
     command -v hyprpicker >/dev/null || { notify-send -a "${t[0]}" "${t[3]}"; exit 1; }
     color=$(hyprpicker -f hex) || exit 0
