@@ -4,8 +4,9 @@
 #   shot window   click a window (all windows on the visible workspaces)
 #   shot screen   the screen under the mouse
 #   shot pick     color picker: the hex value goes to the clipboard (hyprpicker)
-# A screenshot lands in ~/Pictures/Screenshots AND in the clipboard; a
-# notification shows it. Escape while choosing cancels quietly.
+# A screenshot lands in ~/Pictures/Screenshots AND in the clipboard; a short
+# notification shows it, transient: it does not pile up in the notification
+# center (the file is in the folder anyway). Escape while choosing cancels quietly.
 set -uo pipefail
 dir="$HOME/Pictures/Screenshots"
 # texts from the language file (.chezmoidata/locale.toml)
@@ -28,7 +29,7 @@ shoot() {   # grim arguments -> file + clipboard + notification
     file="$dir/$(date +%F_%H-%M-%S).png"
     grim "$@" "$file" || exit 1
     wl-copy --type image/png < "$file"
-    notify-send -a "${t[0]}" -i "$file" "${t[0]}" "${t[1]}"
+    notify-send -h boolean:transient:true -a "${t[0]}" -i "$file" "${t[0]}" "${t[1]}"
 }
 
 # slurp: dark veil instead of the default white one, accent border.
@@ -49,7 +50,7 @@ pick)
     color=$(hyprpicker -f hex) || exit 0
     [[ -n $color ]] || exit 0
     wl-copy "$color"
-    notify-send -a "${t[2]}" "${t[2]}" "$color"
+    notify-send -h boolean:transient:true -a "${t[2]}" "${t[2]}" "$color"
     ;;
 *) echo "usage: shot area|window|screen|pick" >&2; exit 2 ;;
 esac
